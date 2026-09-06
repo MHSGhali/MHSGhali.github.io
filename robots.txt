@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://markgerges.github.io/sitemap.xml

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="A four-bar linkage">
+  <!-- A four-bar crank-rocker: two grounded pivots, a crank, a coupler and a
+       rocker. currentColor is not available to a favicon, so the amber is
+       stated outright; it reads on both light and dark tab strips. -->
+  <g fill="none" stroke="#e0a03c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 24 L11 11 L24 15 L26 24"/>
+  </g>
+  <g fill="#e0a03c">
+    <circle cx="11" cy="11" r="2.6"/>
+    <circle cx="24" cy="15" r="2.6"/>
+  </g>
+  <g fill="#9a958d">
+    <path d="M6 24 l-3.4 5 h6.8 z"/>
+    <path d="M26 24 l-3.4 5 h6.8 z"/>
+  </g>
+</svg>
