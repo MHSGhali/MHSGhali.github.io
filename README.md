@@ -1,4 +1,4 @@
-# markgerges.github.io
+# mhsghali.github.io
 
 My personal site. Plain static files — no framework, no bundler, no build step
 beyond one Python script that stamps the shared nav and footer into each page.
