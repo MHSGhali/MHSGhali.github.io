@@ -1,11 +1,11 @@
 /* Page controller for the linkage tool: wires the toolbar, the status line,
    the 3D view, the Blender export and the share link to the editor. */
 
-import { createEditor } from "./editor.js?v=554aaff8";
-import { createView3D } from "./view3d.js?v=554aaff8";
-import { PRESETS, buildPreset } from "./presets.js?v=554aaff8";
-import { exportBlenderScript } from "./blender.js?v=554aaff8";
-import { encode, decode } from "./serialize.js?v=554aaff8";
+import { createEditor } from "./editor.js?v=0bbdca31";
+import { createView3D } from "./view3d.js?v=0bbdca31";
+import { PRESETS, buildPreset } from "./presets.js?v=0bbdca31";
+import { exportBlenderScript } from "./blender.js?v=0bbdca31";
+import { encode, decode } from "./serialize.js?v=0bbdca31";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -167,10 +167,10 @@ function palette() {
   const cs = getComputedStyle(document.documentElement);
   const get = (n, f) => cs.getPropertyValue(n).trim() || f;
   return {
-    accent: get("--accent", "#e0a03c"),
-    line: get("--surface-line", "#2b2e33"),
-    text: get("--text", "#e4e2de"),
-    dim: get("--text-dim", "#9a958d"),
+    accent: get("--accent", "#ffffff"),
+    line: get("--surface-line", "#2c2c2c"),
+    text: get("--text", "#e9e9e9"),
+    dim: get("--text-dim", "#a1a1a1"),
   };
 }
 

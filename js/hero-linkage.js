@@ -8,9 +8,9 @@
    It stops when it isn't being looked at: under prefers-reduced-motion, when
    the tab is hidden, and when the canvas is scrolled out of view. */
 
-import * as M from "./linkage/mechanism.js?v=554aaff8";
-import * as S from "./linkage/solver.js?v=554aaff8";
-import * as v from "./linkage/vec2.js?v=554aaff8";
+import * as M from "./linkage/mechanism.js?v=0bbdca31";
+import * as S from "./linkage/solver.js?v=0bbdca31";
+import * as v from "./linkage/vec2.js?v=0bbdca31";
 
 const canvas = document.querySelector("[data-hero-linkage]");
 if (canvas) start(canvas);
@@ -68,11 +68,12 @@ function start(canvas) {
   function readPalette() {
     const cs = getComputedStyle(document.documentElement);
     return {
-      accent: cs.getPropertyValue("--accent").trim() || "#e0a03c",
-      line: cs.getPropertyValue("--surface-line").trim() || "#2b2e33",
-      text: cs.getPropertyValue("--text").trim() || "#e4e2de",
-      faint: cs.getPropertyValue("--text-faint").trim() || "#6b675f",
-      elev: cs.getPropertyValue("--bg-elev").trim() || "#191b1f",
+      accent: cs.getPropertyValue("--accent").trim() || "#ffffff",
+      line: cs.getPropertyValue("--surface-line").trim() || "#2c2c2c",
+      text: cs.getPropertyValue("--text").trim() || "#e9e9e9",
+      dim: cs.getPropertyValue("--text-dim").trim() || "#a1a1a1",
+      faint: cs.getPropertyValue("--text-faint").trim() || "#858585",
+      elev: cs.getPropertyValue("--bg-elev").trim() || "#141414",
     };
   }
   window.addEventListener("themechange", () => { palette = readPalette(); draw(); });
@@ -158,7 +159,9 @@ function start(canvas) {
     ctx.lineCap = "round";
     for (const l of m.links) {
       if (!l.alive) continue;
-      ctx.strokeStyle = l.isDriven ? palette.accent : palette.text;
+      /* Monochrome: the driven link is separated from the rest by value,
+         since there is no hue left to separate them with. */
+      ctx.strokeStyle = l.isDriven ? palette.accent : palette.dim;
       ctx.lineWidth = l.isDriven ? 3 : 2.5;
       for (let i = 0; i < l.connectorIds.length; i++) {
         for (let j = i + 1; j < l.connectorIds.length; j++) {

@@ -6,9 +6,9 @@
    with a mouse, a trackpad, or a finger, and every keyboard shortcut from the
    desktop app is also a toolbar button because a phone has no keyboard. */
 
-import * as M from "./mechanism.js?v=554aaff8";
-import * as S from "./solver.js?v=554aaff8";
-import * as v from "./vec2.js?v=554aaff8";
+import * as M from "./mechanism.js?v=0bbdca31";
+import * as S from "./solver.js?v=0bbdca31";
+import * as v from "./vec2.js?v=0bbdca31";
 
 const CONNECTOR_HIT_RADIUS = 12;   /* screen px */
 const LINK_EDGE_HIT_DIST = 7;
@@ -53,13 +53,13 @@ export function createEditor(canvas, { onChange } = {}) {
     const cs = getComputedStyle(document.documentElement);
     const get = (n, f) => cs.getPropertyValue(n).trim() || f;
     return {
-      accent: get("--accent", "#e0a03c"),
-      line: get("--surface-line", "#2b2e33"),
-      text: get("--text", "#e4e2de"),
-      dim: get("--text-dim", "#9a958d"),
-      faint: get("--text-faint", "#6b675f"),
-      elev: get("--bg-elev", "#191b1f"),
-      bg: get("--bg", "#101114"),
+      accent: get("--accent", "#ffffff"),
+      line: get("--surface-line", "#2c2c2c"),
+      text: get("--text", "#e9e9e9"),
+      dim: get("--text-dim", "#a1a1a1"),
+      faint: get("--text-faint", "#858585"),
+      elev: get("--bg-elev", "#141414"),
+      bg: get("--bg", "#0a0a0a"),
     };
   }
 
@@ -580,7 +580,9 @@ export function createEditor(canvas, { onChange } = {}) {
     ctx.lineCap = "round";
     for (const l of mechanism.links) {
       if (!l.alive) continue;
-      ctx.strokeStyle = l.selected ? palette.accent : l.isDriven ? palette.accent : palette.text;
+      /* Monochrome: selected and driven links take the top of the value
+         scale; everything else sits a step below so they stand out. */
+      ctx.strokeStyle = l.selected || l.isDriven ? palette.accent : palette.dim;
       ctx.lineWidth = l.selected ? 4 : l.isDriven ? 3.5 : 2.5;
       /* A variable-length link is drawn dashed: it is the one kind of link
          whose length you cannot trust by looking at it. */

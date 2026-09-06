@@ -1,19 +1,25 @@
 /* ============================================================
    Mark Gerges - design system
-   Dark-first, machined: brass on steel. Light mode via [data-theme].
+   Monochrome, dark-first. Light mode via [data-theme].
+
+   There is no hue anywhere, so --accent is not a colour but a POSITION: the
+   far end of the value scale, white on black and black on white. It marks
+   whatever should carry the most emphasis -- a driven motor link, a traced
+   path, the primary button, a focused control. Everything else is placed
+   between --text and --surface-line by value alone.
    ============================================================ */
 
 :root {
-  --bg:            #101114;
-  --bg-elev:       #191b1f;
-  --bg-elev-2:     #212429;
-  --surface-line:  #2b2e33;
-  --text:          #e4e2de;
-  --text-dim:      #9a958d;
-  --text-faint:    #6b675f;
-  --accent:        #e0a03c;
-  --accent-soft:   rgba(224, 160, 60, 0.10);
-  --ring:          rgba(224, 160, 60, 0.5);
+  --bg:            #0a0a0a;
+  --bg-elev:       #141414;
+  --bg-elev-2:     #1c1c1c;
+  --surface-line:  #2c2c2c;
+  --text:          #e9e9e9;
+  --text-dim:      #a1a1a1;
+  --text-faint:    #858585;
+  --accent:        #ffffff;
+  --accent-soft:   rgba(255, 255, 255, 0.08);
+  --ring:          rgba(255, 255, 255, 0.55);
   --shadow:        0 1px 2px rgba(0,0,0,.6), 0 12px 30px -14px rgba(0,0,0,.85);
   --sheen-opacity: 1;
 
@@ -26,18 +32,18 @@
 }
 
 :root[data-theme="light"] {
-  --bg:            #faf9f6;
+  --bg:            #fbfbfb;
   --bg-elev:       #ffffff;
-  --bg-elev-2:     #f1efe9;
-  --surface-line:  #e3dfd6;
-  --text:          #17150f;
-  --text-dim:      #56514a;
-  --text-faint:    #8a847a;
-  --accent:        #9c6a12;
-  --accent-soft:   rgba(156, 106, 18, 0.08);
-  --ring:          rgba(156, 106, 18, 0.45);
-  --shadow:        0 1px 2px rgba(23,21,15,.05), 0 10px 26px -14px rgba(23,21,15,.2);
-  --sheen-opacity: 0.5;
+  --bg-elev-2:     #f2f2f2;
+  --surface-line:  #e2e2e2;
+  --text:          #131313;
+  --text-dim:      #555555;
+  --text-faint:    #6e6e6e;
+  --accent:        #000000;
+  --accent-soft:   rgba(0, 0, 0, 0.06);
+  --ring:          rgba(0, 0, 0, 0.5);
+  --shadow:        0 1px 2px rgba(0,0,0,.05), 0 10px 26px -14px rgba(0,0,0,.22);
+  --sheen-opacity: 0.6;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -68,18 +74,18 @@ body {
   opacity: var(--sheen-opacity);
   transition: opacity .5s ease;
   background:
-    radial-gradient(1200px 600px at 78% -8%, rgba(224,160,60,.07), transparent 70%),
-    radial-gradient(900px 500px at 8% 104%, rgba(140,160,190,.05), transparent 72%),
+    radial-gradient(1200px 600px at 78% -8%, rgba(255,255,255,.05), transparent 70%),
+    radial-gradient(900px 500px at 8% 104%, rgba(255,255,255,.03), transparent 72%),
     repeating-linear-gradient(102deg,
       rgba(255,255,255,.012) 0px, rgba(255,255,255,.012) 1px,
       transparent 1px, transparent 3px);
 }
 :root[data-theme="light"] .sheen {
   background:
-    radial-gradient(1200px 600px at 78% -8%, rgba(156,106,18,.06), transparent 70%),
-    radial-gradient(900px 500px at 8% 104%, rgba(90,110,140,.05), transparent 72%),
+    radial-gradient(1200px 600px at 78% -8%, rgba(0,0,0,.035), transparent 70%),
+    radial-gradient(900px 500px at 8% 104%, rgba(0,0,0,.022), transparent 72%),
     repeating-linear-gradient(102deg,
-      rgba(23,21,15,.014) 0px, rgba(23,21,15,.014) 1px,
+      rgba(0,0,0,.014) 0px, rgba(0,0,0,.014) 1px,
       transparent 1px, transparent 3px);
 }
 
@@ -97,6 +103,7 @@ h3 { font-size: 1.12rem; }
 p  { margin: 0 0 1.05em; color: var(--text-dim); }
 a  { color: var(--accent); text-decoration: none; text-underline-offset: 3px; }
 a:hover { text-decoration: underline; }
+p a, li a, dd a { text-decoration: underline; text-decoration-thickness: 1px; }
 strong { color: var(--text); font-weight: 600; }
 ::selection { background: var(--accent); color: var(--bg); }
 
@@ -105,7 +112,7 @@ strong { color: var(--text); font-weight: 600; }
   font-size: .705rem;
   letter-spacing: .19em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--text-dim);
   margin: 0 0 14px;
   display: flex; align-items: center; gap: 11px;
 }
@@ -180,7 +187,7 @@ strong { color: var(--text); font-weight: 600; }
 }
 .btn:hover:not(:disabled) { text-decoration: none; transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow); }
 .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #17150f; font-weight: 600; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.08); border-color: var(--accent); }
 .btn svg { width: 15px; height: 15px; flex: none; }
 
@@ -188,9 +195,10 @@ strong { color: var(--text); font-weight: 600; }
 .hero { padding-block: 92px 76px; position: relative; }
 .hero-grid { display: grid; grid-template-columns: 1fr 440px; gap: 40px; align-items: center; }
 /* Smaller than the global h1: the hero shares its row with the canvas, so the
-   headline has about half the page to wrap in. */
+   headline has about half the page to wrap in. The two halves are separated by
+   value rather than hue -- the second line sits at the top of the scale. */
 .hero h1 { margin-bottom: 18px; font-weight: 800; letter-spacing: -.042em; line-height: 1.02;
-  font-size: clamp(2.1rem, 4.9vw, 3.7rem); }
+  font-size: clamp(2.1rem, 4.9vw, 3.7rem); color: var(--text-dim); }
 .hero h1 .grad { color: var(--accent); }
 .hero-role { font-size: 1.05rem; color: var(--text); font-weight: 500; margin-bottom: 14px; }
 .hero-role .sep { color: var(--text-faint); margin: 0 8px; }

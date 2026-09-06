@@ -55,7 +55,7 @@ export async function createView3D(container, getMechanism) {
   /* Rebuilt to suit the mechanism in frame(): a fixed-size grid either swamps a
      small linkage or is swamped by a large one. */
   let grid = null;
-  let gridColor = 0x2b2e33;
+  let gridColor = 0x2c2c2c;
   function buildGrid(span) {
     if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); }
     /* A round pitch near a tenth of the span, so the squares read as a scale. */
@@ -107,7 +107,7 @@ export async function createView3D(container, getMechanism) {
   scene.add(group);
 
   function setTheme(palette) {
-    materials.rod.color.set(palette.text);
+    materials.rod.color.set(palette.dim);
     materials.driven.color.set(palette.accent);
     materials.joint.color.set(palette.dim);
     materials.anchor.color.set(palette.accent);
