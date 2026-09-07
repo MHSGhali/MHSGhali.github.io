@@ -18,7 +18,8 @@
 const THREE_URL = "three";
 const CONTROLS_URL = "three/addons/controls/OrbitControls.js";
 
-import { createViewControl } from "../viewcontrol.js?v=3c8f0a84";
+import { bounds as mechanismBounds, liveSliders } from "./mechanism.js?v=19c91c08";
+import { createViewControl } from "../viewcontrol.js?v=19c91c08";
 
 export async function createView3D(container, getMechanism) {
   let THREE, OrbitControls;
@@ -54,24 +55,6 @@ export async function createView3D(container, getMechanism) {
   scene.add(fill);
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 
-  /* Rebuilt to suit the mechanism in frame(): a fixed-size grid either swamps a
-     small linkage or is swamped by a large one. */
-  let grid = null;
-  let gridColor = 0x2c2c2c;
-  function buildGrid(span) {
-    if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); }
-    /* A round pitch near a tenth of the span, so the squares read as a scale. */
-    const rough = Math.max(span, 100) / 10;
-    const pitch = Math.pow(10, Math.floor(Math.log10(rough))) *
-                  [1, 2, 5, 10].find((k) => k * Math.pow(10, Math.floor(Math.log10(rough))) >= rough);
-    const divisions = 24;
-    grid = new THREE.GridHelper(pitch * divisions, divisions, gridColor, gridColor);
-    grid.rotation.x = Math.PI / 2; /* the mechanism lies in the XY plane */
-    grid.material.transparent = true;
-    grid.material.opacity = 0.45;
-    scene.add(grid);
-  }
-
   /* Shared geometry: one unit cylinder along Z, scaled per rod per frame, and
      one unit sphere. Allocating per rod per frame would churn the GPU for no
      reason -- the topology only changes when the mechanism does. */
@@ -84,6 +67,7 @@ export async function createView3D(container, getMechanism) {
     driven: new THREE.MeshStandardMaterial({ metalness: 0.7, roughness: 0.25 }),
     joint: new THREE.MeshStandardMaterial({ metalness: 0.3, roughness: 0.55 }),
     anchor: new THREE.MeshStandardMaterial({ metalness: 0.4, roughness: 0.4 }),
+    rail: new THREE.MeshStandardMaterial({ metalness: 0.5, roughness: 0.6 }),
   };
 
   const traceMaterial = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.8 });
@@ -98,8 +82,16 @@ export async function createView3D(container, getMechanism) {
   let rods = [];
   let joints = [];
   let traceLines = [];
+  let rails = [];
   let topologyKey = "";
   let framed = false;
+  /* The camera distance the current framing was computed for, so keepInView()
+     can tell a grown trace from an orbit or a zoom. */
+  let framedDistance = 0;
+  /* True while the camera distance is still the one Fit chose. Orbiting keeps
+     it -- rotation does not change what fits -- but any dolly or wheel zoom
+     hands the framing to the visitor and keepInView() then leaves it alone. */
+  let autoFramed = true;
 
   const group = new THREE.Group();
   /* The engine's y axis points down (screen convention); flipping it here
@@ -113,9 +105,8 @@ export async function createView3D(container, getMechanism) {
     materials.driven.color.set(palette.accent);
     materials.joint.color.set(palette.dim);
     materials.anchor.color.set(palette.accent);
+    materials.rail.color.set(palette.dim);
     traceMaterial.color.set(palette.accent);
-    gridColor = new THREE.Color(palette.line).getHex();
-    if (grid) grid.material.color.setHex(gridColor);
     dirty = true;
   }
 
@@ -130,14 +121,28 @@ export async function createView3D(container, getMechanism) {
       const l = m.links[li];
       if (l.alive) parts.push(`l${li}:${l.connectorIds.join(",")}${l.isDriven ? "d" : ""}`);
     }
+    for (const sl of liveSliders(m)) {
+      parts.push(`s${sl.pinConnectorId}:${sl.railAId},${sl.railBId}`);
+    }
     return parts.join("|");
   }
 
   function rebuild(m) {
     for (const r of rods) group.remove(r.mesh);
     for (const j of joints) group.remove(j.mesh);
+    for (const r of rails) group.remove(r.mesh);
     rods = [];
     joints = [];
+    rails = [];
+
+    /* A rail is guideway, not structure: drawn as a thin bar in the dim
+       material so it reads as something the mechanism slides ON rather than
+       another link it is built from. */
+    for (const sl of liveSliders(m)) {
+      const mesh = new THREE.Mesh(rodGeom, materials.rail);
+      group.add(mesh);
+      rails.push({ a: sl.railAId, b: sl.railBId, mesh });
+    }
 
     for (let i = 0; i < m.connectors.length; i++) {
       const c = m.connectors[i];
@@ -201,8 +206,25 @@ export async function createView3D(container, getMechanism) {
       r.mesh.scale.set(rodRadius, rodRadius, Math.max(len, 1e-6));
     }
 
+    /* Rails are posed like rods but thinner, and run a little past their two
+       joints because the constraint is on the whole line, not the segment. */
+    for (const r of rails) {
+      const a = m.connectors[r.a].pos, b = m.connectors[r.b].pos;
+      vA.set(a.x, a.y, 0);
+      vB.set(b.x, b.y, 0);
+      dir.subVectors(vB, vA);
+      const len = dir.length();
+      r.mesh.position.copy(vA).add(vB).multiplyScalar(0.5);
+      if (len > 1e-9) {
+        quat.setFromUnitVectors(up, dir.divideScalar(len));
+        r.mesh.quaternion.copy(quat);
+      }
+      r.mesh.scale.set(rodRadius * 0.45, rodRadius * 0.45, Math.max(len * 1.16, 1e-6));
+    }
+
     syncTraces(m);
     if (!framed) frame(m);
+    else keepInView(m);
     dirty = true;
   }
 
@@ -227,44 +249,77 @@ export async function createView3D(container, getMechanism) {
       group.add(line);
     }
   }
-  /* Put the camera where the whole mechanism is visible, once per topology
-     change rather than every frame -- otherwise the view would lurch about as
-     the mechanism moves. */
-  function frame(m) {
-    const live = m.connectors.filter((c) => c.alive);
-    if (!live.length) return;
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (const c of live) {
-      x0 = Math.min(x0, c.pos.x); x1 = Math.max(x1, c.pos.x);
-      y0 = Math.min(y0, c.pos.y); y1 = Math.max(y1, c.pos.y);
-    }
-    const cx = (x0 + x1) / 2, cy = -(y0 + y1) / 2;
-    const span = Math.max(x1 - x0, y1 - y0, 50);
+  /* The camera distance that fits `b`, and the point it should look at. The
+     mechanism is drawn with y negated (see group.scale.y), so the target's y
+     is negated to match. */
+  const FIT_SLACK = 1.2;  /* extra room a widening refit leaves for more trace */
 
-    rodRadius = span / 90;
-    jointRadius = span / 60;
-    buildGrid(span);
-    grid.position.set(cx, cy, 0);
-
+  function fitFor(b) {
     /* Half the extent the camera must cover, allowing for the viewport being
        wider than it is tall (the vertical field of view is the binding one). */
     const half = Math.max(
-      (x1 - x0) / 2 / Math.max(camera.aspect, 0.2),
-      (y1 - y0) / 2,
+      (b.x1 - b.x0) / 2 / Math.max(camera.aspect, 0.2),
+      (b.y1 - b.y0) / 2,
       25
     ) * 1.25;
-    const d = half / Math.tan((camera.fov * Math.PI) / 360);
+    return {
+      cx: (b.x0 + b.x1) / 2,
+      cy: -(b.y0 + b.y1) / 2,
+      d: half / Math.tan((camera.fov * Math.PI) / 360),
+    };
+  }
+
+  /* Put the camera where the whole mechanism AND its traces are visible, once
+     per topology change rather than every frame -- otherwise the view would
+     lurch about as the mechanism moves. */
+  function frame(m) {
+    const b = mechanismBounds(m);
+    if (!b) return;
+    const { cx, cy, d } = fitFor(b);
+
+    rodRadius = Math.max(b.x1 - b.x0, b.y1 - b.y0, 50) / 90;
+    jointRadius = rodRadius * 1.5;
+
     controls.target.set(cx, cy, 0);
     /* Mostly face-on, tipped just enough to read as three-dimensional. */
     camera.position.set(cx + d * 0.30, cy - d * 0.42, d * 0.86);
     camera.near = Math.max(d / 500, 0.01);
     camera.far = d * 20;
     camera.updateProjectionMatrix();
+    framedDistance = d;
+    autoFramed = true;
     controls.update();
     framed = true;
     syncHeading();
     /* The meshes were sized with the previous radius, so restate them now. */
     sizeMeshes(m);
+  }
+
+  /* A trace only exists once the mechanism has run, and it keeps growing, so
+     the fit chosen at topology time goes stale as soon as the coupler swings
+     wide. Pull the camera back to suit -- along whatever direction it is
+     already pointing, so this never undoes an orbit the visitor set up -- and
+     only ever outwards, or the view would pump in and out every revolution. */
+  function keepInView(m) {
+    if (!autoFramed) return;
+    const b = mechanismBounds(m);
+    if (!b) return;
+    const { cx, cy, d } = fitFor(b);
+    if (d <= framedDistance) return;
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 1e-12) return;
+    /* Pull back FIT_SLACK further than the curve currently needs, so the next
+       millimetre of trace does not re-trigger this and leave the camera
+       creeping backwards for a whole revolution. */
+    const next = d * FIT_SLACK;
+    controls.target.set(cx, cy, 0);
+    camera.position.copy(controls.target).add(dir.setLength(next));
+    camera.near = Math.max(next / 500, 0.01);
+    camera.far = next * 20;
+    camera.updateProjectionMatrix();
+    framedDistance = next;
+    controls.update();
+    syncHeading();
   }
 
   function sizeMeshes(m) {
@@ -312,6 +367,7 @@ export async function createView3D(container, getMechanism) {
   }
 
   function zoomBy(scale) {
+    autoFramed = false;
     const off = camera.position.clone().sub(controls.target);
     const next = Math.min(Math.max(off.length() * scale, camera.near * 4), camera.far * 0.5);
     camera.position.copy(controls.target).add(off.setLength(next));
@@ -337,6 +393,11 @@ export async function createView3D(container, getMechanism) {
     renderer.setSize(rect.width, rect.height, false);
     camera.aspect = rect.width / rect.height;
     camera.updateProjectionMatrix();
+    /* What fits depends on the aspect ratio, so a pane that has just been laid
+       out -- or a window the visitor resized -- needs the fit recomputed.
+       Without this the first frame is computed against the placeholder aspect
+       and the mechanism arrives cropped. */
+    if (framed && autoFramed) frame(getMechanism());
     dirty = true;
   }
   wheel = createViewControl(container.parentElement || container, {
@@ -352,7 +413,16 @@ export async function createView3D(container, getMechanism) {
 
   /* Render on demand: after a sync, while the camera is still settling, or
      while the user is dragging it. An idle 3D pane costs nothing. */
-  controls.addEventListener("change", () => { dirty = true; syncHeading(); });
+  controls.addEventListener("change", () => {
+    /* Rotation preserves the distance to the target, a dolly does not -- so a
+       distance that no longer matches the framed one means the visitor zoomed. */
+    const dist = camera.position.distanceTo(controls.target);
+    if (framedDistance > 0 && Math.abs(dist - framedDistance) > framedDistance * 0.01) {
+      autoFramed = false;
+    }
+    dirty = true;
+    syncHeading();
+  });
   let alive = true;
   (function renderLoop() {
     if (!alive) return;

@@ -208,20 +208,56 @@ strong { color: var(--text); font-weight: 600; }
   .hero-grid { grid-template-columns: 1fr; }
 }
 
-/* ---------- hero linkage canvas ---------- */
-.hero-fig { position: relative; margin: 0; }
-.hero-fig canvas {
-  display: block; width: 100%; height: auto; aspect-ratio: 4 / 3;
-  border: 1px solid var(--surface-line); border-radius: var(--radius);
-  background: var(--bg-elev); box-shadow: var(--shadow);
+/* ---------- hero walker background ----------
+   Full-bleed behind the hero, breaking out of .wrap's column so the creature
+   can walk the whole width. It sits under the text and takes no clicks; the
+   mask fades it out under the headline, where contrast has to be the text's. */
+.hero-walkers {
+  /* Plain inset box inside the hero. It used to break out to 100vw with a
+     translate, which is one more thing that can go wrong (100vw counts the
+     scrollbar) for a decoration; the right-hand side of the text column is
+     where it needs to be anyway. */
+  position: absolute; inset: 0; z-index: 0;
+  overflow: hidden;
+  /* Opaque only past the text column, so the creature and its shadow never
+     compete with the lead paragraph for contrast. */
+  /* ONE mask layer, deliberately. Two layers need mask-composite, and the
+     -webkit- prefixed property takes a different set of keywords from the
+     standard one -- get that pairing wrong in either direction and the layers
+     composite to an empty mask, which hides the background completely on some
+     browsers and not others. A single gradient needs no compositing at all;
+     the vertical falloff is the ground's own radial fade instead. */
+  -webkit-mask-image: linear-gradient(to right, transparent 22%, #000 52%, #000 88%, transparent);
+          mask-image: linear-gradient(to right, transparent 22%, #000 52%, #000 88%, transparent);
+  opacity: .7;
 }
-.hero-fig figcaption {
-  position: absolute; left: 14px; bottom: 12px; right: 14px;
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  font-family: var(--font-mono); font-size: .7rem; color: var(--text-faint);
-  letter-spacing: .04em; pointer-events: none;
+.hero-walkers canvas {
+  display: block; width: 100%; height: 100%;
+  /* Drag to turn the creature. pan-y leaves a vertical swipe to the page, so
+     this never eats scrolling on a phone. */
+  touch-action: pan-y; -webkit-user-select: none; user-select: none;
 }
-.hero-fig figcaption a { pointer-events: auto; color: var(--accent); }
+/* The text column sits above the canvas and would otherwise swallow every
+   pointer event across the full width of the row, leaving nothing to drag.
+   The container passes them through; its content still takes them, so the
+   headline stays selectable and the buttons stay clickable. */
+.hero-grid { pointer-events: none; }
+.hero-grid > * { pointer-events: auto; }
+/* The content has to sit above it, and .hero-grid is the only thing between. */
+.hero-grid { position: relative; z-index: 1; }
+/* One column now that the figure is gone: the background owns the right-hand
+   side, so the text is held to a readable measure instead of filling it. */
+.hero-grid { grid-template-columns: minmax(0, 620px); }
+/* As the window narrows the text takes the whole column and the creature ends
+   up behind it, so it is pushed further back at each step rather than dropped.
+   The framing itself already follows the viewport's shape (see framing.js), so
+   it stays wholly on screen the whole way down; this is only about contrast.
+   It is dropped only at phone widths, where every point of it is behind body
+   text and it would be noise rather than atmosphere. */
+@media (max-width: 1100px) { .hero-walkers { opacity: .5; } }
+@media (max-width: 900px)  { .hero-walkers { opacity: .34; } }
+@media (max-width: 640px)  { .hero-walkers { display: none; } }
+@media (prefers-reduced-motion: reduce) { .hero-walkers { opacity: .5; } }
 
 /* ---------- stat strip ---------- */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--surface-line);
@@ -340,7 +376,7 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 }
 
 /* --- the two viewports --- */
-.stage { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; }
+.stage { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
 
 .viewport {

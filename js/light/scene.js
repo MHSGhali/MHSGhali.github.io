@@ -1,7 +1,7 @@
 /* Primitive and light aggregation plus visibility queries, from src/scene.c.
    Linear scan, as in the C. */
 
-import { primIntersect, primOccludes, offsetOrigin, makeHit } from "./geom.js?v=3c8f0a84";
+import { primIntersect, primOccludes, offsetOrigin, makeHit } from "./geom.js?v=19c91c08";
 
 export function createScene() {
   return { prims: [], mats: [], lights: [] };

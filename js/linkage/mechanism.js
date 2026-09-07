@@ -14,7 +14,7 @@
       That is what makes a ternary-or-larger link (a plate, not a bar) rigid:
       every internal distance is held, not just consecutive ones. */
 
-import * as v from "./vec2.js?v=3c8f0a84";
+import * as v from "./vec2.js?v=19c91c08";
 
 /* Condensed upper-triangular pair index for i<j among k items (0-indexed). */
 export function pairIndex(i, j, k) {
@@ -22,7 +22,7 @@ export function pairIndex(i, j, k) {
 }
 
 export function create() {
-  return { connectors: [], links: [] };
+  return { connectors: [], links: [], sliders: [] };
 }
 
 /* Deep copy. Used for the undo stack and by the Blender exporter, which
@@ -51,6 +51,13 @@ export function clone(src) {
         : null,
       selected: l.selected,
       alive: l.alive,
+    })),
+    sliders: (src.sliders || []).map((s2) => ({
+      pinConnectorId: s2.pinConnectorId,
+      railAId: s2.railAId,
+      railBId: s2.railBId,
+      selected: s2.selected,
+      alive: s2.alive,
     })),
   };
 }
@@ -91,6 +98,14 @@ export function deleteConnector(m, connectorId) {
     const l = m.links[li];
     if (!l.alive) continue;
     if (l.connectorIds.includes(connectorId)) deleteLink(m, li);
+  }
+
+  /* A slider needs all three of its connectors; losing any one kills it. */
+  for (let si = 0; si < m.sliders.length; si++) {
+    const sl = m.sliders[si];
+    if (!sl.alive) continue;
+    if (sl.pinConnectorId === connectorId || sl.railAId === connectorId ||
+        sl.railBId === connectorId) deleteSlider(m, si);
   }
 
   c.path = [];
@@ -194,6 +209,68 @@ export function toggleDriven(m, linkId, defaultSpeedDegS) {
   return true;
 }
 
+/* ---- sliders and pins-in-slots --------------------------------------------
+
+   One connector held on the LINE through two others. That single primitive is
+   both of the sliding joints a planar mechanism needs, exactly as in the C
+   (src/joints.h): with anchors for rails it is a prismatic joint sliding on
+   ground -- a crank-slider piston, a scissor lift's foot -- and with a moving
+   link's connectors it is a pin running in that link's slot, which is what a
+   Whitworth quick-return and a Scotch yoke are built from.
+
+   The rail is a LINE, not a segment: the C constrains only the perpendicular
+   offset, so a pin may travel past either rail connector. Draw the rails long
+   enough to cover the travel and it reads as a slot either way. */
+
+/* Returns the new slider's id, or -1 if the three connectors are not three
+   distinct live ones. */
+export function addSlider(m, pinConnectorId, railAId, railBId) {
+  const ids = [pinConnectorId, railAId, railBId];
+  if (new Set(ids).size !== 3) return -1;
+  for (const id of ids) {
+    const c = m.connectors[id];
+    if (!c || !c.alive) return -1;
+  }
+  m.sliders.push({
+    pinConnectorId, railAId, railBId, selected: false, alive: true,
+  });
+  return m.sliders.length - 1;
+}
+
+export function deleteSlider(m, sliderId) {
+  const sl = m.sliders[sliderId];
+  if (!sl || !sl.alive) return;
+  sl.alive = false;
+  sl.selected = false;
+}
+
+/* Every live slider whose three connectors are all still alive. The solver,
+   the renderers and the exporter all want exactly this list. */
+export function liveSliders(m) {
+  return (m.sliders || []).filter(
+    (sl) => sl.alive &&
+      m.connectors[sl.pinConnectorId]?.alive &&
+      m.connectors[sl.railAId]?.alive &&
+      m.connectors[sl.railBId]?.alive
+  );
+}
+
+/* The slider whose rail passes within `distThresh` of p, or -1. Measured to
+   the drawn SEGMENT rather than the infinite line the solver uses, so a click
+   far off the end of a rail does not select it. */
+export function pickSlider(m, p, distThresh) {
+  let best = -1, bestD = distThresh;
+  for (let i = 0; i < m.sliders.length; i++) {
+    const sl = m.sliders[i];
+    if (!sl.alive) continue;
+    const a = m.connectors[sl.railAId], b = m.connectors[sl.railBId];
+    if (!a?.alive || !b?.alive) continue;
+    const d = pointSegmentDist(p, a.pos, b.pos);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
 /* Untracing discards the recorded path; clearTraces keeps the flag. */
 export function setTraced(m, connectorId, traced) {
   const c = m.connectors[connectorId];
@@ -214,6 +291,31 @@ export function traceStep(m) {
     if (!c.alive || !c.traced) continue;
     c.path.push({ x: c.pos.x, y: c.pos.y });
   }
+}
+
+/* The extent of everything DRAWN: every live joint, and every point of every
+   recorded trace. Both views frame from this rather than from the joints
+   alone, because a coupler curve routinely swings well outside the linkage
+   that draws it -- the drag-link preset's trace is four times the height of
+   its own joint box, so framing on joints alone cuts most of it off.
+
+   Returns null when there is nothing to frame. */
+export function bounds(m) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  let any = false;
+  const put = (p) => {
+    any = true;
+    if (p.x < x0) x0 = p.x;
+    if (p.x > x1) x1 = p.x;
+    if (p.y < y0) y0 = p.y;
+    if (p.y > y1) y1 = p.y;
+  };
+  for (const c of m.connectors) {
+    if (!c.alive) continue;
+    put(c.pos);
+    if (c.traced) for (const p of c.path) put(p);
+  }
+  return any ? { x0, x1, y0, y1 } : null;
 }
 
 /* Nearest alive connector within `radius` of p, or -1. */

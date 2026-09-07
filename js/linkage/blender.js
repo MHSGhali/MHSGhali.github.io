@@ -11,8 +11,8 @@
 
    Convention: 1 mechanism world unit = 1 mm. */
 
-import * as M from "./mechanism.js?v=3c8f0a84";
-import * as S from "./solver.js?v=3c8f0a84";
+import * as M from "./mechanism.js?v=19c91c08";
+import * as S from "./solver.js?v=19c91c08";
 
 export const EXPORT_FRAMES = 120;
 
@@ -107,6 +107,8 @@ export function exportBlenderScript(m, params) {
 
   /* Rods, referring to joints by their index in JOINTS. */
   out.push("RODS = [");
+  /* Pairs already emitted, so a rail that doubles as a link is not written twice. */
+  const joined = new Set();
   for (let li = 0; li < m.links.length; li++) {
     const l = m.links[li];
     if (!l.alive) continue;
@@ -117,8 +119,24 @@ export function exportBlenderScript(m, params) {
         const slotI = jointIds.indexOf(ci), slotJ = jointIds.indexOf(cj);
         if (slotI < 0 || slotJ < 0) continue;
         out.push(`    ("Link${li}_c${ci}c${cj}", ${slotI}, ${slotJ}),`);
+        joined.add(ci < cj ? `${ci}:${cj}` : `${cj}:${ci}`);
       }
     }
+  }
+
+  /* A slider's rail is a real part you would machine, so it goes into the rig
+     as a rod like any other -- named Rail so it is identifiable in the
+     outliner. Skipped when the two rail joints are already joined by a link
+     (a pin running in that link's own slot), which would otherwise export the
+     same bar twice. */
+  for (const sl of M.liveSliders(m)) {
+    const key = sl.railAId < sl.railBId
+      ? `${sl.railAId}:${sl.railBId}` : `${sl.railBId}:${sl.railAId}`;
+    if (joined.has(key)) continue;
+    const slotA = jointIds.indexOf(sl.railAId), slotB = jointIds.indexOf(sl.railBId);
+    if (slotA < 0 || slotB < 0) continue;
+    out.push(`    ("Rail_c${sl.railAId}c${sl.railBId}", ${slotA}, ${slotB}),`);
+    joined.add(key);
   }
   out.push("]", "");
 

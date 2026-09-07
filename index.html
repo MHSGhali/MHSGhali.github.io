@@ -19,10 +19,10 @@
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="css/main.css?v=3c8f0a84">
+<link rel="stylesheet" href="css/main.css?v=19c91c08">
 <script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="js/app.js?v=3c8f0a84" defer></script>
-<script type="module" src="js/hero-linkage.js?v=3c8f0a84"></script>
+<script src="js/app.js?v=19c91c08" defer></script>
+<script type="module" src="js/hero-walkers.js?v=19c91c08"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -74,6 +74,9 @@
 
 <main>
 <section class="hero wrap">
+  <!-- Decorative only: the page reads identically without it, which is why it
+       carries no alt text and no fallback. -->
+  <div class="hero-walkers" data-hero-walkers aria-hidden="true"></div>
   <div class="hero-grid">
     <div>
       <p class="eyebrow">Staff Software Engineer &middot; Tesla AI Platform</p>
@@ -91,14 +94,6 @@
         </a>
       </div>
     </div>
-    <figure class="hero-fig">
-      <canvas data-hero-linkage width="800" height="600"
-              role="img" aria-label="A four-bar crank-rocker linkage turning, with the path of its coupler point drawn out behind it"></canvas>
-      <figcaption>
-        <span>four-bar crank-rocker &middot; coupler curve</span>
-        <a href="pages/linkage.html">Try it &rarr;</a>
-      </figcaption>
-    </figure>
   </div>
 
   <div class="stats reveal">

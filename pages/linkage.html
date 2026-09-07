@@ -17,9 +17,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="../css/main.css?v=3c8f0a84">
+<link rel="stylesheet" href="../css/main.css?v=19c91c08">
 <script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="../js/app.js?v=3c8f0a84" defer></script>
+<script src="../js/app.js?v=19c91c08" defer></script>
 <!-- three.js is pinned here rather than in view3d.js because OrbitControls
      imports the bare specifier "three" internally, which only resolves through
      an import map. Keeping both entries together means one version to bump. -->
@@ -31,7 +31,7 @@
   }
 }
 </script>
-<script type="module" src="../js/linkage/app.js?v=3c8f0a84"></script>
+<script type="module" src="../js/linkage/app.js?v=19c91c08"></script>
 </head>
 <body>
 <div class="sheen" aria-hidden="true"></div>
@@ -74,18 +74,19 @@
   <div class="toolbar" role="toolbar" aria-label="Mechanism tools">
     <select id="preset" aria-label="Load a starter mechanism"></select>
     <span class="tbtn-sep" aria-hidden="true"></span>
-    <button class="tbtn" id="btn-link" type="button" aria-pressed="false">Link <kbd>L</kbd></button>
-    <button class="tbtn" id="btn-anchor" type="button" aria-pressed="false">Anchor <kbd>A</kbd></button>
-    <button class="tbtn" id="btn-motor" type="button" aria-pressed="false">Motor <kbd>M</kbd></button>
-    <button class="tbtn" id="btn-variable" type="button" aria-pressed="false">Variable <kbd>V</kbd></button>
-    <button class="tbtn" id="btn-trace" type="button" aria-pressed="false">Trace <kbd>T</kbd></button>
-    <button class="tbtn" id="btn-delete" type="button">Delete <kbd>&#9003;</kbd></button>
-    <button class="tbtn" id="btn-undo" type="button">Undo <kbd>&#8984;Z</kbd></button>
+    <button class="tbtn" id="btn-link" type="button" title="Join the selected joints into one rigid body. Select two or more joints first." aria-pressed="false">Link <kbd>L</kbd></button>
+    <button class="tbtn" id="btn-slide" type="button" title="Hold a joint on a rail. Select exactly three joints: the first becomes the pin, the other two define its line." aria-pressed="false">Slide <kbd>S</kbd></button>
+    <button class="tbtn" id="btn-anchor" type="button" title="Ground the selected joints so they never move. Select one or more joints first." aria-pressed="false">Anchor <kbd>A</kbd></button>
+    <button class="tbtn" id="btn-motor" type="button" title="Drive the selected link with a motor. Click a bar to select it; it needs exactly one grounded joint to pivot around." aria-pressed="false">Motor <kbd>M</kbd></button>
+    <button class="tbtn" id="btn-variable" type="button" title="Let the selected link change length. Click a bar to select it first. Not available on a driven link." aria-pressed="false">Variable <kbd>V</kbd></button>
+    <button class="tbtn" id="btn-trace" type="button" title="Draw the selected joints' paths while it runs. Select one or more joints first." aria-pressed="false">Trace <kbd>T</kbd></button>
+    <button class="tbtn" id="btn-delete" type="button" title="Delete the selected joints, link or rail.">Delete <kbd>&#9003;</kbd></button>
+    <button class="tbtn" id="btn-undo" type="button" title="Undo the last edit.">Undo <kbd>&#8984;Z</kbd></button>
     <span class="tbtn-sep" aria-hidden="true"></span>
-    <button class="tbtn" id="btn-gravity" type="button" aria-pressed="false">Gravity <kbd>G</kbd></button>
-    <button class="tbtn" id="btn-fit" type="button">Fit</button>
+    <button class="tbtn" id="btn-gravity" type="button" title="Run under gravity. A mechanism with no motor uses it automatically." aria-pressed="false">Gravity <kbd>G</kbd></button>
+    <button class="tbtn" id="btn-fit" type="button" title="Frame the whole mechanism, and its traces, in both views.">Fit</button>
     <span class="tbtn-spacer" aria-hidden="true"></span>
-    <button class="tbtn tbtn-go" id="btn-run" type="button" aria-pressed="false">Run</button>
+    <button class="tbtn tbtn-go" id="btn-run" type="button" title="Run the mechanism, or stop and return to the layout you designed. Editing is disabled while it runs." aria-pressed="false">Run</button>
   </div>
 
   <div class="stage">
@@ -105,7 +106,8 @@
     <span class="msg" id="status-msg"></span>
     <span class="actions">
       <button class="tbtn" id="btn-share" type="button">Copy link</button>
-      <button class="tbtn" id="btn-download" type="button">Download Blender script</button>
+      <button class="tbtn" id="btn-download" type="button" title="A Blender Python script that builds and animates the mechanism's skeleton.">Download Blender script</button>
+      <button class="tbtn" id="btn-print" type="button" title="A zip of printable STL parts: plates, rails, pins and spacers, with a manifest saying how they stack.">Download STL parts</button>
     </span>
   </div>
 
@@ -114,17 +116,21 @@
     <div class="grid grid-2">
       <div>
         <h3>Building</h3>
+        <p class="panel-hint" style="margin:0 0 12px">Every one of these is also a button in the toolbar, and each greys out until it has something to act on &mdash; <strong>L</strong> needs two joints selected, <strong>S</strong> exactly three, <strong>M</strong> a selected link with one grounded joint. Editing is disabled entirely while the mechanism is running: press <strong>R</strong> to stop first.</p>
         <dl class="keys">
           <div><dt>Click</dt><dd>place a joint on empty space, or select one</dd></div>
           <div><dt>Shift-click</dt><dd>add to the selection instead of replacing it &mdash; on an existing joint, or on empty space to place one and keep the rest selected</dd></div>
           <div><dt>Drag</dt><dd>from empty space to box-select; from a joint to move the selection</dd></div>
           <div><dt>Click a bar</dt><dd>select that link</dd></div>
           <div><dt>L</dt><dd>join the selected joints into one rigid body &mdash; two makes a bar, three or more makes a plate</dd></div>
+          <div><dt>S</dt><dd>hold a joint on a rail: select three, and the <em>first</em> becomes a pin held on the line through the other two. Ground the two rail joints with <strong>A</strong> and it is a slideway; leave them on a moving link and it is a pin running in that link's slot</dd></div>
           <div><dt>A</dt><dd>ground the selection, so it never moves</dd></div>
           <div><dt>M</dt><dd>drive the selected link with a motor. It needs exactly one grounded joint, which becomes the pivot</dd></div>
           <div><dt>+ / &minus;</dt><dd>change the motor's speed</dd></div>
           <div><dt>V</dt><dd>let a link change length. It still holds its length until the geometry leaves it no choice</dd></div>
           <div><dt>T</dt><dd>trace the selected joints' paths while it runs</dd></div>
+          <div><dt>Delete</dt><dd>remove the selected joints, link or rail</dd></div>
+          <div><dt>Esc</dt><dd>clear the selection</dd></div>
           <div><dt>&#8984;Z</dt><dd>undo</dd></div>
         </dl>
       </div>
@@ -140,7 +146,9 @@
         <h3 style="margin-top:24px">When it binds</h3>
         <p>Fixed-length links here are genuinely rigid. If the motor reaches a position the mechanism cannot physically assume &mdash; a non-Grashof linkage hitting its limit, say &mdash; the run stops there rather than stretching a bar, and tells you. To get through it, change the geometry or make a link variable with <strong>V</strong>.</p>
         <h3 style="margin-top:24px">Exporting</h3>
-        <p>The Blender script builds one cylinder per link edge and one empty per joint, <em>and animates them</em>: open it in Blender's Scripting tab and press Space. One world unit is one millimetre. It is the mechanism's skeleton, for you to build real printable geometry around.</p>
+        <p>Two exports, and they are different things. The <strong>Blender script</strong> writes an <em>animation</em>: one cylinder per link edge and one empty per joint, keyframed through a full cycle. Open it in Blender's Scripting tab and press Space. It is the mechanism's skeleton, for you to build real geometry around.</p>
+        <p>The <strong>STL parts</strong> write <em>objects</em>: a zip holding one solid per part &mdash; link plates with a boss at every pin, slider rails with a slot cut through them, headed pins, push-on caps, spacer washers, and a baseplate that holds the anchors &mdash; plus a <code>MANIFEST.txt</code> saying what each one is and how the pile stacks up. Parts that share a pin are put on separate <em>layers</em> and any gap left on a pin is packed out with a spacer, so nothing rubs and nothing floats. Every solid is checked watertight before it is written; one that fails is left out and said so in the manifest rather than handed to a slicer that would quietly print something else. One world unit is one millimetre throughout.</p>
+        <p>The zip also carries <code>assembly.stl</code> and <code>assembly_exploded.stl</code>. Neither is a part to print &mdash; they are several solids touching, not one shell &mdash; but opening them is the quickest way to see which piece goes where.</p>
       </div>
     </div>
   </details>

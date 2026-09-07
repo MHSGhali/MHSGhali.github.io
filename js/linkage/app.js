@@ -1,11 +1,13 @@
 /* Page controller for the linkage tool: wires the toolbar, the status line,
    the 3D view, the Blender export and the share link to the editor. */
 
-import { createEditor } from "./editor.js?v=3c8f0a84";
-import { createView3D } from "./view3d.js?v=3c8f0a84";
-import { PRESETS, buildPreset } from "./presets.js?v=3c8f0a84";
-import { exportBlenderScript } from "./blender.js?v=3c8f0a84";
-import { encode, decode } from "./serialize.js?v=3c8f0a84";
+import { createEditor } from "./editor.js?v=19c91c08";
+import { createView3D } from "./view3d.js?v=19c91c08";
+import { PRESETS, buildPreset } from "./presets.js?v=19c91c08";
+import { exportBlenderScript } from "./blender.js?v=19c91c08";
+import { exportPrintableParts } from "./print3d.js?v=19c91c08";
+import { makeZip } from "./zip.js?v=19c91c08";
+import { encode, decode } from "./serialize.js?v=19c91c08";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -17,10 +19,11 @@ const view3dHost = $("#view3d");
 const view3dNote = $("#view3d-note");
 
 const buttons = {
-  link: $("#btn-link"), anchor: $("#btn-anchor"), motor: $("#btn-motor"),
+  link: $("#btn-link"), slide: $("#btn-slide"), anchor: $("#btn-anchor"), motor: $("#btn-motor"),
   variable: $("#btn-variable"), trace: $("#btn-trace"), del: $("#btn-delete"),
   undo: $("#btn-undo"), gravity: $("#btn-gravity"), run: $("#btn-run"),
   fit: $("#btn-fit"), download: $("#btn-download"), share: $("#btn-share"),
+  print: $("#btn-print"),
 };
 
 let view3d = null;
@@ -65,11 +68,19 @@ function loadPreset(id) {
 if (!loadFromHash()) loadPreset(PRESETS[0].id);
 window.addEventListener("hashchange", loadFromHash);
 
-presetSelect.addEventListener("change", () => loadPreset(presetSelect.value));
+presetSelect.addEventListener("change", () => {
+  loadPreset(presetSelect.value);
+  /* Hand the keyboard back. A <select> keeps focus after you choose from it,
+     and the editor deliberately ignores keys aimed at a form control -- so
+     every shortcut silently does nothing until you happen to click elsewhere,
+     which reads as "the hotkeys are broken". */
+  presetSelect.blur();
+});
 
 /* --- toolbar --------------------------------------------------------- */
 
 buttons.link.addEventListener("click", () => editor.linkSelected());
+buttons.slide.addEventListener("click", () => editor.slideSelected());
 buttons.anchor.addEventListener("click", () => editor.toggleAnchor());
 buttons.motor.addEventListener("click", () => editor.toggleMotor());
 buttons.variable.addEventListener("click", () => editor.toggleVariable());
@@ -95,6 +106,24 @@ buttons.download.addEventListener("click", () => {
   /* Revoke on the next turn: revoking synchronously can beat the download. */
   setTimeout(() => URL.revokeObjectURL(url), 10000);
   say("Downloaded linkage_export.py — run it in Blender's Scripting tab, then press Space.");
+});
+
+buttons.print.addEventListener("click", () => {
+  /* A folder of parts, which a browser cannot hand over as a folder -- so the
+     same names arrive inside one archive. */
+  const parts = exportPrintableParts(editor.mechanism);
+  if (!parts.written) {
+    say("Nothing to print: draw a mechanism with at least one link first.", true);
+    return;
+  }
+  const zip = makeZip([{ name: "MANIFEST.txt", bytes: parts.manifest }, ...parts.files]);
+  const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "linkage_parts.zip";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  say(`Downloaded linkage_parts.zip — ${parts.report}`, parts.warnings > 0);
 });
 
 buttons.share.addEventListener("click", async () => {
@@ -128,6 +157,7 @@ function refresh() {
   /* Editing is disabled while the simulation runs, matching the desktop
      tool: the model it is stepping must not change underneath it. */
   set(buttons.link, { disabled: s.running || s.selectedCount < 2 });
+  set(buttons.slide, { disabled: s.running || s.selectedCount !== 3 });
   set(buttons.anchor, { disabled: s.running || s.selectedCount === 0, pressed: s.allAnchored });
   set(buttons.motor, { disabled: s.running || !s.linkCanDrive, pressed: s.linkDriven });
   set(buttons.variable, { disabled: s.running || s.selectedLink < 0 || s.linkDriven, pressed: s.selectedLink >= 0 && !s.linkRigid });
@@ -136,6 +166,7 @@ function refresh() {
   set(buttons.undo, { disabled: !s.canUndo });
   set(buttons.gravity, { pressed: s.gravity });
   set(buttons.share, { disabled: s.running });
+  set(buttons.print, { disabled: s.running || s.linkCount === 0 });
 
   buttons.run.textContent = s.running ? "Stop" : "Run";
   buttons.run.setAttribute("aria-pressed", String(s.running));
@@ -144,6 +175,7 @@ function refresh() {
   const plural = (n, word) => `<b>${n}</b> ${word}${n === 1 ? "" : "s"}`;
   statusCounts.innerHTML =
     `${plural(s.jointCount, "joint")} &nbsp;${plural(s.linkCount, "link")}` +
+    (s.sliderCount ? ` &nbsp;${plural(s.sliderCount, "slider")}` : "") +
     (s.motorSpeed !== null ? ` &nbsp;motor <b>${s.motorSpeed.toFixed(0)}&deg;/s</b>` : "") +
     (!s.hasMotor ? " &nbsp;no motor: runs under gravity" : "");
 

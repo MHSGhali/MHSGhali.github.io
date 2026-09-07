@@ -1,12 +1,12 @@
 /* Page controller for the light simulator: scene state, the worker, the 3D
    view, the property panel, and the readouts. */
 
-import { createView } from "./view3d.js?v=3c8f0a84";
-import { PRESETS, presetById } from "./presets.js?v=3c8f0a84";
-import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=3c8f0a84";
-import { viridis } from "./viridis.js?v=3c8f0a84";
-import { stats } from "./stats.js?v=3c8f0a84";
-import * as v from "./vec3.js?v=3c8f0a84";
+import { createView } from "./view3d.js?v=19c91c08";
+import { PRESETS, presetById } from "./presets.js?v=19c91c08";
+import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=19c91c08";
+import { viridis } from "./viridis.js?v=19c91c08";
+import { stats } from "./stats.js?v=19c91c08";
+import * as v from "./vec3.js?v=19c91c08";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -583,11 +583,9 @@ async function main() {
   $("#add-quad").addEventListener("click", () => addPrim("quad"));
   $("#add-sphere").addEventListener("click", () => addPrim("sphere"));
 
-  window.addEventListener("themechange", () => {
-    const cs = getComputedStyle(document.documentElement);
-    view.setTheme({ line: cs.getPropertyValue("--surface-line").trim() || "#2c2c2c" });
-    drawLegend();
-  });
+  /* The viewport carries no themed chrome -- a surface's colour IS its
+     measurement -- so only the legend needs repainting. */
+  window.addEventListener("themechange", drawLegend);
 
   /* Open on a shared scene if the URL carries one, else the workcell. */
   let loaded = false;

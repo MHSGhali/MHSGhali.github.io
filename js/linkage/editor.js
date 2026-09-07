@@ -6,9 +6,9 @@
    with a mouse, a trackpad, or a finger, and every keyboard shortcut from the
    desktop app is also a toolbar button because a phone has no keyboard. */
 
-import * as M from "./mechanism.js?v=3c8f0a84";
-import * as S from "./solver.js?v=3c8f0a84";
-import * as v from "./vec2.js?v=3c8f0a84";
+import * as M from "./mechanism.js?v=19c91c08";
+import * as S from "./solver.js?v=19c91c08";
+import * as v from "./vec2.js?v=19c91c08";
 
 const CONNECTOR_HIT_RADIUS = 12;   /* screen px */
 const LINK_EDGE_HIT_DIST = 7;
@@ -72,8 +72,18 @@ export function createEditor(canvas, { onChange } = {}) {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw();
+    /* What fits depends on the canvas size, so refit while the framing is
+       still ours -- a resized window should not crop the mechanism. */
+    if (autoFramed) fitView();
+    else draw();
   }
+
+  /* True while the camera is still the one Fit chose. Any manual pan or zoom
+     hands the framing to the visitor, and keepInView() then leaves it alone --
+     otherwise panning in to watch one joint during a run would be yanked back
+     the moment the trace grew. */
+  let autoFramed = true;
+  const releaseFraming = () => { autoFramed = false; };
 
   const toScreen = (p) => ({ x: (p.x - cam.x) * cam.z + w / 2, y: (p.y - cam.y) * cam.z + h / 2 });
   const toWorld = (p) => ({ x: (p.x - w / 2) / cam.z + cam.x, y: (p.y - h / 2) / cam.z + cam.y });
@@ -83,22 +93,45 @@ export function createEditor(canvas, { onChange } = {}) {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
-  /* Frames the whole mechanism. Called when a preset or shared link loads, so
-     a mechanism designed at any scale arrives visible. */
+  /* Frames the mechanism AND its traces. Called when a preset or shared link
+     loads, so a mechanism designed at any scale arrives visible. */
+  const FIT_PAD = 120;   /* world units of breathing room around the extent */
+  const FIT_SLACK = 1.2; /* extra room a widening refit leaves for more trace */
+
   function fitView() {
-    const live = mechanism.connectors.filter((c) => c.alive);
-    if (!live.length) { cam = { x: 0, y: 0, z: 1 }; draw(); return; }
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (const c of live) {
-      x0 = Math.min(x0, c.pos.x); x1 = Math.max(x1, c.pos.x);
-      y0 = Math.min(y0, c.pos.y); y1 = Math.max(y1, c.pos.y);
-    }
-    const pad = 120;
-    cam.x = (x0 + x1) / 2;
-    cam.y = (y0 + y1) / 2;
-    const spanX = Math.max(x1 - x0 + pad, 1), spanY = Math.max(y1 - y0 + pad, 1);
+    autoFramed = true;
+    const b = M.bounds(mechanism);
+    if (!b) { cam = { x: 0, y: 0, z: 1 }; draw(); return; }
+    cam.x = (b.x0 + b.x1) / 2;
+    cam.y = (b.y0 + b.y1) / 2;
+    const spanX = Math.max(b.x1 - b.x0 + FIT_PAD, 1);
+    const spanY = Math.max(b.y1 - b.y0 + FIT_PAD, 1);
     cam.z = w && h ? clamp(Math.min(w / spanX, h / spanY), ZOOM_MIN, ZOOM_MAX) : 1;
     draw();
+  }
+
+  /* A trace only exists once the mechanism has run, and it keeps growing, so
+     the fit computed when the preset loaded goes stale the moment the coupler
+     swings wide. Widen to suit, and only ever outwards: zooming back in as the
+     curve closes would leave the view pumping in and out every revolution. */
+  function keepInView() {
+    if (!autoFramed) return;
+    const b = M.bounds(mechanism);
+    if (!b || !w || !h) return;
+    const halfW = w / (2 * cam.z), halfH = h / (2 * cam.z);
+    const margin = FIT_PAD / 2;
+    if (b.x0 >= cam.x - halfW + margin && b.x1 <= cam.x + halfW - margin &&
+        b.y0 >= cam.y - halfH + margin && b.y1 <= cam.y + halfH - margin) return;
+    /* Zoom out FIT_SLACK further than the curve currently needs. Refitting it
+       exactly would re-trigger on the next millimetre of trace and the view
+       would creep shut over hundreds of frames; with headroom it steps out a
+       handful of times per revolution and then holds still. */
+    const z = Math.min(w / Math.max((b.x1 - b.x0) * FIT_SLACK + FIT_PAD, 1),
+                       h / Math.max((b.y1 - b.y0) * FIT_SLACK + FIT_PAD, 1));
+    if (z >= cam.z) return;   /* already wide enough; only the centre drifted */
+    cam.x = (b.x0 + b.x1) / 2;
+    cam.y = (b.y0 + b.y1) / 2;
+    cam.z = clamp(z, ZOOM_MIN, ZOOM_MAX);
   }
 
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -150,10 +183,13 @@ export function createEditor(canvas, { onChange } = {}) {
       linkCanDrive: lid >= 0 && linkCanDrive(lid),
       allTraced: sel.length > 0 && sel.every((cid) => mechanism.connectors[cid].traced),
       allAnchored: sel.length > 0 && sel.every((cid) => mechanism.connectors[cid].isAnchor),
-      hasSelection: sel.length > 0 || lid >= 0,
+      selectedSlider: mechanism.sliders.findIndex((sl) => sl.alive && sl.selected),
+      hasSelection: sel.length > 0 || lid >= 0 ||
+                    mechanism.sliders.some((sl) => sl.alive && sl.selected),
       canUndo: undoStack.length > 0 && !running,
       jointCount: mechanism.connectors.filter((c) => c.alive).length,
       linkCount: mechanism.links.filter((l2) => l2.alive).length,
+      sliderCount: M.liveSliders(mechanism).length,
       motorSpeed: l && l.isDriven ? l.motorSpeedDegS : null,
       hasMotor: M.hasDrivenLink(mechanism),
     };
@@ -164,6 +200,27 @@ export function createEditor(canvas, { onChange } = {}) {
   function clearSelection() {
     for (const c of mechanism.connectors) c.selected = false;
     for (const l of mechanism.links) l.selected = false;
+    for (const sl of mechanism.sliders) sl.selected = false;
+    selectionOrder = [];
+  }
+
+  /* Selection ORDER, not just membership. A slider has to know which of the
+     three chosen joints is the pin and which two are its rail, and nothing
+     else in the editor cares which order you clicked in. Reconciled after each
+     change rather than maintained at every selection site: click-by-click that
+     preserves the true order, and a box-select falls back to joint order,
+     which is as good an answer as any for a rectangle. */
+  let selectionOrder = [];
+  function noteSelection() {
+    selectionOrder = selectionOrder.filter(
+      (id) => mechanism.connectors[id] && mechanism.connectors[id].alive &&
+              mechanism.connectors[id].selected
+    );
+    for (let i = 0; i < mechanism.connectors.length; i++) {
+      const c = mechanism.connectors[i];
+      if (c.alive && c.selected && !selectionOrder.includes(i)) selectionOrder.push(i);
+    }
+    return selectionOrder;
   }
 
   function linkSelected() {
@@ -172,6 +229,29 @@ export function createEditor(canvas, { onChange } = {}) {
     pushUndo();
     M.addLink(mechanism, sel);
     clearSelection();
+    draw();
+    notify();
+  }
+
+  /* Three joints, in the order they were picked: the first becomes a pin held
+     on the line through the other two. Rails on anchors give a prismatic joint
+     sliding on ground; rails on a moving link give a pin in that link's slot. */
+  function slideSelected() {
+    const sel = noteSelection();
+    if (running) return;
+    if (sel.length !== 3) {
+      bindMessage = "A slider needs exactly three joints: click the pin first, then the two that define its rail.";
+      notify();
+      return;
+    }
+    pushUndo();
+    if (M.addSlider(mechanism, sel[0], sel[1], sel[2]) < 0) {
+      undoStack.pop();
+      bindMessage = "Those three joints cannot form a slider.";
+    } else {
+      bindMessage = "";
+      clearSelection();
+    }
     draw();
     notify();
   }
@@ -233,10 +313,12 @@ export function createEditor(canvas, { onChange } = {}) {
   function deleteSelection() {
     const sel = selectedConnectors();
     const lid = selectedLink();
-    if (running || (!sel.length && lid < 0)) return;
+    const sid = mechanism.sliders.findIndex((sl) => sl.alive && sl.selected);
+    if (running || (!sel.length && lid < 0 && sid < 0)) return;
     pushUndo();
     for (const cid of sel) M.deleteConnector(mechanism, cid);
     if (lid >= 0) M.deleteLink(mechanism, lid);
+    if (sid >= 0) M.deleteSlider(mechanism, sid);
     clearSelection();
     draw();
     notify();
@@ -338,6 +420,7 @@ export function createEditor(canvas, { onChange } = {}) {
       }
       M.traceStep(mechanism);
     }
+    keepInView();
     draw();
     notify();
     raf = requestAnimationFrame(loop);
@@ -384,7 +467,21 @@ export function createEditor(canvas, { onChange } = {}) {
         clearSelection();
         mechanism.connectors[cid].selected = true;
       }
+      noteSelection();
       drag = { kind: "move", from: world, moved: false, start: snapshotPositions() };
+      draw();
+      notify();
+      return;
+    }
+
+    /* Rails are picked after joints but before link edges: a rail usually runs
+       along ground where nothing else competes for the click, and a pin sitting
+       on it should still win. */
+    const sid = M.pickSlider(mechanism, world, LINK_EDGE_HIT_DIST / cam.z);
+    if (sid >= 0) {
+      clearSelection();
+      mechanism.sliders[sid].selected = true;
+      drag = { kind: "none" };
       draw();
       notify();
       return;
@@ -410,6 +507,7 @@ export function createEditor(canvas, { onChange } = {}) {
     if (pinch && pointers.size === 2) {
       const [p1, p2] = [...pointers.values()];
       const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      releaseFraming();
       if (pinch.dist > 0) cam.z = clamp((pinch.z * dist) / pinch.dist, ZOOM_MIN, ZOOM_MAX);
       const midScreen = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
       /* Keep the world point that was under the midpoint pinned to it. */
@@ -423,6 +521,7 @@ export function createEditor(canvas, { onChange } = {}) {
     const screen = pointerPos(e);
 
     if (drag.kind === "pan") {
+      releaseFraming();
       cam.x = drag.cam.x - (screen.x - drag.from.x) / cam.z;
       cam.y = drag.cam.y - (screen.y - drag.from.y) / cam.z;
       draw();
@@ -474,6 +573,7 @@ export function createEditor(canvas, { onChange } = {}) {
         if (!c.alive) continue;
         if (c.pos.x >= x0 && c.pos.x <= x1 && c.pos.y >= y0 && c.pos.y <= y1) c.selected = true;
       }
+      noteSelection();
       notify();
     } else if (drag.kind === "maybe-box" && !running) {
       /* A click on empty space places a joint there and selects it. Holding
@@ -484,6 +584,7 @@ export function createEditor(canvas, { onChange } = {}) {
       if (!drag.shift) clearSelection();
       const id = M.addConnector(mechanism, drag.world);
       mechanism.connectors[id].selected = true;
+      noteSelection();
       notify();
     }
 
@@ -496,6 +597,7 @@ export function createEditor(canvas, { onChange } = {}) {
   canvas.addEventListener("wheel", (e) => {
     e.preventDefault();
     const screen = pointerPos(e);
+    releaseFraming();
     const before = toWorld(screen);
     cam.z = clamp(cam.z * (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP), ZOOM_MIN, ZOOM_MAX);
     const after = toWorld(screen);
@@ -515,6 +617,7 @@ export function createEditor(canvas, { onChange } = {}) {
   const KEYS = {
     l: linkSelected, a: toggleAnchor, m: toggleMotor, v: toggleVariable,
     t: toggleTrace, g: toggleGravity, r: toggleRun, c: clearTraces,
+    s: slideSelected,
   };
 
   function onKeyDown(e) {
@@ -575,6 +678,34 @@ export function createEditor(canvas, { onChange } = {}) {
       ctx.closePath();
       ctx.fill();
       ctx.globalAlpha = 1;
+    }
+
+    /* Rails, under the links: a slider's rail is guideway, not structure, so
+       it is drawn as a thin double line -- the draughting convention for a
+       slideway -- rather than as another bar. Extended a little past its two
+       joints because the constraint is on the whole LINE, so the pin really
+       can travel beyond them. */
+    for (const sl of M.liveSliders(mechanism)) {
+      const a = mechanism.connectors[sl.railAId].pos;
+      const b = mechanism.connectors[sl.railBId].pos;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-9) continue;
+      const ux = dx / len, uy = dy / len;
+      const over = 0.08 * len;
+      const q1 = toScreen({ x: a.x - ux * over, y: a.y - uy * over });
+      const q2 = toScreen({ x: b.x + ux * over, y: b.y + uy * over });
+      /* Offset perpendicular by a fixed number of SCREEN pixels, so the pair
+         reads as a slideway at any zoom instead of closing up when you zoom out. */
+      const nx = -uy * 3, ny = ux * 3;
+      ctx.strokeStyle = sl.selected ? palette.accent : palette.faint;
+      ctx.lineWidth = sl.selected ? 2 : 1.25;
+      for (const sgn of [1, -1]) {
+        ctx.beginPath();
+        ctx.moveTo(q1.x + nx * sgn, q1.y + ny * sgn);
+        ctx.lineTo(q2.x + nx * sgn, q2.y + ny * sgn);
+        ctx.stroke();
+      }
     }
 
     ctx.lineCap = "round";
@@ -730,7 +861,7 @@ export function createEditor(canvas, { onChange } = {}) {
       notify();
     },
     state, draw, fitView, undo,
-    linkSelected, toggleAnchor, toggleMotor, toggleVariable, toggleTrace,
+    linkSelected, slideSelected, toggleAnchor, toggleMotor, toggleVariable, toggleTrace,
     deleteSelection, toggleGravity, toggleRun, clearTraces, nudgeMotorSpeed,
     params,
     destroy() {

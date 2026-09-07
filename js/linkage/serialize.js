@@ -11,7 +11,7 @@
    Dead (tombstoned) entries are dropped and ids renumbered on encode, so a
    long editing session doesn't produce a long link. */
 
-import * as M from "./mechanism.js?v=3c8f0a84";
+import * as M from "./mechanism.js?v=19c91c08";
 
 const b64urlEncode = (s) => {
   const bytes = new TextEncoder().encode(s);
@@ -54,7 +54,17 @@ export function encode(m, gravity) {
     ]);
   }
 
-  return b64urlEncode(JSON.stringify({ v: 1, g: gravity ? 1 : 0, c, l }));
+  /* [pinSlot, railASlot, railBSlot] per slider. */
+  const s2 = [];
+  for (const sl of M.liveSliders(m)) {
+    const ids = [sl.pinConnectorId, sl.railAId, sl.railBId].map((id) => slot.get(id));
+    if (ids.some((id) => id === undefined)) continue;
+    s2.push(ids);
+  }
+
+  /* v2 adds sliders. A v1 link carries none, so it still decodes; the version
+     rises anyway so an older reader rejects a link it would silently mangle. */
+  return b64urlEncode(JSON.stringify({ v: 2, g: gravity ? 1 : 0, c, l, s: s2 }));
 }
 
 /* Returns { mechanism, gravity } or null if the string isn't a mechanism we
@@ -67,7 +77,8 @@ export function decode(str) {
   } catch {
     return null;
   }
-  if (!data || data.v !== 1 || !Array.isArray(data.c) || !Array.isArray(data.l)) return null;
+  if (!data || (data.v !== 1 && data.v !== 2) ||
+      !Array.isArray(data.c) || !Array.isArray(data.l)) return null;
 
   try {
     const m = M.create();
@@ -86,6 +97,10 @@ export function decode(str) {
            claims a motor it can't have simply doesn't get one. */
         if (M.toggleDriven(m, lid, speed)) m.links[lid].motorSpeedDegS = speed;
       }
+    }
+    for (const ids of Array.isArray(data.s) ? data.s : []) {
+      if (!Array.isArray(ids) || ids.length !== 3) return null;
+      if (M.addSlider(m, ids[0], ids[1], ids[2]) < 0) return null;
     }
     return { mechanism: m, gravity: data.g === 1 };
   } catch {

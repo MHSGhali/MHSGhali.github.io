@@ -16,8 +16,8 @@
    Every array is transferred, not copied. `gen` rises with each request; a
    result carrying a stale gen is ignored by the page and abandoned here. */
 
-import { parseScene, buildScene } from "./scenefile.js?v=3c8f0a84";
-import * as F from "./field.js?v=3c8f0a84";
+import { parseScene, buildScene } from "./scenefile.js?v=19c91c08";
+import * as F from "./field.js?v=19c91c08";
 
 let gen = 0;
 
@@ -54,28 +54,31 @@ self.onmessage = async (e) => {
     const meshes = build.map(mesh);
     const weights = F.lightWeights(scene);
 
+    /* Narrowed to float32 for the page: a WebGL vertex buffer is float32
+       regardless, and only the solver needs the double-precision originals
+       (see the tessellation note in field.js). */
+    const gpu = meshes.map((m) => ({
+      pos: Float32Array.from(m.pos), nor: Float32Array.from(m.nor), idx: m.idx,
+    }));
     postMessage(
       {
         type: "geometry", gen: myGen, nlights: nl,
-        surfaces: meshes.map((m, i) => ({
+        surfaces: gpu.map((m, i) => ({
           primId: build[i].primId, hidden: build[i].hidden,
           pos: m.pos, nor: m.nor, idx: m.idx,
         })),
         weights: { rad: weights.rad, lum: weights.lum },
       },
-      meshes.flatMap((m) => [m.pos.buffer, m.nor.buffer, m.idx.buffer])
+      gpu.flatMap((m) => [m.pos.buffer, m.nor.buffer, m.idx.buffer])
         .concat([weights.rad.buffer, weights.lum.buffer])
     );
     if (stale()) return;
 
-    /* Re-read the transferred views: their buffers now belong to the page. */
-    const meshes2 = build.map(mesh);
-
     /* ---- direct, in chunks so a newer request can cut in ---- */
-    const direct = meshes2.map((m) => new Float64Array((m.pos.length / 3) * nl));
+    const direct = meshes.map((m) => new Float64Array((m.pos.length / 3) * nl));
     let base = 0;
-    for (let s = 0; s < meshes2.length; s++) {
-      const m = meshes2[s];
+    for (let s = 0; s < meshes.length; s++) {
+      const m = meshes[s];
       const nv = m.pos.length / 3;
       const CHUNK = 512;
       for (let v0 = 0; v0 < nv; v0 += CHUNK) {
@@ -98,14 +101,14 @@ self.onmessage = async (e) => {
     /* ---- indirect, one progressive pass at a time ---- */
     const passes = msg.indirectPasses | 0;
     if (passes <= 0 || msg.depth <= 0) return;
-    const indRad = meshes2.map((m) => new Float64Array((m.pos.length / 3) * nl));
-    const indLum = meshes2.map((m) => new Float64Array((m.pos.length / 3) * nl));
+    const indRad = meshes.map((m) => new Float64Array((m.pos.length / 3) * nl));
+    const indLum = meshes.map((m) => new Float64Array((m.pos.length / 3) * nl));
     const SAMPLES = 8;
 
     for (let pass = 0; pass < passes; pass++) {
       base = 0;
-      for (let s = 0; s < meshes2.length; s++) {
-        const m = meshes2[s];
+      for (let s = 0; s < meshes.length; s++) {
+        const m = meshes[s];
         const nv = m.pos.length / 3;
         const CHUNK = 256;
         for (let v0 = 0; v0 < nv; v0 += CHUNK) {

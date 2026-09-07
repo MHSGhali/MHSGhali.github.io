@@ -25,15 +25,15 @@
    The pay-off: switching lux <-> W/m^2, or isolating one lamp's contribution,
    is a dot product over stored numbers. Neither re-solves anything. */
 
-import { PI } from "./core.js?v=3c8f0a84";
-import * as v from "./vec3.js?v=3c8f0a84";
-import * as S from "./spectrum.js?v=3c8f0a84";
-import * as U from "./units.js?v=3c8f0a84";
-import * as I from "./integrator.js?v=3c8f0a84";
-import * as R from "./rng.js?v=3c8f0a84";
-import { offsetOrigin } from "./geom.js?v=3c8f0a84";
-import { cmfYbar } from "./color.js?v=3c8f0a84";
-import { KM_LM_PER_W } from "./core.js?v=3c8f0a84";
+import { PI } from "./core.js?v=19c91c08";
+import * as v from "./vec3.js?v=19c91c08";
+import * as S from "./spectrum.js?v=19c91c08";
+import * as U from "./units.js?v=19c91c08";
+import * as I from "./integrator.js?v=19c91c08";
+import * as R from "./rng.js?v=19c91c08";
+import { offsetOrigin } from "./geom.js?v=19c91c08";
+import { cmfYbar } from "./color.js?v=19c91c08";
+import { KM_LM_PER_W } from "./core.js?v=19c91c08";
 
 /* Same seed constant the C's grid uses, and the same rule: seeded from the
    POINT index, never a worker or tile id, so the result does not depend on how
@@ -48,12 +48,21 @@ export const QUALITY = {
   fine:  { quadSeg: 44, diskSeg: 36, sphereSeg: [44, 28], direct: 64, gridMax: 64 },
 };
 
-/* ---- tessellation: positions and normals in WORLD space ---------------- */
+/* ---- tessellation: positions and normals in WORLD space ----------------
+
+   Double precision, not float32, even though these arrays end up in a GPU
+   buffer that is float32 either way. The solver traces a shadow ray from every
+   vertex, and offsetOrigin lifts that ray off the surface by only 1e-9 of the
+   point magnitude -- comfortably above double rounding, but BELOW the ~4e-9
+   that float32 moves a vertex on a 0.06 m sphere. A vertex that rounds to just
+   inside its own sphere self-occludes, so over half of a lit hemisphere's
+   vertices came back shadowed and the part was covered in dark streaks. The
+   renderer narrows these to float32 on the way to WebGL; the solve must not. */
 
 function tessQuad(prim, seg) {
   const nv = (seg + 1) * (seg + 1);
-  const pos = new Float32Array(nv * 3);
-  const nor = new Float32Array(nv * 3);
+  const pos = new Float64Array(nv * 3);
+  const nor = new Float64Array(nv * 3);
   const idx = new Uint32Array(seg * seg * 6);
   let k = 0;
   for (let j = 0; j <= seg; j++) {
@@ -93,8 +102,8 @@ function tessQuad(prim, seg) {
 function tessDisk(prim, seg) {
   const rings = Math.max(4, Math.round(seg / 2));
   const nv = 1 + rings * seg;
-  const pos = new Float32Array(nv * 3);
-  const nor = new Float32Array(nv * 3);
+  const pos = new Float64Array(nv * 3);
+  const nor = new Float64Array(nv * 3);
   const idx = new Uint32Array(seg * 3 + (rings - 1) * seg * 6);
   const b = v.basis(prim.n);
   const put = (k, p) => {
@@ -127,8 +136,8 @@ function tessDisk(prim, seg) {
 
 function tessSphere(prim, segU, segV) {
   const nv = (segU + 1) * (segV + 1);
-  const pos = new Float32Array(nv * 3);
-  const nor = new Float32Array(nv * 3);
+  const pos = new Float64Array(nv * 3);
+  const nor = new Float64Array(nv * 3);
   const idx = new Uint32Array(segU * segV * 6);
   let k = 0;
   for (let j = 0; j <= segV; j++) {
@@ -174,8 +183,8 @@ function tessPlane(prim, seg, extent) {
 export function tessGrid(g, cap = Infinity) {
   const nu = Math.max(1, Math.min(g.nu | 0, cap)), nv = Math.max(1, Math.min(g.nv | 0, cap));
   const n = v.normalize(v.cross(g.u, g.v));
-  const pos = new Float32Array(nu * nv * 3);
-  const nor = new Float32Array(nu * nv * 3);
+  const pos = new Float64Array(nu * nv * 3);
+  const nor = new Float64Array(nu * nv * 3);
   let k = 0;
   for (let j = 0; j < nv; j++) {
     for (let i = 0; i < nu; i++, k++) {

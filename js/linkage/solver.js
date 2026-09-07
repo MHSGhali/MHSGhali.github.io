@@ -8,13 +8,25 @@
    for four-bar branch ambiguity and the whole thing generalizes to open
    chains, multi-loop mechanisms, and ternary-or-larger links.
 
+   Two kinds of residual share the one least-squares problem. A PAIR residual
+   is a squared-distance between two connectors, in units of length^2. A RAIL
+   residual holds a slider's pin on the line through two other connectors and
+   is naturally linear, in units of length. Mixing them unscaled would be a
+   mistake: the single Levenberg damping term is scaled by the largest diagonal
+   of JtJ across the whole problem, so a residual an order of magnitude smaller
+   in its natural units would simply be ignored. RAIL is therefore multiplied
+   by a characteristic length of the mechanism, putting both in length^2. The
+   rail's own endpoints get Jacobian entries too -- unlike a fixed guide axis
+   the line may itself be moving, which is what makes it a pin running in a
+   slot rather than a prismatic joint on ground.
+
    Two comments from the C are reproduced below because they explain choices
    that look arbitrary and are not: the global damping scale, and why
    convergence and binding are judged by different measures. */
 
-import * as v from "./vec2.js?v=3c8f0a84";
-import { pairIndex } from "./mechanism.js?v=3c8f0a84";
-import { solve as linalgSolve } from "./linalg.js?v=3c8f0a84";
+import * as v from "./vec2.js?v=19c91c08";
+import { pairIndex, liveSliders } from "./mechanism.js?v=19c91c08";
+import { solve as linalgSolve } from "./linalg.js?v=19c91c08";
 
 export function defaultParams() {
   return {
@@ -29,6 +41,23 @@ export function defaultParams() {
     lengthTolAbs: 0.02,
     lengthTolRel: 0.0001,
   };
+}
+
+/* Largest rest distance anywhere in the mechanism -- the natural length scale
+   for making the two residual kinds dimensionally comparable. */
+function characteristicLength(m) {
+  let best = 0;
+  for (const l of m.links) {
+    if (!l.alive) continue;
+    const k = l.connectorIds.length;
+    for (let i = 0; i < k; i++) {
+      for (let j = i + 1; j < k; j++) {
+        const d = l.restDist[pairIndex(i, j, k)];
+        if (d > best) best = d;
+      }
+    }
+  }
+  return best > 1e-9 ? best : 1;
 }
 
 /* Call once when transitioning from editing to running: freezes every link's
@@ -102,6 +131,9 @@ function solvePass(m, params, enforceVariableLinks) {
   /* Residual list: one entry per enforced pairwise distance that has at least
      one free endpoint. Driven links are exactly satisfied by construction. */
   const resCi = [], resCj = [], resRest = [];
+  /* Parallel to the arrays above: -1 marks an ordinary PAIR residual, and any
+     other value is the slider's rail-A connector, making the row a RAIL. */
+  const resRailA = [], resRailB = [];
   for (const l of m.links) {
     if (!l.alive || l.isDriven) continue;
     if (!l.rigid && !enforceVariableLinks) continue;
@@ -112,8 +144,20 @@ function solvePass(m, params, enforceVariableLinks) {
         if (freeIndex[ci] < 0 && freeIndex[cj] < 0) continue; /* both fixed */
         resCi.push(ci); resCj.push(cj);
         resRest.push(l.restDist[pairIndex(i, j, k)]);
+        resRailA.push(-1); resRailB.push(-1);
       }
     }
+  }
+
+  /* Sliders and pins-in-slots: the pin is held on the rail's line. */
+  const railScale = characteristicLength(m);
+  for (const sl of liveSliders(m)) {
+    /* Nothing to solve if every point involved is already placed. */
+    if (freeIndex[sl.pinConnectorId] < 0 &&
+        freeIndex[sl.railAId] < 0 && freeIndex[sl.railBId] < 0) continue;
+    resCi.push(sl.pinConnectorId); resCj.push(sl.pinConnectorId);
+    resRest.push(0);
+    resRailA.push(sl.railAId); resRailB.push(sl.railBId);
   }
 
   const nres = resCi.length;
@@ -142,9 +186,23 @@ function solvePass(m, params, enforceVariableLinks) {
   function evalResiduals(xv, rOut) {
     let cost = 0;
     for (let k = 0; k < nres; k++) {
-      const dx = posX(xv, resCi[k]) - posX(xv, resCj[k]);
-      const dy = posY(xv, resCi[k]) - posY(xv, resCj[k]);
-      const rr = dx * dx + dy * dy - resRest[k] * resRest[k];
+      let rr;
+      if (resRailA[k] >= 0) {
+        /* Signed distance from the pin to the rail line, scaled into length^2. */
+        const ax = posX(xv, resRailA[k]), ay = posY(xv, resRailA[k]);
+        const ddx = posX(xv, resRailB[k]) - ax, ddy = posY(xv, resRailB[k]) - ay;
+        const dlen = Math.hypot(ddx, ddy);
+        if (dlen > 1e-12) {
+          const qx = posX(xv, resCi[k]) - ax, qy = posY(xv, resCi[k]) - ay;
+          rr = ((ddx * qy - ddy * qx) / dlen) * railScale;
+        } else {
+          rr = 0;
+        }
+      } else {
+        const dx = posX(xv, resCi[k]) - posX(xv, resCj[k]);
+        const dy = posY(xv, resCi[k]) - posY(xv, resCj[k]);
+        rr = dx * dx + dy * dy - resRest[k] * resRest[k];
+      }
       rOut[k] = rr;
       cost += rr * rr;
     }
@@ -154,6 +212,32 @@ function solvePass(m, params, enforceVariableLinks) {
   function buildJacobian(xv) {
     J.fill(0);
     for (let k = 0; k < nres; k++) {
+      if (resRailA[k] >= 0) {
+        /* r = cross(d, q) / |d|, differentiated through the pin AND the rail's
+           own endpoints, since the rail may belong to a moving link. */
+        const pin = resCi[k], ra = resRailA[k], rb = resRailB[k];
+        const ax = posX(xv, ra), ay = posY(xv, ra);
+        const dx = posX(xv, rb) - ax, dy = posY(xv, rb) - ay;
+        const dlen = Math.hypot(dx, dy);
+        if (dlen < 1e-12) continue;
+        const qx = posX(xv, pin) - ax, qy = posY(xv, pin) - ay;
+        const f = dx * qy - dy * qx;          /* |d| * signed distance */
+        const l3 = dlen * dlen * dlen;
+        const sc = railScale;
+        if (freeIndex[pin] >= 0) {
+          J[k * n + 2 * freeIndex[pin]] += (-dy / dlen) * sc;
+          J[k * n + 2 * freeIndex[pin] + 1] += (dx / dlen) * sc;
+        }
+        if (freeIndex[ra] >= 0) {
+          J[k * n + 2 * freeIndex[ra]] += ((-qy + dy) / dlen + (f * dx) / l3) * sc;
+          J[k * n + 2 * freeIndex[ra] + 1] += ((-dx + qx) / dlen + (f * dy) / l3) * sc;
+        }
+        if (freeIndex[rb] >= 0) {
+          J[k * n + 2 * freeIndex[rb]] += (qy / dlen - (f * dx) / l3) * sc;
+          J[k * n + 2 * freeIndex[rb] + 1] += (-qx / dlen - (f * dy) / l3) * sc;
+        }
+        continue;
+      }
       const ci = resCi[k], cj = resCj[k];
       const dx = posX(xv, ci) - posX(xv, cj);
       const dy = posY(xv, ci) - posY(xv, cj);
@@ -251,6 +335,17 @@ function lengthViolation(m, absTol, relTol, includeVariable) {
         if (Math.abs(actual - rest) > Math.max(absTol, relTol * rest)) return true;
       }
     }
+  }
+
+  /* A pin dragged off its rail is a genuine lock-up, exactly like a stretched
+     link: the geometry leaves the mechanism nowhere legal to be. */
+  for (const sl of liveSliders(m)) {
+    const a = m.connectors[sl.railAId].pos, b = m.connectors[sl.railBId].pos;
+    const d = v.sub(b, a);
+    const len = v.len(d);
+    if (len < 1e-9) continue;
+    const off = Math.abs(v.cross(d, v.sub(m.connectors[sl.pinConnectorId].pos, a)) / len);
+    if (off > Math.max(absTol, relTol * len)) return true;
   }
   return false;
 }

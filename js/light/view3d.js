@@ -11,7 +11,7 @@ const THREE_URL = "three";
 const ORBIT_URL = "three/addons/controls/OrbitControls.js";
 const GIZMO_URL = "three/addons/controls/TransformControls.js";
 
-import { createViewControl } from "../viewcontrol.js?v=3c8f0a84";
+import { createViewControl } from "../viewcontrol.js?v=19c91c08";
 
 export async function createView(container, opts = {}) {
   let THREE, OrbitControls, TransformControls;
@@ -45,12 +45,6 @@ export async function createView(container, opts = {}) {
   gizmo.addEventListener("objectChange", () => opts.onGizmoMove && opts.onGizmoMove());
   const gizmoHelper = gizmo.getHelper ? gizmo.getHelper() : gizmo;
   scene.add(gizmoHelper);
-
-  const grid = new THREE.GridHelper(2, 20, 0x444444, 0x2a2a2a);
-  grid.rotation.x = Math.PI / 2;
-  grid.material.transparent = true;
-  grid.material.opacity = 0.35;
-  scene.add(grid);
 
   /* Field surfaces are unlit: their colour IS the measurement, and shading them
      again would mix a fake light into a real one. */
@@ -212,16 +206,9 @@ export async function createView(container, opts = {}) {
     camera.near = d / 200;
     camera.far = d * 30;
     camera.updateProjectionMatrix();
-    grid.scale.setScalar(span);
-    grid.position.set(cx, cy, bounds.min.z);
     orbit.update();
     dirty = true;
     syncHeading();
-  }
-
-  function setTheme(p) {
-    grid.material.color.set(p.line);
-    dirty = true;
   }
 
   function resize() {
@@ -313,7 +300,7 @@ export async function createView(container, opts = {}) {
   return {
     failed: false,
     setSurfaces, setField, setLamps, placeLamp, pick, attachGizmo, lampObject,
-    frame, setTheme, resize, orbitBy, zoomBy,
+    frame, resize, orbitBy, zoomBy,
     markDirty() { dirty = true; },
     domElement: renderer.domElement,
     dispose() { alive = false; wheel && wheel.destroy(); orbit.dispose(); renderer.dispose(); renderer.domElement.remove(); },
