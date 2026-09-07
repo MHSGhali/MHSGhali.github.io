@@ -26,14 +26,14 @@
    reproduces what was read. buildScene() turns a description into the runtime
    Scene the estimators use. */
 
-import { PI } from "./core.js";
-import * as v from "./vec3.js";
-import * as S from "./spectrum.js";
-import * as U from "./units.js";
-import * as B from "./bsdf.js";
-import * as L from "./light.js";
-import * as G from "./geom.js";
-import { createScene } from "./scene.js";
+import { PI } from "./core.js?v=8156b23a";
+import * as v from "./vec3.js?v=8156b23a";
+import * as S from "./spectrum.js?v=8156b23a";
+import * as U from "./units.js?v=8156b23a";
+import * as B from "./bsdf.js?v=8156b23a";
+import * as L from "./light.js?v=8156b23a";
+import * as G from "./geom.js?v=8156b23a";
+import { createScene } from "./scene.js?v=8156b23a";
 
 export function emptyDesc() {
   return { materials: [], prims: [], lights: [], grid: null, camera: null };
@@ -190,7 +190,9 @@ export function serializeScene(d) {
   }
   if (d.prims.length) out.push("");
   for (const l of d.lights) {
-    const flux = `${l.fluxUnit} ${n6(l.fluxValue)} ${spdStr(l.spd)}`;
+    /* A sun states an irradiance, not a flux, and carries no fluxValue at all --
+       so the flux clause must not be built for it. */
+    const flux = l.kind === "sun" ? "" : `${l.fluxUnit} ${n6(l.fluxValue)} ${spdStr(l.spd)}`;
     if (l.kind === "point") out.push(`light point ${vs(l.p)} ${flux}`);
     else if (l.kind === "spot") {
       out.push(`light spot ${vs(l.p)} ${vs(l.dir)} ${n6(l.totalDeg)} ${n6(l.falloffDeg)} ${flux}`);

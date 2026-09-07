@@ -387,3 +387,60 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
   border-bottom: 1px solid var(--surface-line); font-size: .87rem; color: var(--text-dim); }
 .keys dt { flex: 0 0 84px; font-family: var(--font-mono); font-size: .74rem; color: var(--text); }
 .keys dd { margin: 0; }
+
+/* ============================================================
+   Light simulator (pages/light.html)
+   ============================================================ */
+
+/* The viewport carries the measurement, so it gets the room; the property
+   panel is a fixed column beside it. */
+.stage-light { grid-template-columns: 1fr 300px; }
+@media (max-width: 900px) { .stage-light { grid-template-columns: 1fr; } }
+
+#viewport-wrap { aspect-ratio: 16 / 10; }
+@media (max-width: 900px) { #viewport-wrap { aspect-ratio: 4 / 3; } }
+#viewport { touch-action: none; cursor: crosshair; }
+
+/* --- colour bar --- */
+.legend {
+  position: absolute; left: 12px; right: 12px; bottom: 10px; z-index: 2;
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono); font-size: .68rem; color: var(--text-faint);
+  pointer-events: none;
+}
+.legend canvas {
+  flex: 1; height: 9px; border-radius: 3px; display: block;
+  border: 1px solid var(--surface-line);
+}
+
+/* --- property panel --- */
+.panel {
+  background: var(--bg-elev); border: 1px solid var(--surface-line);
+  border-radius: var(--radius); padding: 16px; overflow-y: auto;
+  max-height: 640px;
+}
+.panel h3 { font-size: .95rem; margin: 0 0 14px; }
+.panel-hint { font-size: .86rem; color: var(--text-faint); margin: 0; }
+.prow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.prow label {
+  flex: 0 0 92px; font-family: var(--font-mono); font-size: .68rem;
+  color: var(--text-faint); letter-spacing: .02em;
+}
+.prow input, .prow select {
+  flex: 1; min-width: 0; width: 100%;
+  font-family: var(--font-mono); font-size: .76rem;
+  padding: 6px 8px; border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-line); background: var(--bg-elev-2); color: var(--text);
+}
+.prow input:focus, .prow select:focus { border-color: var(--accent); outline: none; }
+.vec3 { display: flex; gap: 5px; flex: 1; min-width: 0; }
+.vec3 input { flex: 1 1 0; min-width: 0; }
+.panel .tbtn { margin-top: 14px; width: 100%; justify-content: center; }
+
+/* --- probe readout --- */
+.probe {
+  margin: 10px 0 0; min-height: 1.4em;
+  font-size: .76rem; color: var(--text-faint);
+}
+.probe b { color: var(--text); }
+.status .over { color: var(--text-faint); }

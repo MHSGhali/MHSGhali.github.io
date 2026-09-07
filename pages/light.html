@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Light Simulation | Mark Gerges</title>
+<meta name="description" content="A physically-based spectral light simulator in the browser: build a scene, place real light sources, and see the illuminance field on every surface in lux or W/m². The engine is a JavaScript port of my C ray tracer.">
+<link rel="canonical" href="https://mhsghali.github.io/pages/light.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Light Simulation — spectral illuminance in the browser">
+<meta property="og:description" content="Place lamps, move parts, and read the illuminance field on every surface. 95 spectral bins, CIE 1931 photometry, real interreflection.">
+<meta property="og:url" content="https://mhsghali.github.io/pages/light.html">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+<link rel="stylesheet" href="../css/main.css?v=8156b23a">
+<script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<script src="../js/app.js?v=8156b23a" defer></script>
+<!-- three.js is pinned here rather than in view3d.js because OrbitControls and
+     TransformControls import the bare specifier "three" internally, which only
+     resolves through an import map. One place to bump the version. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="../js/light/app.js?v=8156b23a"></script>
+</head>
+<body>
+<div class="sheen" aria-hidden="true"></div>
+
+<!-- BUILD:nav -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="../index.html">Mark Gerges</a>
+    <button class="icon-btn nav-toggle" data-nav-toggle aria-expanded="false" aria-label="Toggle navigation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#experience">Experience</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../pages/linkage.html">Linkage</a>
+      <a href="../pages/light.html">Light</a>
+      <a href="../assets/files/MarkGerges.pdf">Resume</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="icon-btn" data-theme-toggle aria-label="Toggle color theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<!-- /BUILD:nav -->
+
+<main>
+<section class="tool wrap">
+  <div class="tool-head">
+    <div>
+      <p class="eyebrow">Light Simulation</p>
+      <h1>Where does the light land?</h1>
+    </div>
+    <p>Place lamps and parts, and read the illuminance falling on every surface — in lux or in watts per square metre, from the same stored measurement. Radiance is carried as 95 spectral bins, so the photometric numbers come from an exact integral against the CIE observer rather than a correction factor.</p>
+  </div>
+
+  <div class="toolbar" role="toolbar" aria-label="Scene tools">
+    <select id="preset" aria-label="Load a starter scene"></select>
+    <span class="tbtn-sep" aria-hidden="true"></span>
+    <button class="tbtn" id="add-rect" type="button">+ panel</button>
+    <button class="tbtn" id="add-spot" type="button">+ spot</button>
+    <button class="tbtn" id="add-point" type="button">+ point</button>
+    <button class="tbtn" id="add-quad" type="button">+ surface</button>
+    <button class="tbtn" id="add-sphere" type="button">+ part</button>
+    <span class="tbtn-sep" aria-hidden="true"></span>
+    <button class="tbtn" id="btn-units" type="button" title="Switch between illuminance and irradiance">lx</button>
+    <button class="tbtn" id="btn-mode" type="button" title="Include interreflection, or direct light only">full</button>
+    <button class="tbtn" id="btn-quality" type="button" title="Solve resolution">draft</button>
+    <button class="tbtn" id="btn-fit" type="button">Fit</button>
+  </div>
+
+  <div class="stage stage-light">
+    <div class="viewport" id="viewport-wrap">
+      <span class="vp-label">Illuminance field</span>
+      <div id="viewport" style="position:absolute;inset:0"></div>
+      <p class="vp-note" id="vp-note">Loading the 3D view…</p>
+      <div class="legend">
+        <span id="legend-lo">0</span>
+        <canvas id="legend" aria-hidden="true"></canvas>
+        <span id="legend-hi"></span>
+      </div>
+    </div>
+    <aside class="panel" id="panel" aria-label="Properties"></aside>
+  </div>
+
+  <div class="status">
+    <span id="stats"></span>
+    <span class="msg" id="msg"></span>
+    <span class="actions">
+      <button class="tbtn" id="btn-share" type="button">Copy link</button>
+      <button class="tbtn" id="btn-scene" type="button">Download .scene</button>
+    </span>
+  </div>
+  <p class="probe mono" id="probe"></p>
+  <p class="probe mono" id="zeros"></p>
+
+  <details class="howto">
+    <summary>How to use it, and what the numbers mean</summary>
+    <div class="grid grid-2">
+      <div>
+        <h3>Driving it</h3>
+        <dl class="keys">
+          <div><dt>Click</dt><dd>select a lamp or a surface; its properties appear on the right</dd></div>
+          <div><dt>Drag gizmo</dt><dd>move the selected lamp. The field re-solves as you release</dd></div>
+          <div><dt>Hover</dt><dd>probe the surface under the pointer, with each lamp's share of it</dd></div>
+          <div><dt>Drag / scroll</dt><dd>orbit and zoom the camera</dd></div>
+          <div><dt>lx ⇄ W·m⁻²</dt><dd>switch unit systems. This never re-solves — see below</dd></div>
+          <div><dt>full ⇄ direct</dt><dd>with or without light that has bounced off the enclosure</dd></div>
+          <div><dt>draft ⇄ fine</dt><dd>solve resolution: fine is slower but resolves shadow edges</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3>Why the unit switch is instant</h3>
+        <p>Every internal quantity is radiometric. Lux exists only as an exact integral of the stored spectrum against the CIE luminous efficiency function V(λ) — never as a fudge factor on a radiometric number.</p>
+        <p>Direct light from a source is always that source's normalised spectrum scaled by one number, so what is stored per point is that number, per lamp. Both lux and W·m⁻² are linear functionals of a spectrum, so each is a different dot product against the same stored row. Changing units, or isolating one lamp, is arithmetic over numbers already in memory — not another solve.</p>
+        <h3 style="margin-top:24px">What it is doing</h3>
+        <p>Direct light is next-event estimation against every lamp, with visibility, so shadows are real. Interreflection is a path traced with multiple importance sampling, accumulated progressively — watch the numbers settle after a change. A lamp given in lumens is converted to watts once, when the scene loads, so no photometric value is ever stored or accumulated.</p>
+      </div>
+    </div>
+  </details>
+
+  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Light-Simulation" target="_blank" rel="noopener">Light-Simulation</a>, my spectral ray tracer in C. It reproduces that engine's spectral and colorimetric output to all 18 significant digits, and its 4096-point workcell field to within float32 round-off — the same random stream, so the comparison is of numbers rather than of averages. The scene format is the CLI's, so a scene you download here runs there unchanged. The workcell preset is the geometry behind <a href="../index.html#publications">US Patent 12,610,446</a> and the adaptive-lighting work in my thesis.</p>
+</section>
+</main>
+
+<!-- BUILD:footer -->
+<footer>
+  <div class="wrap foot">
+    <p>&copy; <span data-year></span> Mark Gerges</p>
+    <div class="social">
+      <a href="https://www.linkedin.com/in/mark-gerges-9899967a/" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.06c.53-.95 1.83-1.95 3.76-1.95C20.5 8.75 22 11 22 14.5V21h-4v-5.9c0-1.4-.03-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9z"/></svg></a>
+      <a href="https://github.com/MHSGhali" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.35-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.78 2.71 1.27 3.37.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg></a>
+      <a href="mailto:redacted@example.com" aria-label="Email"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+    </div>
+  </div>
+</footer>
+<!-- /BUILD:footer -->
+</body>
+</html>

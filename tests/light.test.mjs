@@ -21,6 +21,8 @@ import * as SC from "../js/light/scene.js";
 import * as I from "../js/light/integrator.js";
 import * as R from "../js/light/rng.js";
 import { PI } from "../js/light/core.js";
+import { PRESETS } from "../js/light/presets.js";
+import { parseScene, serializeScene, buildScene } from "../js/light/scenefile.js";
 
 /* Relative comparison, falling back to absolute near zero -- the C's CHECK_NEAR. */
 function near(got, want, tol, msg) {
@@ -402,4 +404,29 @@ test("the scalar direct path equals the spectral one", () => {
      multiplies by integrate(sHat), which is 0.99999995 rather than 1 because
      sHat is stored as float32. That is the entire discrepancy. */
   near(U.photometric(fromScalars), U.photometric(spectral), 1e-7, "lux");
+});
+
+/* --------------------------------------------------------- scene format */
+
+test("every preset round-trips through the scene format", () => {
+  /* The written file has to be readable both by this parser and by the C CLI,
+     which is what makes "Download .scene" worth having. A light that states an
+     irradiance rather than a flux -- the sun -- has no flux clause, and writing
+     one produced `undefined` in the file. */
+  for (const p of PRESETS) {
+    const a = parseScene(p.text);
+    const text = serializeScene(a);
+    assert.ok(!/undefined|NaN/.test(text), `${p.id}: wrote an invalid token\n${text}`);
+    const b = parseScene(text);
+    assert.equal(b.lights.length, a.lights.length, `${p.id}: light count`);
+    assert.equal(b.prims.length, a.prims.length, `${p.id}: prim count`);
+    assert.equal(b.materials.length, a.materials.length, `${p.id}: material count`);
+
+    /* And the rebuilt scene must be the same scene, not merely the same shape. */
+    const sa = buildScene(a).scene, sb = buildScene(b).scene;
+    for (let i = 0; i < sa.lights.length; i++) {
+      near(sb.lights[i].phiE, sa.lights[i].phiE, 1e-9, `${p.id}: light ${i} flux`);
+      near(sb.lights[i].radiance, sa.lights[i].radiance, 1e-9, `${p.id}: light ${i} radiance`);
+    }
+  }
 });

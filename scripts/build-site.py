@@ -26,6 +26,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 PAGES = {
     "index.html": "",
     "pages/linkage.html": "../",
+    "pages/light.html": "../",
 }
 
 BLOCKS = {"nav": "partials/nav.html", "footer": "partials/footer.html"}

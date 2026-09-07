@@ -1,13 +1,15 @@
 /* The transport estimators, from src/integrator.c. */
 
-import { PI } from "./core.js";
-import * as v from "./vec3.js";
-import * as S from "./spectrum.js";
-import * as L from "./light.js";
-import * as B from "./bsdf.js";
-import { intersect, occluded } from "./scene.js";
-import { offsetOrigin, makeHit } from "./geom.js";
-import * as R from "./rng.js";
+import { PI } from "./core.js?v=8156b23a";
+import * as v from "./vec3.js?v=8156b23a";
+import * as S from "./spectrum.js?v=8156b23a";
+import * as L from "./light.js?v=8156b23a";
+import * as B from "./bsdf.js?v=8156b23a";
+import { intersect, occluded } from "./scene.js?v=8156b23a";
+import { cmfYbar } from "./color.js?v=8156b23a";
+import { KM_LM_PER_W } from "./core.js?v=8156b23a";
+import { offsetOrigin, makeHit } from "./geom.js?v=8156b23a";
+import * as R from "./rng.js?v=8156b23a";
 
 /* Which sampling strategies the path tracer uses to find emitted light.
 
@@ -104,11 +106,21 @@ export function estimateIrradiance(sc, p, n, nsamples, rng, outAcc, aRow) {
 const matOf = (sc, matId) => (matId >= 0 && matId < sc.mats.length ? sc.mats[matId] : null);
 
 /* Deposit a contribution into the radiance accumulator and, if requested, into
-   the emitting source's own column. */
-function deposit(out, aRow, beta, value, w, lightId, scratch) {
+   the emitting source's own column.
+
+   `aRowLum` gets the same contribution measured photometrically. Both are
+   linear functionals of the spectrum, so attributing them at the deposit -- the
+   moment the emitting source is known -- is exact for both unit systems. The
+   alternative, splitting a vertex's luminous total between sources afterwards
+   in proportion to their radiometric share, is only exact when every source has
+   the same spectrum. */
+function deposit(out, aRow, aRowLum, beta, value, w, lightId, scratch) {
   const c = S.mul(beta, value, scratch);
   S.accAddScaled(out, c, w);
-  if (aRow && lightId >= 0) aRow[lightId] += S.integrate(c) * w;
+  if (lightId >= 0) {
+    if (aRow) aRow[lightId] += S.integrate(c) * w;
+    if (aRowLum) aRowLum[lightId] += KM_LM_PER_W * S.integrateWeighted(c, cmfYbar()) * w;
+  }
 }
 
 /* Estimate spectral radiance arriving along `ray`, in W/(m^2 sr nm).
@@ -117,9 +129,12 @@ function deposit(out, aRow, beta, value, w, lightId, scratch) {
    than this. Used by the probe estimator, where direct light is already counted
    by explicit light sampling, so collecting emission at the first hit as well
    would double count it. */
-export function traceRadiance(sc, ray, rng, maxDepth, strat, outAcc, aRow, skipEmissionBefore = 0) {
+export function traceRadiance(
+  sc, ray, rng, maxDepth, strat, outAcc, aRow, skipEmissionBefore = 0, aRowLum = null
+) {
   outAcc.fill(0);
   if (aRow) aRow.fill(0);
+  if (aRowLum) aRowLum.fill(0);
 
   const beta = S.constant(1); /* path throughput, dimensionless */
   const f = S.zero();
@@ -162,7 +177,7 @@ export function traceRadiance(sc, ray, rng, maxDepth, strat, outAcc, aRow, skipE
          sampling would disagree about the back of every area light. */
       if (v.dot(hit.ng, v.neg(r.d)) <= 0) le.fill(0);
       else S.copy(m.le, le);
-      deposit(outAcc, aRow, beta, le, w, hit.lightId, depositScratch);
+      deposit(outAcc, aRow, aRowLum, beta, le, w, hit.lightId, depositScratch);
     }
 
     if (depth >= maxDepth) break;
@@ -194,7 +209,7 @@ export function traceRadiance(sc, ray, rng, maxDepth, strat, outAcc, aRow, skipE
            scalar -- the same factorisation the direct estimator exploits. */
         S.mul(f, l.sHat, cScratch);
         S.scale(cScratch, s.liOverPdfScalar, cScratch);
-        deposit(outAcc, aRow, beta, cScratch, w * wi.z, l.index, depositScratch);
+        deposit(outAcc, aRow, aRowLum, beta, cScratch, w * wi.z, l.index, depositScratch);
       }
     }
 

@@ -12,9 +12,9 @@
    that look arbitrary and are not: the global damping scale, and why
    convergence and binding are judged by different measures. */
 
-import * as v from "./vec2.js?v=0bbdca31";
-import { pairIndex } from "./mechanism.js?v=0bbdca31";
-import { solve as linalgSolve } from "./linalg.js?v=0bbdca31";
+import * as v from "./vec2.js?v=8156b23a";
+import { pairIndex } from "./mechanism.js?v=8156b23a";
+import { solve as linalgSolve } from "./linalg.js?v=8156b23a";
 
 export function defaultParams() {
   return {
