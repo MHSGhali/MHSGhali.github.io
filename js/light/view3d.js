@@ -11,6 +11,8 @@ const THREE_URL = "three";
 const ORBIT_URL = "three/addons/controls/OrbitControls.js";
 const GIZMO_URL = "three/addons/controls/TransformControls.js";
 
+import { createViewControl } from "../viewcontrol.js?v=3c8f0a84";
+
 export async function createView(container, opts = {}) {
   let THREE, OrbitControls, TransformControls;
   try {
@@ -30,7 +32,8 @@ export async function createView(container, opts = {}) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
 
-  const orbit = new OrbitControls(camera, renderer.domElement);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  const orbit = controls;
   orbit.enableDamping = true;
   orbit.dampingFactor = 0.08;
 
@@ -59,6 +62,7 @@ export async function createView(container, opts = {}) {
   let surfaces = [];
   let lampMeshes = [];
   let dirty = true;
+  let wheel = null;
   const raycaster = new THREE.Raycaster();
 
   function clearGroup(g) {
@@ -212,6 +216,7 @@ export async function createView(container, opts = {}) {
     grid.position.set(cx, cy, bounds.min.z);
     orbit.update();
     dirty = true;
+    syncHeading();
   }
 
   function setTheme(p) {
@@ -227,10 +232,75 @@ export async function createView(container, opts = {}) {
     camera.updateProjectionMatrix();
     dirty = true;
   }
+
+  /* ---- orbit / zoom, driven by the corner wheel ----
+     Done on the camera directly rather than through OrbitControls' internals:
+     the offset from the target is converted to spherical, adjusted, and rebuilt.
+     Polar is clamped just short of the poles, where the up vector degenerates
+     and the view flips. */
+  function orbitBy(dAzimuth, dPolar) {
+    const off = camera.position.clone().sub(controls.target);
+    const radius = off.length();
+    if (radius <= 0) return;
+    const up = camera.up;
+    /* Spherical about the camera's own up axis, so this works for a Z-up scene
+       as well as three.js's default Y-up. */
+    const zAxis = up.clone().normalize();
+    const xAxis = new THREE.Vector3(1, 0, 0);
+    if (Math.abs(xAxis.dot(zAxis)) > 0.9) xAxis.set(0, 1, 0);
+    const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+    xAxis.crossVectors(yAxis, zAxis).normalize();
+
+    const z = off.dot(zAxis);
+    let polar = Math.acos(Math.min(1, Math.max(-1, z / radius)));
+    let azimuth = Math.atan2(off.dot(yAxis), off.dot(xAxis));
+
+    azimuth += dAzimuth;
+    polar = Math.min(Math.PI - 0.05, Math.max(0.05, polar + dPolar));
+
+    const s = Math.sin(polar);
+    off.copy(xAxis).multiplyScalar(Math.cos(azimuth) * s * radius)
+      .addScaledVector(yAxis, Math.sin(azimuth) * s * radius)
+      .addScaledVector(zAxis, Math.cos(polar) * radius);
+    camera.position.copy(controls.target).add(off);
+    camera.lookAt(controls.target);
+    controls.update();
+    dirty = true;
+    syncHeading();
+  }
+
+  function zoomBy(scale) {
+    const off = camera.position.clone().sub(controls.target);
+    const next = Math.min(Math.max(off.length() * scale, camera.near * 4), camera.far * 0.5);
+    camera.position.copy(controls.target).add(off.setLength(next));
+    controls.update();
+    dirty = true;
+  }
+
+  /* Keep the needle pointing where the camera actually is. */
+  function syncHeading() {
+    if (!wheel) return;
+    const off = camera.position.clone().sub(controls.target);
+    const up = camera.up.clone().normalize();
+    const xAxis = new THREE.Vector3(1, 0, 0);
+    if (Math.abs(xAxis.dot(up)) > 0.9) xAxis.set(0, 1, 0);
+    const yAxis = new THREE.Vector3().crossVectors(up, xAxis).normalize();
+    xAxis.crossVectors(yAxis, up).normalize();
+    wheel.setHeading(Math.atan2(off.dot(yAxis), off.dot(xAxis)));
+  }
+
+  wheel = createViewControl(container.parentElement || container, {
+    label: "Rotate and zoom the view",
+    onSpin: (d) => orbitBy(d, 0),
+    onTilt: (d) => orbitBy(0, d),
+    onZoom: (s2) => zoomBy(s2),
+    onReset: () => opts.onFit && opts.onFit(),
+  });
+
   new ResizeObserver(resize).observe(container);
   resize();
 
-  orbit.addEventListener("change", () => { dirty = true; });
+  orbit.addEventListener("change", () => { dirty = true; syncHeading(); });
 
   let alive = true;
   (function loop() {
@@ -243,9 +313,9 @@ export async function createView(container, opts = {}) {
   return {
     failed: false,
     setSurfaces, setField, setLamps, placeLamp, pick, attachGizmo, lampObject,
-    frame, setTheme, resize,
+    frame, setTheme, resize, orbitBy, zoomBy,
     markDirty() { dirty = true; },
     domElement: renderer.domElement,
-    dispose() { alive = false; orbit.dispose(); renderer.dispose(); renderer.domElement.remove(); },
+    dispose() { alive = false; wheel && wheel.destroy(); orbit.dispose(); renderer.dispose(); renderer.domElement.remove(); },
   };
 }

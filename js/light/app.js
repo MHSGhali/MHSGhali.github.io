@@ -1,12 +1,12 @@
 /* Page controller for the light simulator: scene state, the worker, the 3D
    view, the property panel, and the readouts. */
 
-import { createView } from "./view3d.js?v=8156b23a";
-import { PRESETS, presetById } from "./presets.js?v=8156b23a";
-import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=8156b23a";
-import { viridis } from "./viridis.js?v=8156b23a";
-import { stats } from "./stats.js?v=8156b23a";
-import * as v from "./vec3.js?v=8156b23a";
+import { createView } from "./view3d.js?v=3c8f0a84";
+import { PRESETS, presetById } from "./presets.js?v=3c8f0a84";
+import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=3c8f0a84";
+import { viridis } from "./viridis.js?v=3c8f0a84";
+import { stats } from "./stats.js?v=3c8f0a84";
+import * as v from "./vec3.js?v=3c8f0a84";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -475,6 +475,7 @@ function download(name, text, mime) {
 async function main() {
   const host = $("#viewport");
   view = await createView(host, {
+    onFit: () => frameView(),
     onGizmoMove: () => {
       const sel = state.selection;
       if (!sel || sel.kind !== "light") return;

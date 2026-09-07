@@ -8,9 +8,9 @@
    It stops when it isn't being looked at: under prefers-reduced-motion, when
    the tab is hidden, and when the canvas is scrolled out of view. */
 
-import * as M from "./linkage/mechanism.js?v=8156b23a";
-import * as S from "./linkage/solver.js?v=8156b23a";
-import * as v from "./linkage/vec2.js?v=8156b23a";
+import * as M from "./linkage/mechanism.js?v=3c8f0a84";
+import * as S from "./linkage/solver.js?v=3c8f0a84";
+import * as v from "./linkage/vec2.js?v=3c8f0a84";
 
 const canvas = document.querySelector("[data-hero-linkage]");
 if (canvas) start(canvas);

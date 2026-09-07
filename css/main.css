@@ -444,3 +444,46 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 }
 .probe b { color: var(--text); }
 .status .over { color: var(--text-faint); }
+
+/* ============================================================
+   Viewport navigation wheel (js/viewcontrol.js)
+   ============================================================ */
+
+.viewctl {
+  position: absolute; top: 10px; right: 10px; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 8px; border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  border: 1px solid var(--surface-line);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  /* Sits over the canvas, so it must take its own pointer events rather than
+     letting them fall through to OrbitControls underneath. */
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+
+.viewctl-dial { width: 68px; height: 68px; display: block; cursor: grab; touch-action: none; }
+.viewctl.is-dragging .viewctl-dial { cursor: grabbing; }
+
+.vc-ring { fill: none; stroke: var(--surface-line); stroke-width: 4; }
+.vc-tick { stroke: var(--text-faint); stroke-width: 1.3; }
+.vc-tick-long { stroke: var(--text-dim); stroke-width: 1.8; }
+.vc-needle { fill: var(--accent); }
+.vc-stem { stroke: var(--accent); stroke-width: 1.6; opacity: .65; }
+
+.viewctl-row { display: flex; gap: 4px; }
+.vc-btn {
+  width: 20px; height: 20px; padding: 0;
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: .66rem; line-height: 1;
+  border: 1px solid var(--surface-line); border-radius: 5px;
+  background: var(--bg-elev-2); color: var(--text-dim); cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.vc-btn:hover { color: var(--accent); border-color: var(--accent); }
+.vc-icon { width: 12px; height: 12px; display: block; }
+.vc-icon-path { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+
+@media (max-width: 640px) {
+  .viewctl { top: 8px; right: 8px; padding: 6px; }
+  .viewctl-dial { width: 60px; height: 60px; }
+}
