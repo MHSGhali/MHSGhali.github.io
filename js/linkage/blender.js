@@ -11,8 +11,8 @@
 
    Convention: 1 mechanism world unit = 1 mm. */
 
-import * as M from "./mechanism.js?v=19c91c08";
-import * as S from "./solver.js?v=19c91c08";
+import * as M from "./mechanism.js?v=955473fe";
+import * as S from "./solver.js?v=955473fe";
 
 export const EXPORT_FRAMES = 120;
 

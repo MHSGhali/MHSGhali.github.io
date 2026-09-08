@@ -2,9 +2,20 @@
 (function () {
   // --- theme -------------------------------------------------------------
   var root = document.documentElement;
+  root.classList.add('js');
   var stored = null;
   try { stored = localStorage.getItem('theme'); } catch (e) {}
-  if (stored === 'light') root.setAttribute('data-theme', 'light');
+  /* Same rule as the inline head script, which has already run: an explicit
+     stored choice wins, and only in its absence does the OS preference decide.
+     Repeated here so the theme is still right if the inline script was the
+     thing that failed. Nothing is ever WRITTEN here -- a preference the
+     visitor has not stated must not become a stored choice, or the toggle
+     would have nothing to fall back to. */
+  var prefersLight = window.matchMedia
+    && window.matchMedia('(prefers-color-scheme: light)').matches;
+  if (stored === 'light' || (!stored && prefersLight)) {
+    root.setAttribute('data-theme', 'light');
+  }
 
   window.addEventListener('DOMContentLoaded', function () {
     var toggle = document.querySelector('[data-theme-toggle]');
@@ -50,13 +61,39 @@
     if (reduce || !('IntersectionObserver' in window)) {
       targets.forEach(function (el) { el.classList.add('in'); });
     } else {
+      /* Reveal targets are individual cards and timeline entries rather than
+         whole sections, so a fast scroll never lands on an empty section
+         waiting out a fade. Several usually cross the threshold in the same
+         callback, and firing them together is a flash rather than a reveal, so
+         stagger only that batch -- one arriving alone still starts at once. */
       var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
+        var arriving = entries.filter(function (e) { return e.isIntersecting; });
+        arriving.forEach(function (entry, i) {
+          if (i) entry.target.style.transitionDelay = (i * 60) + 'ms';
+          entry.target.classList.add('in');
+          io.unobserve(entry.target);
         });
       }, { threshold: 0.08, rootMargin: '0px 0px -40px' });
       targets.forEach(function (el) { io.observe(el); });
     }
+
+    // --- email links -----------------------------------------------------
+    /* The address never appears in the served HTML: it is carried as two
+       halves and joined here. That defeats the naive `mailto:` and plain-text
+       scrapes without hiding it from a person, since the finished link and
+       its label both read normally. Each link ships `hidden` and is revealed
+       only once it has a working href, so a failure here leaves no dead
+       button -- just the LinkedIn and GitHub routes that were always there. */
+    document.querySelectorAll('[data-mailto]').forEach(function (el) {
+      var user = el.getAttribute('data-mailto-user');
+      var domain = el.getAttribute('data-mailto-domain');
+      if (!user || !domain) return;
+      var addr = user + '@' + domain;
+      el.setAttribute('href', 'mailto:' + addr);
+      var label = el.querySelector('[data-mailto-label]');
+      if (label) label.textContent = addr;
+      el.hidden = false;
+    });
 
     // --- year stamp ------------------------------------------------------
     document.querySelectorAll('[data-year]').forEach(function (el) {

@@ -1,13 +1,13 @@
 /* Page controller for the linkage tool: wires the toolbar, the status line,
    the 3D view, the Blender export and the share link to the editor. */
 
-import { createEditor } from "./editor.js?v=19c91c08";
-import { createView3D } from "./view3d.js?v=19c91c08";
-import { PRESETS, buildPreset } from "./presets.js?v=19c91c08";
-import { exportBlenderScript } from "./blender.js?v=19c91c08";
-import { exportPrintableParts } from "./print3d.js?v=19c91c08";
-import { makeZip } from "./zip.js?v=19c91c08";
-import { encode, decode } from "./serialize.js?v=19c91c08";
+import { createEditor } from "./editor.js?v=955473fe";
+import { createView3D } from "./view3d.js?v=955473fe";
+import { PRESETS, buildPreset } from "./presets.js?v=955473fe";
+import { exportBlenderScript } from "./blender.js?v=955473fe";
+import { exportPrintableParts } from "./print3d.js?v=955473fe";
+import { makeZip } from "./zip.js?v=955473fe";
+import { encode, decode } from "./serialize.js?v=955473fe";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -23,8 +23,10 @@ const buttons = {
   variable: $("#btn-variable"), trace: $("#btn-trace"), del: $("#btn-delete"),
   undo: $("#btn-undo"), gravity: $("#btn-gravity"), run: $("#btn-run"),
   fit: $("#btn-fit"), download: $("#btn-download"), share: $("#btn-share"),
-  print: $("#btn-print"),
+  print: $("#btn-print"), deselect: $("#btn-deselect"), clear: $("#btn-clear"),
+  slower: $("#btn-slower"), faster: $("#btn-faster"),
 };
+const editorNote = $("#editor-note");
 
 let view3d = null;
 /* The last thing the page said to the visitor: a preset's blurb, or the result
@@ -88,11 +90,36 @@ buttons.trace.addEventListener("click", () => editor.toggleTrace());
 buttons.del.addEventListener("click", () => editor.deleteSelection());
 buttons.undo.addEventListener("click", () => editor.undo());
 buttons.gravity.addEventListener("click", () => editor.toggleGravity());
+/* Esc, C and +/- were bound to keys only, so on a touchscreen -- which has no
+   keys -- three documented controls were unreachable, motor speed among them
+   and it is the only pacing control the tool has. */
+buttons.deselect.addEventListener("click", () => editor.clearSelection());
+buttons.clear.addEventListener("click", () => editor.clearTraces());
+buttons.slower.addEventListener("click", () => editor.nudgeMotorSpeed(-1));
+buttons.faster.addEventListener("click", () => editor.nudgeMotorSpeed(1));
 buttons.run.addEventListener("click", () => editor.toggleRun());
 buttons.fit.addEventListener("click", () => {
   editor.fitView();
   if (view3d && !view3d.failed) view3d.resetView();
 });
+
+/* --- which viewport holds the screen on a phone -----------------------
+   Only one is visible under 900px. A hidden canvas cannot be measured, so both
+   the editor and the 3D view have to be told to re-measure when they are the
+   one shown -- otherwise the newly revealed view keeps whatever size it had
+   when it was last laid out, which for a view hidden since load is none. */
+const stage = $("#stage");
+const viewButtons = { design: $("#btn-view-design"), "3d": $("#btn-view-3d") };
+function showView(which) {
+  stage.dataset.show = which;
+  for (const [name, btn] of Object.entries(viewButtons)) {
+    btn.setAttribute("aria-pressed", String(name === which));
+  }
+  if (which === "3d" && view3d && !view3d.failed) view3d.resize();
+  else editor.draw();
+}
+viewButtons.design.addEventListener("click", () => showView("design"));
+viewButtons["3d"].addEventListener("click", () => showView("3d"));
 
 /* --- export and share ------------------------------------------------- */
 
@@ -165,10 +192,19 @@ function refresh() {
   set(buttons.del, { disabled: s.running || !s.hasSelection });
   set(buttons.undo, { disabled: !s.canUndo });
   set(buttons.gravity, { pressed: s.gravity });
+  set(buttons.deselect, { disabled: !s.hasSelection });
+  set(buttons.clear, { disabled: !s.anyTraced });
+  /* nudgeMotorSpeed acts on the SELECTED link, so these are live only when the
+     driven link is the one selected -- same rule the +/- keys have always had,
+     now visible instead of silent. */
+  set(buttons.slower, { disabled: s.motorSpeed === null });
+  set(buttons.faster, { disabled: s.motorSpeed === null });
   set(buttons.share, { disabled: s.running });
   set(buttons.print, { disabled: s.running || s.linkCount === 0 });
 
-  buttons.run.textContent = s.running ? "Stop" : "Run";
+  /* Only the word, never the button's contents: the <kbd>R</kbd> beside it is
+     markup, and textContent on the button would delete it. */
+  buttons.run.querySelector("[data-run-label]").textContent = s.running ? "Stop" : "Run";
   buttons.run.setAttribute("aria-pressed", String(s.running));
   editorCanvas.parentElement.classList.toggle("is-running", s.running);
 
@@ -183,7 +219,44 @@ function refresh() {
   statusMsg.textContent = message;
   statusMsg.classList.toggle("warn", !!s.bindMessage);
 
+  editorNote.textContent = nextStep(s);
+
   if (view3d && !view3d.failed) view3d.sync();
+}
+
+/* What to do next, said in the Design viewport.
+
+   Every build button disables itself until it has something to act on, which is
+   right but means the toolbar arrives almost entirely greyed out -- to a first
+   visitor that reads as broken software, and the explanation is in a panel that
+   is both collapsed and below the fold. This is the same precondition each
+   button already carries in its `title`, surfaced where the visitor is looking.
+
+   It lives here rather than in the editor because it is copy, and the editor is
+   the engine's half of this page. Returning "" hides it: there is nothing
+   useful to say while the mechanism is running, and the status line owns the
+   bind message anyway. */
+function nextStep(s) {
+  if (s.running) return "";
+  if (s.selectedLink >= 0) {
+    if (s.linkCanDrive) return "Motor (M) drives this link. Variable (V) lets it change length.";
+    if (s.linkDriven) return "+ and - change this motor's speed. Run (R) starts it.";
+    return "Variable (V) lets this link change length. Motor (M) needs one grounded joint.";
+  }
+  switch (s.selectedCount) {
+    case 0:
+      return s.jointCount === 0
+        ? "Click anywhere to place a joint."
+        : "Click a joint or a bar to select it · click empty space to place a joint";
+    case 1:
+      return "Anchor (A) grounds it · Trace (T) draws its path · shift-click another to link";
+    case 2:
+      return "Link (L) joins these two into a rigid bar.";
+    case 3:
+      return "Link (L) makes a rigid plate · Slide (S) rails the first on the other two";
+    default:
+      return "Link (L) joins all " + s.selectedCount + " into one rigid plate.";
+  }
 }
 
 /* A preset's blurb, or the note left by an export, describes the mechanism as

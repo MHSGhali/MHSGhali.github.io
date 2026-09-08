@@ -17,9 +17,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="../css/main.css?v=19c91c08">
-<script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="../js/app.js?v=19c91c08" defer></script>
+<link rel="stylesheet" href="../css/main.css?v=955473fe">
+<script>/* Runs before paint: marks JS alive so the reveal animation can hide
+   things it will later show, and settles the theme so there is no flash. */
+document.documentElement.classList.add("js");
+try{var t=localStorage.getItem("theme");
+/* No stored choice means the visitor has not chosen; follow the OS. */
+if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
+document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<script src="../js/app.js?v=955473fe" defer></script>
 <!-- three.js is pinned here rather than in view3d.js because OrbitControls and
      TransformControls import the bare specifier "three" internally, which only
      resolves through an import map. One place to bump the version. -->
@@ -31,7 +37,7 @@
   }
 }
 </script>
-<script type="module" src="../js/light/app.js?v=19c91c08"></script>
+<script type="module" src="../js/light/app.js?v=955473fe"></script>
 </head>
 <body>
 <div class="sheen" aria-hidden="true"></div>
@@ -47,9 +53,11 @@
       <a href="../index.html#about">About</a>
       <a href="../index.html#experience">Experience</a>
       <a href="../index.html#projects">Projects</a>
+      <a href="../index.html#contact">Contact</a>
       <a href="../pages/linkage.html">Linkage</a>
-      <a href="../pages/light.html">Light</a>
-      <a href="../assets/files/MarkGerges.pdf">Resume</a>
+      <a href="../pages/light.html" aria-current="page">Light</a>
+      <a href="../assets/files/MarkGerges.pdf" target="_blank" rel="noopener"
+         aria-label="Resume (PDF, opens in a new tab)">Resume<span class="ext" aria-hidden="true">PDF</span></a>
     </nav>
     <div class="nav-actions">
       <button class="icon-btn" data-theme-toggle aria-label="Toggle color theme">
@@ -74,16 +82,27 @@
   <div class="toolbar" role="toolbar" aria-label="Scene tools">
     <select id="preset" aria-label="Load a starter scene"></select>
     <span class="tbtn-sep" aria-hidden="true"></span>
-    <button class="tbtn" id="add-rect" type="button">+ panel</button>
-    <button class="tbtn" id="add-spot" type="button">+ spot</button>
-    <button class="tbtn" id="add-point" type="button">+ point</button>
-    <button class="tbtn" id="add-quad" type="button">+ surface</button>
-    <button class="tbtn" id="add-sphere" type="button">+ part</button>
+    <button class="tbtn" id="add-rect" type="button" title="Add a rectangular area light.">+ panel</button>
+    <button class="tbtn" id="add-spot" type="button" title="Add a cone-limited spot light.">+ spot</button>
+    <button class="tbtn" id="add-point" type="button" title="Add an omnidirectional point light.">+ point</button>
     <span class="tbtn-sep" aria-hidden="true"></span>
-    <button class="tbtn" id="btn-units" type="button" title="Switch between illuminance and irradiance">lx</button>
-    <button class="tbtn" id="btn-mode" type="button" title="Include interreflection, or direct light only">full</button>
-    <button class="tbtn" id="btn-quality" type="button" title="Solve resolution">draft</button>
-    <button class="tbtn" id="btn-fit" type="button">Fit</button>
+    <button class="tbtn" id="add-quad" type="button" title="Add a passive flat surface. It receives light; it does not emit.">+ surface</button>
+    <button class="tbtn" id="add-sphere" type="button" title="Add a sphere. It blocks light and casts a shadow.">+ part</button>
+    <span class="tbtn-sep" aria-hidden="true"></span>
+    <!-- These three report STATE, so each shows both options with the live one
+         lit, rather than a bare word that could equally mean "you are here" or
+         "click to go here". The separator keeps them off the action buttons. -->
+    <button class="tbtn tbtn-toggle" id="btn-units" type="button" aria-pressed="true" title="Read the field as illuminance (lux) or irradiance (W·m⁻²). Switching never re-solves.">
+      <span data-on>lx</span><span class="tbtn-alt" data-off>W·m⁻²</span>
+    </button>
+    <button class="tbtn tbtn-toggle" id="btn-mode" type="button" aria-pressed="true" title="Include light that has bounced off the enclosure, or direct light only.">
+      <span data-on>full</span><span class="tbtn-alt" data-off>direct</span>
+    </button>
+    <button class="tbtn tbtn-toggle" id="btn-quality" type="button" aria-pressed="false" title="Solve resolution. Fine is slower but resolves shadow edges.">
+      <span class="tbtn-alt" data-off>draft</span><span data-on>fine</span>
+    </button>
+    <span class="tbtn-sep" aria-hidden="true"></span>
+    <button class="tbtn" id="btn-fit" type="button" title="Frame the whole scene.">Fit</button>
   </div>
 
   <div class="stage stage-light">
@@ -96,6 +115,11 @@
         <canvas id="legend" aria-hidden="true"></canvas>
         <span id="legend-hi"></span>
       </div>
+      <!-- Hovering the field is this tool's best interaction, and its answer
+           used to be written below the status bar -- at 1440x900 that is past
+           the fold, so you looked at the cursor and the number appeared
+           somewhere you were not. It belongs in the viewport. -->
+      <p class="probe mono" id="probe"></p>
     </div>
     <aside class="panel" id="panel" aria-label="Properties"></aside>
   </div>
@@ -103,13 +127,12 @@
   <div class="status">
     <span id="stats"></span>
     <span class="msg" id="msg"></span>
+    <span class="msg" id="zeros"></span>
     <span class="actions">
       <button class="tbtn" id="btn-share" type="button">Copy link</button>
       <button class="tbtn" id="btn-scene" type="button">Download .scene</button>
     </span>
   </div>
-  <p class="probe mono" id="probe"></p>
-  <p class="probe mono" id="zeros"></p>
 
   <details class="howto">
     <summary>How to use it, and what the numbers mean</summary>
@@ -145,6 +168,7 @@
   <div class="wrap foot">
     <p>&copy; <span data-year></span> Mark Gerges</p>
     <div class="social">
+      <a data-mailto data-mailto-user="mrkghali" data-mailto-domain="gmail.com" href="#contact" aria-label="Email" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
       <a href="https://www.linkedin.com/in/mark-gerges-9899967a/" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.06c.53-.95 1.83-1.95 3.76-1.95C20.5 8.75 22 11 22 14.5V21h-4v-5.9c0-1.4-.03-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9z"/></svg></a>
       <a href="https://github.com/MHSGhali" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.35-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.78 2.71 1.27 3.37.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg></a>
     </div>

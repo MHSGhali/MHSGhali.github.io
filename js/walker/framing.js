@@ -90,6 +90,15 @@ function spinAbout(p, box, yaw, pitch) {
 export function fitCamera(box, aspect, opts = {}) {
   const fovDeg = opts.fovDeg ?? 34;
   const fill = opts.fill ?? 0.86;      /* leave a margin all round */
+  /* Horizontal and vertical are not the same question. Fitting the whole swept
+     box in BOTH leaves the creature small enough that six legs superimpose into
+     a knot. Vertically it must stay inside the frame -- crop the feet and it
+     stops reading as something that walks. Horizontally the extremes are the
+     ends of the crankshaft, a straight bar whose ends carry no information, so
+     letting those run past the edge buys the scale back for free.
+     fillX above 1 therefore means "allowed to overflow"; fillY never should. */
+  const fillX = opts.fillX ?? fill;
+  const fillY = opts.fillY ?? fill;
   const bias = opts.bias ?? 0.46;
   const yaw = opts.yaw ?? 0.36;        /* camera x offset as a share of distance */
   const rise = opts.rise ?? 105;       /* how far above the creature's centre  */
@@ -109,12 +118,19 @@ export function fitCamera(box, aspect, opts = {}) {
 
   for (let iter = 0; iter < 60; iter++) {
     const halfViewW = dist * tanHalf * aspect;
-    shift = Math.max(0, Math.min(halfViewW - box.halfW * 1.08, halfViewW * bias));
+    /* The guard keeps the shift from pushing the box off the far edge. It has
+       to allow the same horizontal overflow fillX does, or a frame deliberately
+       cropped sideways would collapse the bias to zero and re-centre the
+       creature -- straight under the headline it is supposed to sit beside. */
+    shift = Math.max(0, Math.min(halfViewW * fillX - box.halfW * 1.08, halfViewW * bias));
     const aim = box.cx - shift;
     const eye = { x: aim + dist * yaw, y: box.cy + rise, z: dist };
     const at = { x: aim, y: box.cy - 6, z: 0 };
     ndc = project(corners, eye, at, fovDeg, aspect);
-    const over = Math.max(-ndc.x0, ndc.x1, -ndc.y0, ndc.y1) / fill;
+    const over = Math.max(
+      Math.max(-ndc.x0, ndc.x1) / fillX,
+      Math.max(-ndc.y0, ndc.y1) / fillY,
+    );
     /* Converge from BOTH sides. Only ever backing away leaves the creature
        tiny at the angles where it is narrower than the estimate assumed --
        turned end-on to the crankshaft it filled barely a quarter of the frame.

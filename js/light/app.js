@@ -1,12 +1,12 @@
 /* Page controller for the light simulator: scene state, the worker, the 3D
    view, the property panel, and the readouts. */
 
-import { createView } from "./view3d.js?v=19c91c08";
-import { PRESETS, presetById } from "./presets.js?v=19c91c08";
-import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=19c91c08";
-import { viridis } from "./viridis.js?v=19c91c08";
-import { stats } from "./stats.js?v=19c91c08";
-import * as v from "./vec3.js?v=19c91c08";
+import { createView } from "./view3d.js?v=955473fe";
+import { PRESETS, presetById } from "./presets.js?v=955473fe";
+import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=955473fe";
+import { viridis } from "./viridis.js?v=955473fe";
+import { stats } from "./stats.js?v=955473fe";
+import * as v from "./vec3.js?v=955473fe";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -104,6 +104,10 @@ function solve(immediate = false) {
       indirectPasses: INDIRECT_PASSES,
     });
     say("solving…");
+    /* min/mean/max keep changing while interreflection accumulates. Without
+       this the numbers just drift with no sign they are provisional, and a
+       visitor who reads one early reads a wrong one. Cleared on converge. */
+    $("#stats").classList.add("unsettled");
   };
   if (immediate) go();
   else solveTimer = setTimeout(go, 90); /* coalesce a drag into one solve */
@@ -182,8 +186,19 @@ function drawLegend() {
 const fmt = (x) =>
   x >= 1000 ? Math.round(x).toLocaleString() : x >= 10 ? x.toFixed(0) : x.toFixed(2);
 
+/* Whether the numbers on screen are final. Direct-only is done the moment the
+   direct pass lands; with interreflection on, every pass moves them, so they
+   are provisional until the last one. Mirrors what say() reports, so the
+   status line and the stats never disagree about whether this is the answer. */
+function settled() {
+  if (!state.direct) return false;
+  if (!state.includeIndirect) return true;
+  return state.passes > 0 && state.pass >= state.passes;
+}
+
 function updateStats(sorted, over) {
   if (!sorted || !sorted.length) return;
+  $("#stats").classList.toggle("unsettled", !settled());
   const st = stats(sorted);
   $("#stats").innerHTML =
     `<b>${fmt(st.min)}</b> min &nbsp; <b>${fmt(st.mean)}</b> mean &nbsp; ` +
@@ -513,21 +528,25 @@ async function main() {
     loadText(p.text, p.blurb);
     history.replaceState(null, "", location.pathname + location.search);
   });
+  /* The three state buttons show both options; `aria-pressed` says which is
+     live, and CSS lights that half. Nothing rewrites their text, so the pair
+     stays readable and a screen reader gets the same fact the eye does. */
+  const setToggle = (sel, on) => $(sel).setAttribute("aria-pressed", String(on));
   $("#btn-units").addEventListener("click", () => {
     state.photometric = !state.photometric;
-    $("#btn-units").textContent = state.photometric ? "lx" : "W·m⁻²";
+    setToggle("#btn-units", state.photometric);
     /* No re-solve: both unit systems are dot products against the same rows. */
     repaint();
     say(`showing ${state.photometric ? "illuminance in lux" : "irradiance in W·m⁻²"} — no re-solve needed`);
   });
   $("#btn-mode").addEventListener("click", () => {
     state.includeIndirect = !state.includeIndirect;
-    $("#btn-mode").textContent = state.includeIndirect ? "full" : "direct only";
+    setToggle("#btn-mode", state.includeIndirect);
     repaint();
   });
   $("#btn-quality").addEventListener("click", () => {
     state.quality = state.quality === "draft" ? "fine" : "draft";
-    $("#btn-quality").textContent = state.quality;
+    setToggle("#btn-quality", state.quality === "fine");
     solve(true);
   });
   $("#btn-fit").addEventListener("click", frameView);

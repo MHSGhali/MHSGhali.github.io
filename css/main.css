@@ -149,6 +149,13 @@ strong { color: var(--text); font-weight: 600; }
 }
 .nav-links a:hover { color: var(--text); background: var(--bg-elev-2); text-decoration: none; }
 .nav-links a[aria-current="page"] { color: var(--text); }
+/* The nav's only off-site destination. Without a cue it looks like another
+   section anchor, and clicking it replaces the site with a PDF viewer. */
+.nav-links .ext {
+  font-family: var(--font-mono); font-size: .58rem; letter-spacing: .06em;
+  margin-left: 5px; padding: 1px 4px; border-radius: 3px; vertical-align: 1px;
+  border: 1px solid var(--surface-line); color: var(--text-faint);
+}
 
 .icon-btn {
   display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px;
@@ -227,9 +234,15 @@ strong { color: var(--text); font-weight: 600; }
      composite to an empty mask, which hides the background completely on some
      browsers and not others. A single gradient needs no compositing at all;
      the vertical falloff is the ground's own radial fade instead. */
-  -webkit-mask-image: linear-gradient(to right, transparent 22%, #000 52%, #000 88%, transparent);
-          mask-image: linear-gradient(to right, transparent 22%, #000 52%, #000 88%, transparent);
-  opacity: .7;
+  /* The text column is capped at 620px inside a 1120px wrap, so it ends around
+     55% -- the mask must not reach full strength before then, or the creature
+     is at full contrast exactly where the lead paragraph's last words are. */
+  -webkit-mask-image: linear-gradient(to right, transparent 30%, #000 66%, #000 93%, transparent);
+          mask-image: linear-gradient(to right, transparent 30%, #000 66%, #000 93%, transparent);
+  /* The mask above already protects the text column's contrast, so the
+     opacity was doing that job twice and washing the creature out where it is
+     the only thing on screen. */
+  opacity: .85;
 }
 .hero-walkers canvas {
   display: block; width: 100%; height: 100%;
@@ -254,8 +267,8 @@ strong { color: var(--text); font-weight: 600; }
    it stays wholly on screen the whole way down; this is only about contrast.
    It is dropped only at phone widths, where every point of it is behind body
    text and it would be noise rather than atmosphere. */
-@media (max-width: 1100px) { .hero-walkers { opacity: .5; } }
-@media (max-width: 900px)  { .hero-walkers { opacity: .34; } }
+@media (max-width: 1100px) { .hero-walkers { opacity: .62; } }
+@media (max-width: 900px)  { .hero-walkers { opacity: .42; } }
 @media (max-width: 640px)  { .hero-walkers { display: none; } }
 @media (prefers-reduced-motion: reduce) { .hero-walkers { opacity: .5; } }
 
@@ -277,6 +290,15 @@ strong { color: var(--text); font-weight: 600; }
 a.card { display: block; color: inherit; }
 a.card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: var(--shadow); text-decoration: none; }
 a.card h3 { color: var(--accent); }
+/* The two playable tools sat in the same box as three case studies that are
+   only prose, so the thing a visitor can actually go and use looked like
+   reading material. The rule marks them without inventing a second card. */
+.card-live { border-left: 2px solid var(--accent); }
+/* A pointer onward rather than a project in its own right, so it sits back. */
+.card-more { background: transparent; border-style: dashed; }
+.card-more h3 { color: var(--text-dim); }
+.card-more:hover h3 { color: var(--accent); }
+.card-live .tag { margin-bottom: 10px; }
 .card h3 + .meta { margin-top: -.35em; }
 .grid { display: grid; gap: 16px; }
 .grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
@@ -299,6 +321,10 @@ a.card h3 { color: var(--accent); }
 .tl-org { color: var(--accent); font-weight: 500; margin-bottom: .5em; }
 .tl-date { font-family: var(--font-mono); font-size: .74rem; color: var(--text-faint);
   margin-left: auto; white-space: nowrap; letter-spacing: .02em; }
+/* The header row keeps the full width -- .tl-date is pushed to the far right
+   by margin-left:auto and would collapse inwards if the item were capped. Only
+   the prose is measured. */
+.tl-item > p, .tl-item ul { max-width: 78ch; }
 .tl-item ul { margin: 10px 0 0; padding-left: 18px; color: var(--text-dim); }
 .tl-item li { margin-bottom: 6px; }
 .tl-item li::marker { color: var(--text-faint); }
@@ -329,9 +355,13 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 .social a:hover { color: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
 .social svg { width: 17px; height: 17px; }
 
-/* ---------- reveal on scroll ---------- */
-.reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.3,1); }
-.reveal.in { opacity: 1; transform: none; }
+/* ---------- reveal on scroll ----------
+   Gated on `.js`, which the inline head script sets before paint. Only
+   app.js ever adds `.in`, so an ungated rule would leave every section but
+   the hero invisible if that script failed to load or threw -- the page
+   would be a headline and a footer. With the gate, no JS means no hiding. */
+.js .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.3,1); }
+.js .reveal.in { opacity: 1; transform: none; }
 
 /* ============================================================
    Linkage tool (pages/linkage.html)
@@ -365,6 +395,20 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
   background: var(--bg); border: 1px solid var(--surface-line); color: var(--text-faint);
 }
 .tbtn-go { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+
+/* A button that reports STATE rather than performing an action. It shows both
+   options at once and lights the live one, because a lone word ("draft") reads
+   equally as "you are in draft" and as "click for draft" -- and the two are
+   opposite. aria-pressed carries the same fact to a screen reader, and it is
+   the only thing the script sets: the labels never change. */
+.tbtn-toggle { gap: 0; }
+.tbtn-toggle span { padding: 0 5px; color: var(--text-faint); transition: color .15s; }
+.tbtn-toggle .tbtn-alt { border-left: 1px solid var(--surface-line); }
+.tbtn-toggle[aria-pressed="true"]  { color: var(--text); border-color: var(--surface-line); background: var(--bg-elev-2); }
+.tbtn-toggle[aria-pressed="false"] { color: var(--text); }
+/* The lit half is whichever one the current state names. */
+.tbtn-toggle[aria-pressed="true"]  [data-on]  { color: var(--accent); }
+.tbtn-toggle[aria-pressed="false"] [data-off] { color: var(--accent); }
 .tbtn-sep { width: 1px; align-self: stretch; background: var(--surface-line); margin: 0 4px; }
 .tbtn-spacer { flex: 1 1 auto; }
 
@@ -379,6 +423,16 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 .stage { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
 
+/* Both viewports are on screen together above 900px, so there is nothing to
+   choose between and the switch stays out of the way. */
+.stage-switch { display: none; gap: 6px; margin-bottom: 10px; }
+@media (max-width: 900px) {
+  .stage-switch { display: flex; }
+  .stage-switch .tbtn { flex: 1; justify-content: center; }
+  #stage[data-show="design"] #view3d-vp,
+  #stage[data-show="3d"] #editor-vp { display: none; }
+}
+
 .viewport {
   position: relative; overflow: hidden;
   background: var(--bg-elev); border: 1px solid var(--surface-line);
@@ -390,6 +444,7 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 #view3d-vp { aspect-ratio: 4 / 3; touch-action: none; }
 @media (max-width: 900px) { #view3d-vp { aspect-ratio: 16 / 10; } }
 
+
 .vp-label {
   position: absolute; top: 10px; left: 12px; z-index: 2;
   font-family: var(--font-mono); font-size: .68rem; letter-spacing: .12em;
@@ -399,7 +454,10 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
   position: absolute; inset: auto 12px 10px 12px; z-index: 2;
   font-family: var(--font-mono); font-size: .7rem; color: var(--text-faint);
   text-align: center; pointer-events: none;
+  /* It sits over the drawing, and the mechanism can pass right under it. */
+  text-shadow: 0 1px 3px var(--bg-elev), 0 0 8px var(--bg-elev);
 }
+.vp-note:empty { display: none; }
 
 /* --- status line --- */
 .status {
@@ -435,7 +493,7 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 
 #viewport-wrap { aspect-ratio: 16 / 10; }
 @media (max-width: 900px) { #viewport-wrap { aspect-ratio: 4 / 3; } }
-#viewport { touch-action: none; cursor: crosshair; }
+#viewport { touch-action: none; cursor: crosshair; }  /* narrowed for touch below */
 
 /* --- colour bar --- */
 .legend {
@@ -473,13 +531,39 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 .vec3 input { flex: 1 1 0; min-width: 0; }
 .panel .tbtn { margin-top: 14px; width: 100%; justify-content: center; }
 
-/* --- probe readout --- */
+/* --- probe readout ---
+   Pinned inside the viewport, under the nav wheel: the answer to "what is the
+   illuminance here?" has to appear where the pointer is, not below the fold. */
 .probe {
-  margin: 10px 0 0; min-height: 1.4em;
-  font-size: .76rem; color: var(--text-faint);
+  position: absolute; top: 10px; left: 12px; right: 108px; z-index: 2;
+  margin: 0; min-height: 1.4em;
+  font-size: .72rem; line-height: 1.5; color: var(--text-dim);
+  text-shadow: 0 1px 3px var(--bg), 0 0 8px var(--bg);
+  pointer-events: none;
 }
+/* The viewport label owns the top-left corner, so step the probe below it. */
+#viewport-wrap .probe { top: 30px; }
+.probe:empty { display: none; }
 .probe b { color: var(--text); }
 .status .over { color: var(--text-faint); }
+
+/* While interreflection accumulates, min/mean/max keep moving. Saying so is
+   the difference between a number that is settling and one that is wrong. */
+#stats.unsettled { opacity: .55; transition: opacity .3s ease; }
+
+/* touch-action: none is right on a desktop, where the page is scrolled by a
+   wheel or a trackpad and the viewport should keep every gesture. On a phone
+   the same rule is a trap: the viewport is nearly the full width of the screen,
+   so a finger landing anywhere on it swallows the swipe and the page will not
+   scroll past the tool. .hero-walkers has always got this right (pan-y, and a
+   comment saying why); the tools did not.
+
+   pan-y gives the vertical swipe back to the page. Everything else survives:
+   two fingers still pinch and orbit, a horizontal drag still selects and turns,
+   and the 3D views' polar angle is on the nav wheel's own up/down buttons. */
+@media (max-width: 900px) {
+  #editor-vp, #view3d-vp, #viewport { touch-action: pan-y; }
+}
 
 /* ============================================================
    Viewport navigation wheel (js/viewcontrol.js)

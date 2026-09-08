@@ -17,9 +17,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="../css/main.css?v=19c91c08">
-<script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="../js/app.js?v=19c91c08" defer></script>
+<link rel="stylesheet" href="../css/main.css?v=955473fe">
+<script>/* Runs before paint: marks JS alive so the reveal animation can hide
+   things it will later show, and settles the theme so there is no flash. */
+document.documentElement.classList.add("js");
+try{var t=localStorage.getItem("theme");
+/* No stored choice means the visitor has not chosen; follow the OS. */
+if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
+document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<script src="../js/app.js?v=955473fe" defer></script>
 <!-- three.js is pinned here rather than in view3d.js because OrbitControls
      imports the bare specifier "three" internally, which only resolves through
      an import map. Keeping both entries together means one version to bump. -->
@@ -31,7 +37,7 @@
   }
 }
 </script>
-<script type="module" src="../js/linkage/app.js?v=19c91c08"></script>
+<script type="module" src="../js/linkage/app.js?v=955473fe"></script>
 </head>
 <body>
 <div class="sheen" aria-hidden="true"></div>
@@ -47,9 +53,11 @@
       <a href="../index.html#about">About</a>
       <a href="../index.html#experience">Experience</a>
       <a href="../index.html#projects">Projects</a>
-      <a href="../pages/linkage.html">Linkage</a>
+      <a href="../index.html#contact">Contact</a>
+      <a href="../pages/linkage.html" aria-current="page">Linkage</a>
       <a href="../pages/light.html">Light</a>
-      <a href="../assets/files/MarkGerges.pdf">Resume</a>
+      <a href="../assets/files/MarkGerges.pdf" target="_blank" rel="noopener"
+         aria-label="Resume (PDF, opens in a new tab)">Resume<span class="ext" aria-hidden="true">PDF</span></a>
     </nav>
     <div class="nav-actions">
       <button class="icon-btn" data-theme-toggle aria-label="Toggle color theme">
@@ -81,18 +89,36 @@
     <button class="tbtn" id="btn-variable" type="button" title="Let the selected link change length. Click a bar to select it first. Not available on a driven link." aria-pressed="false">Variable <kbd>V</kbd></button>
     <button class="tbtn" id="btn-trace" type="button" title="Draw the selected joints' paths while it runs. Select one or more joints first." aria-pressed="false">Trace <kbd>T</kbd></button>
     <button class="tbtn" id="btn-delete" type="button" title="Delete the selected joints, link or rail.">Delete <kbd>&#9003;</kbd></button>
+    <button class="tbtn" id="btn-deselect" type="button" title="Clear the selection without deleting anything.">Deselect <kbd>Esc</kbd></button>
     <button class="tbtn" id="btn-undo" type="button" title="Undo the last edit.">Undo <kbd>&#8984;Z</kbd></button>
     <span class="tbtn-sep" aria-hidden="true"></span>
     <button class="tbtn" id="btn-gravity" type="button" title="Run under gravity. A mechanism with no motor uses it automatically." aria-pressed="false">Gravity <kbd>G</kbd></button>
+    <button class="tbtn" id="btn-slower" type="button" title="Slow the motor down. Select the driven link first. Keyboard: &minus;">&minus;</button>
+    <button class="tbtn" id="btn-faster" type="button" title="Speed the motor up. Select the driven link first. Keyboard: +">+</button>
+    <button class="tbtn" id="btn-clear" type="button" title="Erase the paths traced so far.">Clear traces <kbd>C</kbd></button>
     <button class="tbtn" id="btn-fit" type="button" title="Frame the whole mechanism, and its traces, in both views.">Fit</button>
     <span class="tbtn-spacer" aria-hidden="true"></span>
-    <button class="tbtn tbtn-go" id="btn-run" type="button" title="Run the mechanism, or stop and return to the layout you designed. Editing is disabled while it runs." aria-pressed="false">Run</button>
+    <button class="tbtn tbtn-go" id="btn-run" type="button" title="Run the mechanism, or stop and return to the layout you designed. Editing is disabled while it runs." aria-pressed="false"><span data-run-label>Run</span> <kbd>R</kbd></button>
   </div>
 
-  <div class="stage">
+  <!-- Under 900px the two viewports stack, so "the 3D view follows along" was
+       never true on a phone: you could only ever see one, and only by scrolling
+       between them. This picks which one holds the screen. Hidden on a desktop,
+       where they genuinely do sit side by side. -->
+  <div class="stage-switch" role="group" aria-label="Which view to show">
+    <button class="tbtn" id="btn-view-design" type="button" aria-pressed="true">Design</button>
+    <button class="tbtn" id="btn-view-3d" type="button" aria-pressed="false">3D</button>
+  </div>
+
+  <div class="stage" id="stage" data-show="design">
     <div class="viewport" id="editor-vp">
       <span class="vp-label">Design</span>
       <canvas id="editor"></canvas>
+      <!-- Every build button is disabled until it has something to act on, so
+           the toolbar arrives almost entirely greyed out and reads as broken.
+           This says what to do next, in the viewport the visitor is looking at
+           rather than in a collapsed panel below the fold. -->
+      <p class="vp-note" id="editor-note"></p>
     </div>
     <div class="viewport" id="view3d-vp">
       <span class="vp-label">3D</span>
@@ -142,6 +168,7 @@
           <div><dt>C</dt><dd>clear the recorded traces</dd></div>
           <div><dt>Scroll</dt><dd>zoom, centred on the pointer. Pinch on a touchscreen</dd></div>
           <div><dt>Space-drag</dt><dd>pan the view. Middle-drag does the same</dd></div>
+          <div><dt>On a phone</dt><dd>a swipe up or down scrolls the page; two fingers pinch and pan the view. Use the Design/3D switch above to give one view the screen</dd></div>
         </dl>
         <h3 style="margin-top:24px">When it binds</h3>
         <p>Fixed-length links here are genuinely rigid. If the motor reaches a position the mechanism cannot physically assume &mdash; a non-Grashof linkage hitting its limit, say &mdash; the run stops there rather than stretching a bar, and tells you. To get through it, change the geometry or make a link variable with <strong>V</strong>.</p>
@@ -162,6 +189,7 @@
   <div class="wrap foot">
     <p>&copy; <span data-year></span> Mark Gerges</p>
     <div class="social">
+      <a data-mailto data-mailto-user="mrkghali" data-mailto-domain="gmail.com" href="#contact" aria-label="Email" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
       <a href="https://www.linkedin.com/in/mark-gerges-9899967a/" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.06c.53-.95 1.83-1.95 3.76-1.95C20.5 8.75 22 11 22 14.5V21h-4v-5.9c0-1.4-.03-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9z"/></svg></a>
       <a href="https://github.com/MHSGhali" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.35-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.78 2.71 1.27 3.37.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg></a>
     </div>
