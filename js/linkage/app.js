@@ -1,13 +1,13 @@
 /* Page controller for the linkage tool: wires the toolbar, the status line,
    the 3D view, the Blender export and the share link to the editor. */
 
-import { createEditor } from "./editor.js?v=955473fe";
-import { createView3D } from "./view3d.js?v=955473fe";
-import { PRESETS, buildPreset } from "./presets.js?v=955473fe";
-import { exportBlenderScript } from "./blender.js?v=955473fe";
-import { exportPrintableParts } from "./print3d.js?v=955473fe";
-import { makeZip } from "./zip.js?v=955473fe";
-import { encode, decode } from "./serialize.js?v=955473fe";
+import { createEditor } from "./editor.js?v=071da3f3";
+import { createView3D } from "./view3d.js?v=071da3f3";
+import { PRESETS, buildPreset } from "./presets.js?v=071da3f3";
+import { exportBlenderScript } from "./blender.js?v=071da3f3";
+import { exportPrintableParts } from "./print3d.js?v=071da3f3";
+import { makeZip } from "./zip.js?v=071da3f3";
+import { encode, decode } from "./serialize.js?v=071da3f3";
 
 const $ = (sel) => document.querySelector(sel);
 

@@ -1,11 +1,17 @@
 /* The homepage background: a Strandbeest walking, in 3D, casting shadows.
 
-   Six Jansen legs hang from one crankshaft, evenly spaced around the turn, so
-   at every instant at least one foot is on the ground (six is the smallest
-   count for which that is true -- four leaves the creature airborne for a
-   fifth of the cycle). Each leg is a separate mechanism run by the real
-   solver, exactly as the linkage tool runs one; six of them cost well under a
-   twentieth of a millisecond a frame, so there was no reason to bake it.
+   Three Jansen legs hang from one crankshaft, evenly spaced around the turn.
+   Each leg is a separate mechanism run by the real solver, exactly as the
+   linkage tool runs one; three of them cost well under a twentieth of a
+   millisecond a frame, so there was no reason to bake it.
+
+   Three is a deliberately open silhouette, not a walkable count: the leg's
+   duty factor is about 20% (gait() measures it), so it takes six legs before
+   some foot is always planted, and with three the creature is off the ground
+   for roughly two fifths of the turn. Nothing here simulates weight -- the
+   body is carried forwards at the stance rate regardless -- so the cost is
+   only that the gait no longer reads as load-bearing, and what is bought is
+   legs you can see through instead of a thicket of them.
 
    WHY THE CREATURE MOVES. During its stance a foot travels backwards relative
    to the body, so a body carried forwards at the same rate leaves the planted
@@ -26,18 +32,18 @@
 
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
 
-import * as M from "./linkage/mechanism.js?v=955473fe";
-import * as S from "./linkage/solver.js?v=955473fe";
-import { buildLeg, gait, legExtent } from "./walker/jansen.js?v=955473fe";
-import { sweptBox, fitCamera } from "./walker/framing.js?v=955473fe";
+import * as M from "./linkage/mechanism.js?v=071da3f3";
+import * as S from "./linkage/solver.js?v=071da3f3";
+import { buildLeg, gait, legExtent } from "./walker/jansen.js?v=071da3f3";
+import { sweptBox, fitCamera } from "./walker/framing.js?v=071da3f3";
 
-const LEGS = 6;
+const LEGS = 3;
 const LEG_SPACING = 52;          /* along the crankshaft */
 const CRANK_DEG_S = 46;          /* a slow walk: one stride every eight seconds */
 const WRAP = 4000;               /* invisible: the ground carries no features */
 
 /* Framing the WHOLE swept box was the honest reading of "keep it on screen",
-   and it made the creature unreadable: six legs 52 apart, fitted end to end,
+   and it made the creature unreadable: legs 52 apart, fitted end to end,
    superimpose into a grey knot at the size that leaves. Nothing is lost by
    letting the far end of the crankshaft run past the edge -- the walking is in
    the near legs, and the shaft is a straight line either way -- so `fill` goes
@@ -62,7 +68,7 @@ async function start(host) {
   /* Depends only on the aspect ratio, so it is solved on resize, not per frame. */
   let framing = fitCamera(box, 1, FRAMING);
 
-  /* ---- the creature: six legs on one crankshaft ---------------------- */
+  /* ---- the creature: three legs on one crankshaft --------------------- */
   const legs = [];
   for (let n = 0; n < LEGS; n++) {
     const { mechanism, id } = buildLeg(CRANK_DEG_S, 1);
@@ -162,8 +168,8 @@ async function start(host) {
   }
 
   /* The chassis: two beams down the length of the creature, through the crank
-     centres and through the fixed pivots. Without them six legs read as six
-     separate machines rather than one animal. */
+     centres and through the fixed pivots. Without them the legs read as
+     separate machines rather than as one animal. */
   const spine = [];
   for (const key of ["O", "G"]) {
     const mesh = new THREE.Mesh(rodGeom, mat.rod);
@@ -208,8 +214,8 @@ async function start(host) {
   /* How far the visitor has turned the view, in radians. Pitch is clamped
      short of the ground plane and of straight overhead, where the up vector
      degenerates and the view flips. */
-  /* Not zero. At yaw 0 the camera looks straight down the crankshaft and all
-     six legs stack into one silhouette -- the creature reads as a knot of grey
+  /* Not zero. At yaw 0 the camera looks straight down the crankshaft and the
+     legs stack into one silhouette -- the creature reads as a knot of grey
      sticks rather than as something with legs, and no amount of zoom fixes it
      because the problem is the angle. Turning it three-quarters on fans the
      legs out along the shaft, which is the view a Strandbeest is recognisable
@@ -246,9 +252,21 @@ async function start(host) {
   window.addEventListener("themechange", applyTheme);
 
   /* Re-solved whenever the shape of the viewport or the angle of the view
-     changes -- both alter what the frustum has to hold. */
+     changes -- both alter what the frustum has to hold.
+
+     The default framing pushes the creature right of centre so that it walks
+     beside the headline rather than under it. On a phone main.css takes it out
+     from behind the text entirely and gives it a band of its own; there is
+     nothing to dodge there, and a creature still leaning right only looks
+     off-centre. Asking the stylesheet which layout it chose -- an absolute
+     backdrop is positioned, a band in the flow is static -- means the two
+     cannot disagree about where that breakpoint is. */
   function refit() {
-    framing = fitCamera(box, camera.aspect, { ...FRAMING, yaw: orbit.yaw, pitch: orbit.pitch });
+    const inBand = getComputedStyle(host).position === "static";
+    framing = fitCamera(box, camera.aspect, {
+      ...FRAMING, yaw: orbit.yaw, pitch: orbit.pitch,
+      ...(inBand ? { bias: 0 } : null),
+    });
   }
 
   /* ---- painting -------------------------------------------------------

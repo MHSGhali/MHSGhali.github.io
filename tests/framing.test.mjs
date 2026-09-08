@@ -15,28 +15,30 @@ import { sweptBox, project, fitCamera } from "../js/walker/framing.js";
 import { legExtent } from "../js/walker/jansen.js";
 
 /* The homepage's own numbers, from js/hero-walkers.js. */
-const LEGS = 6;
+const LEGS = 3;
 const LEG_SPACING = 52;
 const FRAMING = { fillX: 1.22, fillY: 0.88 };
 
-/* Shapes to stay SAFE at: everything down to absurdly narrow, because the crop
+/* Shapes to stay SAFE at: everything from the letterbox the phone band is
+   (190px tall across the full width) down to absurdly narrow, because the crop
    must never eat the creature whatever the window does. */
-const ASPECTS = [2.4, 1.78, 1.4, 1.0, 0.72];
-/* Shapes the hero is actually painted at. main.css hides the background below
-   640px, and the hero box is a full-width band a few hundred pixels tall, so
-   in practice it is always wider than it is tall. Below about 1.4 the frame is
-   width-limited and the creature is legitimately smaller -- promising a fill
-   there would be promising something the geometry cannot give. */
-const FILL_ASPECTS = [2.4, 1.78, 1.4];
+const ASPECTS = [3.4, 2.4, 1.78, 1.4, 1.0, 0.72];
+/* Shapes the hero is actually painted at. On a desktop it is the hero box, a
+   full-width band a few hundred pixels tall; below 640px it is its own band,
+   190px tall and the width of the screen -- so in practice it is always wider
+   than it is tall, and on a phone considerably so. Below about 1.4 the frame
+   is width-limited and the creature is legitimately smaller -- promising a
+   fill there would be promising something the geometry cannot give. */
+const FILL_ASPECTS = [3.4, 2.4, 1.78, 1.4];
 /* Every angle the drag allows. PITCH_LIMIT in hero-walkers.js is ~0.5 rad. */
 const YAWS = [0, 0.4, 1.0, Math.PI / 2, 2.4, Math.PI];
 const PITCHES = [-0.5, 0, 0.5];
 
 const box = () => sweptBox(legExtent(), LEGS, LEG_SPACING);
 
-function ndcFor(aspect, yaw, pitch) {
+function ndcFor(aspect, yaw, pitch, opts = FRAMING) {
   const b = box();
-  const f = fitCamera(b, aspect, { ...FRAMING, yaw, pitch });
+  const f = fitCamera(b, aspect, { ...opts, yaw, pitch });
   return project(
     b.corners.map((c) => spin(c, b, yaw, pitch)),
     f.eye, f.at, f.fovDeg, aspect,
@@ -104,9 +106,31 @@ test("it sits right of centre, clear of the headline", () => {
   }
 });
 
+/* The phone band. Below 640px main.css takes the creature out from behind the
+   text and gives it a strip of its own, and hero-walkers.js drops the rightward
+   bias there -- with no headline to sit beside, leaning right is just
+   off-centre. These are the shapes that strip is: 190px tall, the width of a
+   phone. */
+const BAND = { ...FRAMING, bias: 0 };
+const BAND_ASPECTS = [3.4, 2.05, 1.68];
+
+test("the phone band centres the creature and still shows all of it", () => {
+  for (const aspect of BAND_ASPECTS)
+    for (const yaw of YAWS) {
+      const f = fitCamera(box(), aspect, { ...BAND, yaw });
+      assert.equal(f.shift, 0, `still biased right at aspect ${aspect}, yaw ${yaw}`);
+      const n = ndcFor(aspect, yaw, 0, BAND);
+      const worst = Math.max(-n.y0, n.y1);
+      assert.ok(worst <= 1, `clipped in the band at aspect ${aspect}, yaw ${yaw}: ${worst.toFixed(3)}`);
+      assert.ok(
+        n.y1 - n.y0 >= 0.9,
+        `too small in the band at aspect ${aspect}, yaw ${yaw}: ${(n.y1 - n.y0).toFixed(3)} of 2`,
+      );
+    }
+});
+
 test("a box that is turned end-on is still solved, not backed away from", () => {
-  /* Seen down the crankshaft the six legs become a row nearly three times as
-     wide. Converging from one side only left it tiny; this is the regression
+  /* Seen down the crankshaft the legs become a row far wider than one leg. Converging from one side only left it tiny; this is the regression
      that comment in fitCamera describes. */
   const wide = ndcFor(1.78, Math.PI / 2, 0);
   const narrow = ndcFor(1.78, 0, 0);

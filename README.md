@@ -72,10 +72,13 @@ a broken one.
 
 ## The homepage background
 
-A Strandbeest walking in 3D, on the same solver the linkage tool runs. Six
-Jansen legs share one crankshaft — the fewest for which a foot is always on the
-ground — and the body advances at the rate the stance foot sweeps backwards, so
-a planted foot stays planted rather than skating.
+A Strandbeest walking in 3D, on the same solver the linkage tool runs. Three
+Jansen legs share one crankshaft, evenly spaced around the turn, and the body
+advances at the rate the stance foot sweeps backwards, so a planted foot stays
+planted rather than skating. Three is chosen for the silhouette, not for the
+gait: with a duty factor near 20% it takes six legs before some foot is always
+down, and nothing here simulates weight, so the creature simply reads as
+lighter and you can see through it.
 
 `js/walker/jansen.js` holds the thirteen "holy numbers" and the forward
 kinematics: two fixed pivots and five circle–circle intersections down to the
@@ -86,7 +89,7 @@ sweeping all thirty-two and keeping the one whose foot path has the published
 duty factor of about 20%. `framing.js` solves where to put the camera, against
 the creature's own swept size and the viewport's shape.
 
-It deliberately does not fit the whole creature. Framed end to end, six legs 52
+It deliberately does not fit the whole creature. Framed end to end, legs 52
 apart superimpose into a knot of grey sticks at the size that leaves, so the
 camera is fitted vertically but allowed to run the ends of the crankshaft off
 the sides -- `fillX` above 1, `fillY` below it. The view also opens turned
@@ -95,6 +98,14 @@ the crankshaft and every leg hides behind the one in front, which is an angle
 problem no amount of zoom fixes. `tests/framing.test.mjs` pins both -- that the
 crop never eats the creature vertically at any window shape or drag angle, that
 it stays bounded sideways, and that what is left still fills the frame.
+
+On a phone it stops being a backdrop. The text column is the whole width there,
+so a creature behind it is behind every word and the mask has nothing to fade it
+into; below 640px it leaves the absolute layer and takes a band of its own under
+the buttons -- full contrast, still draggable, competing with nothing. The
+rightward bias goes with it: `refit()` asks the stylesheet which layout it chose
+(a backdrop is positioned, a band is static) rather than keeping its own copy of
+the breakpoint.
 
 ## Working on it
 

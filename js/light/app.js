@@ -1,12 +1,12 @@
 /* Page controller for the light simulator: scene state, the worker, the 3D
    view, the property panel, and the readouts. */
 
-import { createView } from "./view3d.js?v=955473fe";
-import { PRESETS, presetById } from "./presets.js?v=955473fe";
-import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=955473fe";
-import { viridis } from "./viridis.js?v=955473fe";
-import { stats } from "./stats.js?v=955473fe";
-import * as v from "./vec3.js?v=955473fe";
+import { createView } from "./view3d.js?v=071da3f3";
+import { PRESETS, presetById } from "./presets.js?v=071da3f3";
+import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=071da3f3";
+import { viridis } from "./viridis.js?v=071da3f3";
+import { stats } from "./stats.js?v=071da3f3";
+import * as v from "./vec3.js?v=071da3f3";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
