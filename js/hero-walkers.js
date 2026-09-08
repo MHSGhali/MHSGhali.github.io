@@ -26,15 +26,24 @@
 
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
 
-import * as M from "./linkage/mechanism.js?v=19c91c08";
-import * as S from "./linkage/solver.js?v=19c91c08";
-import { buildLeg, gait, legExtent } from "./walker/jansen.js?v=19c91c08";
-import { sweptBox, fitCamera } from "./walker/framing.js?v=19c91c08";
+import * as M from "./linkage/mechanism.js?v=955473fe";
+import * as S from "./linkage/solver.js?v=955473fe";
+import { buildLeg, gait, legExtent } from "./walker/jansen.js?v=955473fe";
+import { sweptBox, fitCamera } from "./walker/framing.js?v=955473fe";
 
 const LEGS = 6;
 const LEG_SPACING = 52;          /* along the crankshaft */
 const CRANK_DEG_S = 46;          /* a slow walk: one stride every eight seconds */
 const WRAP = 4000;               /* invisible: the ground carries no features */
+
+/* Framing the WHOLE swept box was the honest reading of "keep it on screen",
+   and it made the creature unreadable: six legs 52 apart, fitted end to end,
+   superimpose into a grey knot at the size that leaves. Nothing is lost by
+   letting the far end of the crankshaft run past the edge -- the walking is in
+   the near legs, and the shaft is a straight line either way -- so `fill` goes
+   past 1 and the creature is framed on the legs instead of on its envelope.
+   tests/framing.test.mjs pins how far past the edge that is allowed to go. */
+const FRAMING = { fillX: 1.22, fillY: 0.88 };
 
 
 const host = document.querySelector("[data-hero-walkers]");
@@ -51,7 +60,7 @@ async function start(host) {
   const speedRad = (CRANK_DEG_S * Math.PI) / 180;
   const box = sweptBox(legExtent(), LEGS, LEG_SPACING);
   /* Depends only on the aspect ratio, so it is solved on resize, not per frame. */
-  let framing = fitCamera(box, 1);
+  let framing = fitCamera(box, 1, FRAMING);
 
   /* ---- the creature: six legs on one crankshaft ---------------------- */
   const legs = [];
@@ -199,7 +208,13 @@ async function start(host) {
   /* How far the visitor has turned the view, in radians. Pitch is clamped
      short of the ground plane and of straight overhead, where the up vector
      degenerates and the view flips. */
-  const orbit = { yaw: 0, pitch: 0 };
+  /* Not zero. At yaw 0 the camera looks straight down the crankshaft and all
+     six legs stack into one silhouette -- the creature reads as a knot of grey
+     sticks rather than as something with legs, and no amount of zoom fixes it
+     because the problem is the angle. Turning it three-quarters on fans the
+     legs out along the shaft, which is the view a Strandbeest is recognisable
+     from. The visitor can still drag it anywhere from here. */
+  const orbit = { yaw: 0.72, pitch: 0.2 };
   const PITCH_LIMIT = 0.62;
   const AXIS_Y = new THREE.Vector3(0, 1, 0);
   const tmpQ1 = new THREE.Quaternion(), tmpQ2 = new THREE.Quaternion();
@@ -233,7 +248,7 @@ async function start(host) {
   /* Re-solved whenever the shape of the viewport or the angle of the view
      changes -- both alter what the frustum has to hold. */
   function refit() {
-    framing = fitCamera(box, camera.aspect, { yaw: orbit.yaw, pitch: orbit.pitch });
+    framing = fitCamera(box, camera.aspect, { ...FRAMING, yaw: orbit.yaw, pitch: orbit.pitch });
   }
 
   /* ---- painting -------------------------------------------------------

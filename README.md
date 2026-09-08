@@ -15,7 +15,7 @@ js/linkage/           the mechanism engine and the tool's UI
 js/light/             the spectral light engine, its worker and the tool's UI
 partials/             nav and footer, stamped into pages by the build script
 scripts/build-site.py stamps the partials and versions every asset URL
-tests/                the engine's regression tests
+tests/                the engines' regression tests, and the hero's camera framing
 ```
 
 ## The linkage simulator
@@ -84,15 +84,24 @@ Linkage* (arXiv:2606.22129 §2). Two circles meet in two places and only one
 choice at each step assembles into Jansen's leg; that branch was found by
 sweeping all thirty-two and keeping the one whose foot path has the published
 duty factor of about 20%. `framing.js` solves where to put the camera, against
-the creature's own swept size and the viewport's shape, so it stays wholly on
-screen at any window shape and any angle you drag it to.
+the creature's own swept size and the viewport's shape.
+
+It deliberately does not fit the whole creature. Framed end to end, six legs 52
+apart superimpose into a knot of grey sticks at the size that leaves, so the
+camera is fitted vertically but allowed to run the ends of the crankshaft off
+the sides -- `fillX` above 1, `fillY` below it. The view also opens turned
+three-quarters on rather than square: at yaw 0 the camera looks straight down
+the crankshaft and every leg hides behind the one in front, which is an angle
+problem no amount of zoom fixes. `tests/framing.test.mjs` pins both -- that the
+crop never eats the creature vertically at any window shape or drag angle, that
+it stays bounded sideways, and that what is left still fills the frame.
 
 ## Working on it
 
 ```
 python3 scripts/build-site.py            # after editing partials/, css/ or js/
 python3 scripts/build-site.py --check    # non-zero if anything is stale
-node --test tests/*.mjs                  # both engines' regression tests
+node --test tests/*.mjs                  # both engines, and the hero framing
 python3 -m http.server 8000              # then open http://localhost:8000
 ```
 
@@ -101,6 +110,14 @@ and stamps the hash onto every asset URL, including the ES-module specifiers the
 engine uses internally. Without it GitHub Pages will keep serving a visitor
 ten-minute-old JavaScript after a deploy.
 
-The tests are ported from `tests/test_mechanism.c` in the C repo and keep their
-original names, so a failure here maps straight back to the test that covers the
-same behaviour there.
+The engine tests are ported from `tests/test_mechanism.c` in the C repo and keep
+their original names, so a failure here maps straight back to the test that
+covers the same behaviour there. `framing.test.mjs` has no counterpart there --
+the desktop tool has no homepage.
+
+The contact address is never written out in full. `index.html` and
+`partials/footer.html` carry it as `data-mailto-user` / `data-mailto-domain`,
+and `js/app.js` joins the halves at runtime, so the served HTML holds no
+harvestable string and the JSON-LD block carries no `email` field. Both links
+ship `hidden` and are revealed only once they have a real `href`, so a script
+failure leaves the LinkedIn and GitHub buttons rather than a dead one.

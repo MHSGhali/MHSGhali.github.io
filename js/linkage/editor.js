@@ -6,9 +6,9 @@
    with a mouse, a trackpad, or a finger, and every keyboard shortcut from the
    desktop app is also a toolbar button because a phone has no keyboard. */
 
-import * as M from "./mechanism.js?v=19c91c08";
-import * as S from "./solver.js?v=19c91c08";
-import * as v from "./vec2.js?v=19c91c08";
+import * as M from "./mechanism.js?v=955473fe";
+import * as S from "./solver.js?v=955473fe";
+import * as v from "./vec2.js?v=955473fe";
 
 const CONNECTOR_HIT_RADIUS = 12;   /* screen px */
 const LINK_EDGE_HIT_DIST = 7;
@@ -182,6 +182,9 @@ export function createEditor(canvas, { onChange } = {}) {
       linkRigid: !l || l.rigid,
       linkCanDrive: lid >= 0 && linkCanDrive(lid),
       allTraced: sel.length > 0 && sel.every((cid) => mechanism.connectors[cid].traced),
+      /* Whether there is anything for "Clear traces" to erase. Traced joints
+         with an empty path do not count -- the button would do nothing. */
+      anyTraced: mechanism.connectors.some((c) => c.alive && c.traced && c.path.length > 1),
       allAnchored: sel.length > 0 && sel.every((cid) => mechanism.connectors[cid].isAnchor),
       selectedSlider: mechanism.sliders.findIndex((sl) => sl.alive && sl.selected),
       hasSelection: sel.length > 0 || lid >= 0 ||
@@ -341,6 +344,14 @@ export function createEditor(canvas, { onChange } = {}) {
   function clearTraces() {
     M.clearTraces(mechanism);
     draw();
+  }
+
+  /* What Esc does, as something the toolbar can call: clearSelection() alone
+     only mutates the model, and every caller has to repaint and re-report. */
+  function deselectAll() {
+    clearSelection();
+    draw();
+    notify();
   }
 
   /* ------------------------------------------------------------ run/stop */
@@ -860,7 +871,7 @@ export function createEditor(canvas, { onChange } = {}) {
       fitView();
       notify();
     },
-    state, draw, fitView, undo,
+    state, draw, fitView, undo, clearSelection: deselectAll,
     linkSelected, slideSelected, toggleAnchor, toggleMotor, toggleVariable, toggleTrace,
     deleteSelection, toggleGravity, toggleRun, clearTraces, nudgeMotorSpeed,
     params,

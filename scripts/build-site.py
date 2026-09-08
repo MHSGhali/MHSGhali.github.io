@@ -6,7 +6,10 @@ The site is plain static files with no framework, but the nav and footer would
 otherwise be hand-copied into each page, so changing a link would mean editing
 every one of them and one would drift. The markup lives once in partials/ and
 this script stamps it between the BUILD markers. Pages stay real static HTML --
-nothing depends on JavaScript and there is nothing for a crawler to miss.
+nothing depends on JavaScript and there is nothing for a crawler to miss. That
+now holds for what a visitor SEES too, not just for the markup: the scroll
+reveal hides sections behind a `.js` class that only a live script sets, so a
+script that fails to load leaves the page plain rather than blank.
 
 Placeholders:
   {{ROOT}}  relative path back to the site root ("", "../", "../../", ...)
@@ -94,6 +97,33 @@ def version_module_imports(src, tag):
     )
 
 
+def mark_current(nav_html, page, root):
+    """Mark the nav link that points at `page` with aria-current="page".
+
+    main.css styles .nav-links a[aria-current="page"], but nothing ever set the
+    attribute, so the rule was dead and the nav gave no sense of place. The
+    partial cannot carry it -- the same markup is stamped into every page -- so
+    it has to be applied here, where the page being written is known.
+
+    index.html is matched on its section anchors rather than on a file name:
+    {{HOME}} is empty there, so those hrefs come out as bare "#about" and there
+    is no filename in them to compare. Anchors are left unmarked anyway; only a
+    whole-page destination is a "current page".
+    """
+    if page == "index.html":
+        target = None  # the homepage's own nav entries are all anchors
+    else:
+        target = root + page
+
+    def sub(m):
+        href = m.group(1)
+        if target and href == target:
+            return f'<a href="{href}" aria-current="page"'
+        return m.group(0)
+
+    return re.sub(r'<a href="([^"]+)"', sub, nav_html)
+
+
 def main():
     check = "--check" in sys.argv
     tag = stamp()
@@ -121,6 +151,8 @@ def main():
         for name, src in BLOCKS.items():
             with open(os.path.join(ROOT, src)) as f:
                 body = f.read().replace("{{ROOT}}", root).replace("{{HOME}}", home).rstrip("\n")
+            if name == "nav":
+                body = mark_current(body, page, root)
             pattern = re.compile(
                 r"(<!-- BUILD:%s -->\n).*?(\n\s*<!-- /BUILD:%s -->)" % (name, name), re.S
             )

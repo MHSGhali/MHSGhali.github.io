@@ -19,10 +19,16 @@
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="css/main.css?v=19c91c08">
-<script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="js/app.js?v=19c91c08" defer></script>
-<script type="module" src="js/hero-walkers.js?v=19c91c08"></script>
+<link rel="stylesheet" href="css/main.css?v=955473fe">
+<script>/* Runs before paint: marks JS alive so the reveal animation can hide
+   things it will later show, and settles the theme so there is no flash. */
+document.documentElement.classList.add("js");
+try{var t=localStorage.getItem("theme");
+/* No stored choice means the visitor has not chosen; follow the OS. */
+if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
+document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<script src="js/app.js?v=955473fe" defer></script>
+<script type="module" src="js/hero-walkers.js?v=955473fe"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -57,9 +63,11 @@
       <a href="#about">About</a>
       <a href="#experience">Experience</a>
       <a href="#projects">Projects</a>
+      <a href="#contact">Contact</a>
       <a href="pages/linkage.html">Linkage</a>
       <a href="pages/light.html">Light</a>
-      <a href="assets/files/MarkGerges.pdf">Resume</a>
+      <a href="assets/files/MarkGerges.pdf" target="_blank" rel="noopener"
+         aria-label="Resume (PDF, opens in a new tab)">Resume<span class="ext" aria-hidden="true">PDF</span></a>
     </nav>
     <div class="nav-actions">
       <button class="icon-btn" data-theme-toggle aria-label="Toggle color theme">
@@ -87,7 +95,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="9" cy="6" r="2"/><path d="M5 19 9 6l8 5-2 8"/></svg>
           Try the linkage simulator
         </a>
-        <a class="btn" href="assets/files/MarkGerges.pdf">
+        <a class="btn" href="assets/files/MarkGerges.pdf" download>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Download resume
         </a>
@@ -106,13 +114,13 @@
 <section class="section" id="about">
   <div class="wrap">
     <p class="eyebrow reveal">About</p>
-    <div class="grid grid-2 reveal">
-      <div>
+    <div class="grid grid-2">
+      <div class="reveal">
         <p>I am the technical lead on Tesla's internal GenAI platform and manager of the product team on it. Over the past year the platform grew roughly <strong>6&times; in GPU capacity</strong> across three datacenters and <strong>55&times; in direct users</strong>, serving models company-wide across billions of requests.</p>
         <p>I built the provider- and API-agnostic inference gateway covering chat, embeddings, and image and video generation, so Claude Code, Codex, OpenCode, Grok CLI and the rest work against one endpoint for every Tesla employee. I own the metering and access-governance layer end to end &mdash; versioned rate cards, per-org cost attribution, automated spend limits, manager-chain approval &mdash; which replaced a manual approval queue with a token service and took the platform out of the critical path for every new consumer.</p>
         <p>I am also the sole author of the inference benchmarking harness the platform's capacity decisions run on. Its time-to-first-token data was the empirical case behind the proposals that grew the fleet and put frontier open-weight models in house.</p>
       </div>
-      <div>
+      <div class="reveal">
         <p>I came to infrastructure through hardware. Three years in Tesla's Vision R&amp;D division building computer vision and opto-electro-mechanical inspection systems: optical and photometric design, camera interfacing, embedded lighting and motion control in C, robotic-arm inspection cells, the detection and segmentation models on top, and the programs that rolled them out globally. My M.Sc. from the University of Washington specialised in controls and robotics, with a patent and a publication in adaptive lighting control. Before that, six years in Middle East oil and gas running cost, schedule, and risk on capital projects.</p>
         <p>That path is why I reach for first principles and a number when a problem is unfamiliar. Throughout Tesla I go by <strong>&ldquo;The Janitor&rdquo;</strong>, earned cleaning up messes and making sure everything works properly and reliably while delivering critical solutions.</p>
         <div class="tags" style="margin-top:22px">
@@ -133,9 +141,9 @@
 <section class="section" id="experience">
   <div class="wrap">
     <p class="eyebrow reveal">Experience</p>
-    <div class="timeline reveal">
+    <div class="timeline">
 
-      <article class="tl-item">
+      <article class="tl-item reveal">
         <div class="tl-head">
           <h3>Staff Software Engineer, AI Platform</h3>
           <span class="tl-date">Nov 2024&ndash;Present</span>
@@ -151,7 +159,7 @@
         </ul>
       </article>
 
-      <article class="tl-item past">
+      <article class="tl-item past reveal">
         <div class="tl-head">
           <h3>Sr. Mechatronics Engineer</h3>
           <span class="tl-date">Aug 2022&ndash;Oct 2024</span>
@@ -165,7 +173,7 @@
         </ul>
       </article>
 
-      <article class="tl-item past">
+      <article class="tl-item past reveal">
         <div class="tl-head">
           <h3>Sr. Technical Project Manager</h3>
           <span class="tl-date">Aug 2021&ndash;Jul 2022</span>
@@ -178,7 +186,7 @@
         </ul>
       </article>
 
-      <article class="tl-item past">
+      <article class="tl-item past reveal">
         <div class="tl-head">
           <h3>Graduate Research Assistant</h3>
           <span class="tl-date">Feb 2020&ndash;Jun 2021</span>
@@ -190,7 +198,7 @@
         </ul>
       </article>
 
-      <article class="tl-item past">
+      <article class="tl-item past reveal">
         <div class="tl-head">
           <h3>Project Control Engineer</h3>
           <span class="tl-date">Sep 2016&ndash;Aug 2019</span>
@@ -199,7 +207,7 @@
         <p>Owned schedule, cost, and risk across the firm's portfolio: resource-loaded quantities, manhours, and costs on Primavera P6, built the cost-code system, and ran the weekly and monthly progress, forecast, and risk cycle. Attained ISO and OHSAS certification for the firm as management representative for quality assurance.</p>
       </article>
 
-      <article class="tl-item past">
+      <article class="tl-item past reveal">
         <div class="tl-head">
           <h3>Planning, Cost and Risk Engineer</h3>
           <span class="tl-date">Dec 2013&ndash;Aug 2016</span>
@@ -215,32 +223,42 @@
 <section class="section" id="projects">
   <div class="wrap">
     <p class="eyebrow reveal">Selected projects</p>
-    <div class="grid grid-2 reveal">
-      <a class="card" href="pages/light.html">
+    <div class="grid grid-2">
+      <a class="card reveal card-live" href="pages/light.html">
+        <p class="meta"><span class="tag hot">Live in your browser</span></p>
         <h3>Light Simulation &rarr;</h3>
         <p class="meta">Personal &middot; C, JavaScript</p>
         <p style="margin:0">A physically-based <strong>spectral</strong> ray tracer: 95 bins across 360&ndash;830&nbsp;nm, photometry by exact integral against the CIE observer. Build a scene in the browser and read the illuminance on every surface, in lux or W&middot;m&sup2;.</p>
       </a>
-      <a class="card" href="pages/linkage.html">
+      <a class="card reveal card-live" href="pages/linkage.html">
+        <p class="meta"><span class="tag hot">Live in your browser</span></p>
         <h3>Linkage Design &rarr;</h3>
         <p class="meta">Personal &middot; C, SDL2, JavaScript</p>
         <p style="margin:0">A general-purpose planar mechanism editor and simulator: build a linkage out of joints, anchors and rigid bodies, drive one with a motor, and forward-simulate the motion. Runs right here in the browser, with a live 3D view and a Blender export.</p>
       </a>
-      <div class="card">
-        <h3>Surface defect detection of large cast bodies</h3>
+      <a class="card reveal" href="https://www.linkedin.com/in/mark-gerges-9899967a/details/projects/" target="_blank" rel="noopener">
+        <h3>Surface defect detection of large cast bodies &rarr;</h3>
         <p class="meta">Tesla, CA &middot; Jan 2022&ndash;Feb 2025</p>
         <p style="margin:0">Capitalized on surface texture and directional hypersensitivity; designed, constructed, programmed and deployed an in-motion <strong>41-camera</strong> multiview station and dual robotic-arm articulated inspection stations, adopted by other internal teams and suppliers. Coordinated delivery across seven functions.</p>
-      </div>
-      <div class="card">
-        <h3>Vehicle status inspection station</h3>
+      </a>
+      <a class="card reveal" href="https://www.linkedin.com/in/mark-gerges-9899967a/details/projects/" target="_blank" rel="noopener">
+        <h3>Vehicle status inspection station &rarr;</h3>
         <p class="meta">Tesla, CA &middot; Nov 2021&ndash;Nov 2023</p>
         <p style="margin:0">Used network-camera remote calibration and photometric reflection to increase defect contrast; designed the optics, photometrics, and structure, delivering <strong>$3M per quarter</strong> in cost recovery that grew with iteration. Built across six groups, from city permitting to line integration.</p>
-      </div>
-      <div class="card">
-        <h3>Vehicle service triage station</h3>
+      </a>
+      <a class="card reveal" href="https://www.linkedin.com/in/mark-gerges-9899967a/details/projects/" target="_blank" rel="noopener">
+        <h3>Vehicle service triage station &rarr;</h3>
         <p class="meta">Tesla, CA &middot; Jul 2024&ndash;Jan 2025</p>
         <p style="margin:0">Designed the optics, photometrics, and structure of a service inspection station, cutting footprint and cost while increasing coverage for millimetre-accuracy defect and debris detection.</p>
-      </div>
+      </a>
+      <!-- Five cards leave a hole in a three-column row. Stretching a case
+           study across it would give the quietest card the most room; this
+           fills it with the thing the other three link to anyway. -->
+      <a class="card card-more reveal" href="https://www.linkedin.com/in/mark-gerges-9899967a/details/projects/" target="_blank" rel="noopener">
+        <h3>More projects &rarr;</h3>
+        <p class="meta">LinkedIn</p>
+        <p style="margin:0">The rest of the inspection and vision work &mdash; stations, programs and rollouts &mdash; with dates and detail.</p>
+      </a>
     </div>
   </div>
 </section>
@@ -248,13 +266,13 @@
 <section class="section" id="education">
   <div class="wrap">
     <p class="eyebrow reveal">Education</p>
-    <div class="grid grid-2 reveal">
-      <div class="card">
+    <div class="grid grid-2">
+      <div class="card reveal">
         <h3>M.S. Mechanical Engineering</h3>
         <p class="meta">Controls &amp; Robotics &middot; University of Washington &middot; 2019&ndash;2021</p>
         <p style="margin:0">Thesis: adaptive lighting control for uniform and uneven topographies. Advisor: Prof. Xu Chen.</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <h3>B.S. Mechanical Engineering</h3>
         <p class="meta">Mechatronics &amp; Design &middot; The American University in Cairo &middot; 2008&ndash;2013</p>
         <p style="margin:0">Further coursework: Machine Learning Specialization (Stanford Online); Computer Vision (Carnegie Mellon SCS); Data Structures and Algorithms, Python, and Object-Oriented Java (Georgia Tech).</p>
@@ -285,7 +303,17 @@
     <h2>Let's talk.</h2>
     <p class="lead">Open to conversations about GenAI infrastructure, inference at scale, platform economics, and anything where the optics and the software have to be designed together.</p>
     <div class="hero-cta">
-      <a class="btn btn-primary" href="https://www.linkedin.com/in/mark-gerges-9899967a/" target="_blank" rel="noopener">
+      <!-- The address is assembled at runtime from the two halves below, so no
+           harvestable string sits in the served HTML. It starts `hidden`, which
+           [hidden] in main.css forces over .btn's display, and app.js reveals it
+           once it has a real href -- a button that cannot work is never shown.
+           Without JavaScript the LinkedIn and GitHub buttons still stand, which
+           is exactly the state this section was in before. -->
+      <a class="btn btn-primary" data-mailto data-mailto-user="mrkghali" data-mailto-domain="gmail.com" href="#contact" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+        <span data-mailto-label></span>
+      </a>
+      <a class="btn" href="https://www.linkedin.com/in/mark-gerges-9899967a/" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.06c.53-.95 1.83-1.95 3.76-1.95C20.5 8.75 22 11 22 14.5V21h-4v-5.9c0-1.4-.03-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9z"/></svg>
         LinkedIn
       </a>
@@ -300,6 +328,7 @@
   <div class="wrap foot">
     <p>&copy; <span data-year></span> Mark Gerges</p>
     <div class="social">
+      <a data-mailto data-mailto-user="mrkghali" data-mailto-domain="gmail.com" href="#contact" aria-label="Email" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
       <a href="https://www.linkedin.com/in/mark-gerges-9899967a/" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.06c.53-.95 1.83-1.95 3.76-1.95C20.5 8.75 22 11 22 14.5V21h-4v-5.9c0-1.4-.03-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9z"/></svg></a>
       <a href="https://github.com/MHSGhali" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.35-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.78 2.71 1.27 3.37.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg></a>
     </div>
