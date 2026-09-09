@@ -7,15 +7,22 @@ beyond one Python script that stamps the shared nav and footer into each page.
 index.html            the whole single-page site
 pages/linkage.html    the linkage simulator
 pages/light.html      the light simulator
+pages/chat.html       the assistant, on its own
 css/main.css          design system and every component
 js/app.js             theme toggle, mobile nav, scroll reveal
 js/hero-walkers.js    the homepage background, driven by the real solver
 js/walker/            Jansen's leg, and the camera that keeps it framed
 js/linkage/           the mechanism engine and the tool's UI
 js/light/             the spectral light engine, its worker and the tool's UI
+js/chat/              the in-browser model, the command grammar and the panel
+sw.js                 the service worker that keeps the model resident
 partials/             nav and footer, stamped into pages by the build script
 scripts/build-site.py stamps the partials and versions every asset URL
-tests/                the engines' regression tests, and the hero's camera framing
+js/*/knowledge.js     what the assistant knows about each simulator
+js/linkage/generate.js  four-, six- and eight-bar linkages built to order
+tests/                the engines' regression tests, the hero's camera framing,
+                      the assistant's grammar and gate, and what keeps its
+                      prompts from drifting out of step with the code
 ```
 
 ## The linkage simulator
@@ -70,6 +77,161 @@ The C also prints gears, racks, cams and Geneva wheels. This engine has pin
 joints and sliders only, so those emitters have no counterpart here rather than
 a broken one.
 
+## The assistant
+
+`pages/chat.html` runs a small quantized language model inside the visitor's own
+browser: the weights stream from a CDN once, compile to WebGPU shaders, and
+execute on their GPU. There is no server, no API key and no request to anything
+of mine. It answers questions about my background, and on the two simulator
+pages the same panel drives the tools.
+
+On the simulator pages it reaches **every control those tools have**, and a few
+they do not: you can build a mechanism from an empty canvas without touching the
+mouse ("start from scratch", "place a joint at -60, 0", "select all", "link
+them", "anchor it", "select link 1", "put a motor on it", "run it"), or pick a
+lamp out of a light scene and set its flux, colour temperature, cone and
+position by name. The canvas numbers nothing, so the panel reads the joints and
+the lamps out with numbers, and those numbers are what it takes back.
+
+Two things it does without the model at all, because neither is a matter of
+judgement. **A starter can be asked for by what it does**: "create a mechanism
+that draws a straight line" is the Hoeken, "something that lifts a platform
+straight up" is the scissor lift, "simple harmonic motion" is the Scotch yoke.
+Each already traces the point that shows its motion, so running it draws the
+answer. And **a linkage of a named size is generated**, not planned: "build me a
+six bar linkage with a motor on link 3" produces one that turns.
+
+`js/linkage/generate.js` is a Grashof four-bar with dyads hung off its coupler.
+The part worth explaining is why the dyad lengths are what they are. A dyad
+added at a guess jams: its coupler point swings through a range of distances
+from the new anchor over a revolution, and any pair of lengths that cannot span
+that whole range binds partway round. So the coupler point's path is swept
+first, its nearest and furthest approach measured, and both dyad links set to
+0.62 of the furthest. Equal lengths can always fold to reach anything nearer,
+and twice 0.62 leaves a quarter again of slack at full stretch. A test runs
+every size through a full revolution against the real solver and checks the
+mobility comes out at one, which is the only check here that means anything.
+
+Each simulator carries its own **knowledge document** — `js/linkage/knowledge.js`
+and `js/light/knowledge.js` — an XML-tagged file holding what the tool can do,
+what it cannot, and the rules it enforces, with the live state of the tool
+injected as a `<state>` block on every turn. One document serves the planner,
+the help text and prose answers, so those three can no longer drift apart, and
+the assistant can be honest in both directions:
+
+> **why won't the motor go on?**
+> Both ends of that link are anchored, and a motor needs exactly one anchored
+> joint to turn about. Free one end and it will go on.  ▸ *unanchor joint 2*
+
+> **can it do gears?**
+> No. This tool only has pin joints and sliders; it cannot make gears, racks,
+> cams or Geneva wheels.
+
+Getting there needed a fix that was invisible until it was measured: **the topic
+gate was refusing the questions the feature exists to answer.** `classify()`
+builds its vocabulary from the résumé, and a résumé has never heard the words
+*gears*, *cams*, *friction* or *refraction* — so five of seven diagnosis
+questions, including that first one, were turned away as off-topic before the
+model ever saw them. The gate now takes the domain and unions in that
+simulator's own vocabulary, which falls out of the design: the `<limits>`
+section names exactly the things people ask for and cannot have, so the document
+that answers the question is also what lets the question through.
+
+Only one body of knowledge is ever sent. On a simulator page a question about
+the tool gets the tool's document and its state; a question that names Mark gets
+the résumé. Beside a simulator, *you* means the assistant and *he* means Mark,
+so "what can you do" is a question about the editor. A tool answer comes out at
+about 3,400 characters against the résumé's 6,600 — the cheaper path, not the
+more expensive one, which matters because WebLLM prefills the whole system
+prompt on every single message.
+
+A refusal that knows the remedy offers it as a button. Three gates stand between
+a suggestion and the simulator: it is authored by the controller from live state
+(or by the model inside `<try>` tags), it is only rendered if the grammar parses
+it, and tapping it goes through `ask()` so every precondition is re-checked at
+the moment it runs. That last one is what makes a stale chip harmless — it
+produces the same helpful refusal again rather than doing the wrong thing. The
+chips are never restored from the transcript, because a chip from another page's
+conversation would be a live wrong button.
+
+It is deliberately built so that **the model never presses a button**. Every
+message is triaged in this order:
+
+1. **Is it a build?** "Build me a crank that spins" names an outcome and no
+   steps, which is the one thing a grammar cannot express, so the model writes
+   a plan (`js/chat/plan.js`) in the same words a visitor would type. Every line
+   goes back through the grammar and a line that does not parse is dropped, so
+   a model can propose anything and still cannot invent an action.
+2. **Is it a command?** `js/chat/commands.js` matches a closed grammar. The
+   message is cut into clauses first, so "place a joint at 0 0, then one at
+   60 0, then link them" is three steps in the order they were said. This costs
+   nothing and works before the model has downloaded at all.
+3. **Is it on topic?** `classify()` in `js/chat/profile.js` refuses anything
+   unrelated. A 2B model will answer "who wrote Don Quixote" confidently and
+   wrongly, under my name, so that question never reaches the GPU.
+4. Only then is prose generated.
+
+That split is the whole design. A wrong sentence about a resume is a wrong
+sentence; a wrong tool call reaches into the simulator and changes what the
+visitor is looking at, so actions are held to a grammar and answers are not.
+`tests/chat.test.mjs` pins both directions of it: that "the scissor lift please"
+loads, and that "what is a Scotch yoke" does not.
+
+The planner's instructions go in a **system** message and the visitor's request
+in a **user** message. That is not decoration: a small instruct model weights
+the two slots differently and drifts into conversation when the rules arrive as
+conversation, and putting a stranger's sentence inside the instruction block
+makes "ignore the above" indistinguishable from the rules around it.
+Instructions in one turn, data in the other.
+
+The planner's hard-won rule is that **a plan is a prefix, not a scattering**.
+Asked for something past its depth, a 2B model writes a few good lines and then
+starts thinking out loud, and its commentary quotes the very commands it is
+reasoning about: `then "link them". This implies anchor is done on one of the
+selected` parses as a perfectly good link. Reading commands out of the middle of
+prose built a mess of three joints and no motor. So the plan ends at the first
+line that is not a command, and lines are rejected as prose before they are
+parsed at all. It is also why the summary reports the state the tool ended in
+rather than what the last step said: on a plan that half worked, the honest
+answer is "3 joints and 2 links, no motor", not "Anchored."
+
+The exception to that rule is a line of commands run together with the newlines
+missing, which is what a 2B model produces as it tires: `select link 1 anchor it
+select link 2 put a motor on it run it`. That is rejected on length like any
+long line, and it was costing the motor off the end of otherwise correct builds.
+So a long line with no prose marker in it is split at command boundaries, all or
+nothing: every piece must parse, which is what keeps this from being the
+scavenging it replaced.
+
+What none of this fixes is the model's grasp of mechanisms, and it should not
+pretend to. Asked for "a crank that spins" it builds one; asked for "three bars"
+it may close them into a triangle, which is rigid and cannot move, and the tool
+then refuses the motor and says so. The plan is shown before it runs and the end
+state is reported honestly, so a bad plan is visible rather than silent. When it
+matters, the deterministic path is right there: "build me a four bar" loads the
+starter in a second, with no model involved at all.
+
+The window is 4096 tokens and the profile is about 3200, so sending all of it
+would leave no room for the conversation and would make every answer slower
+(WebLLM keeps no prefix cache: the system prompt is prefilled on every message).
+`selectContext()` cuts the profile on its own headings and sends only the
+sections a question scores against, with term weights from how many sections
+each word appears in. Retrieval, without embeddings or a second model.
+
+The engine is held by `sw.js` rather than by the page. A navigation destroys a
+page's JavaScript context, so a model owned by the page would be rebuilt every
+time you opened one; a service worker outlives navigation, which is what makes
+the panel on the linkage page open instantly once the chat page has loaded it.
+`js/chat/engine.js` falls back to a dedicated worker where a service worker
+cannot be used, and steps down the model ladder when a GPU cannot hold the top
+of it. The WebLLM runtime itself is imported lazily, so a visitor who never
+opens the panel on a simulator page downloads none of it.
+
+The profile in `js/chat/profile.js` is the only thing to edit to change what it
+knows. It deliberately carries no email address and no phone number: the rest of
+the site keeps the address out of the served bytes, and a profile string in a
+static `.js` file would be the easiest scrape on the site.
+
 ## The homepage background
 
 A Strandbeest walking in 3D, on the same solver the linkage tool runs. Three
@@ -112,7 +274,7 @@ the breakpoint.
 ```
 python3 scripts/build-site.py            # after editing partials/, css/ or js/
 python3 scripts/build-site.py --check    # non-zero if anything is stale
-node --test tests/*.mjs                  # both engines, and the hero framing
+node --test tests/*.mjs                  # engines, hero framing, chat grammar
 python3 -m http.server 8000              # then open http://localhost:8000
 ```
 
@@ -120,6 +282,13 @@ The build script must be run after any CSS or JS change: it hashes those files
 and stamps the hash onto every asset URL, including the ES-module specifiers the
 engine uses internally. Without it GitHub Pages will keep serving a visitor
 ten-minute-old JavaScript after a deploy.
+
+`sw.js` is the one script the version stamp is deliberately kept off. A service
+worker is identified by its script URL, so stamping it would register a fresh
+worker on every deploy and leave the old one resident; browsers revalidate a
+service worker script on their own. Files started as workers (`solver.worker.js`,
+`js/chat/worker.js`) are not import specifiers either, so they copy their parent
+module's `?v=` across at runtime instead.
 
 The engine tests are ported from `tests/test_mechanism.c` in the C repo and keep
 their original names, so a failure here maps straight back to the test that

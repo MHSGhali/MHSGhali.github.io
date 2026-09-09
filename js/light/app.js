@@ -1,12 +1,12 @@
 /* Page controller for the light simulator: scene state, the worker, the 3D
    view, the property panel, and the readouts. */
 
-import { createView } from "./view3d.js?v=071da3f3";
-import { PRESETS, presetById } from "./presets.js?v=071da3f3";
-import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=071da3f3";
-import { viridis } from "./viridis.js?v=071da3f3";
-import { stats } from "./stats.js?v=071da3f3";
-import * as v from "./vec3.js?v=071da3f3";
+import { createView } from "./view3d.js?v=6725d2de";
+import { PRESETS, presetById } from "./presets.js?v=6725d2de";
+import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=6725d2de";
+import { viridis } from "./viridis.js?v=6725d2de";
+import { stats } from "./stats.js?v=6725d2de";
+import * as v from "./vec3.js?v=6725d2de";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -25,6 +25,7 @@ const state = {
   quality: "draft",
   selection: null,       /* {kind:'light'|'prim', index} */
   surfaces: [],          /* {primId, nverts, pos, nor} */
+  lastStats: null,       /* what the stats line last said, for the assistant */
   nlights: 0,
   weights: null,
   direct: null,
@@ -200,6 +201,16 @@ function updateStats(sorted, over) {
   if (!sorted || !sorted.length) return;
   $("#stats").classList.toggle("unsettled", !settled());
   const st = stats(sorted);
+  /* Kept for the assistant panel, which reads the same numbers back in words.
+     Formatted here rather than there so the two can never disagree about what
+     the solver said. */
+  let dark = 0;
+  for (let i = 0; i < sorted.length; i++) if (sorted[i] <= 0) dark++;
+  state.lastStats = {
+    min: fmt(st.min), mean: fmt(st.mean), max: fmt(st.max),
+    u0: st.u0.toFixed(3), over, settled: settled(),
+    dark, points: sorted.length,
+  };
   $("#stats").innerHTML =
     `<b>${fmt(st.min)}</b> min &nbsp; <b>${fmt(st.mean)}</b> mean &nbsp; ` +
     `<b>${fmt(st.max)}</b> max ${unitLabel()} &nbsp;·&nbsp; ` +
@@ -209,10 +220,8 @@ function updateStats(sorted, over) {
   /* A single unlit point drives both uniformity ratios to zero, so say why
      rather than leaving two zeroes looking like a broken solve. The C prints
      the same caveat. */
-  let zeros = 0;
-  for (let i = 0; i < sorted.length; i++) if (sorted[i] <= 0) zeros++;
-  $("#zeros").textContent = zeros
-    ? `${zeros} of ${sorted.length} points receive no light at all, which is why the uniformity ratios are zero.`
+  $("#zeros").textContent = dark
+    ? `${dark} of ${sorted.length} points receive no light at all, which is why the uniformity ratios are zero.`
     : "";
 }
 
@@ -429,6 +438,108 @@ function selectFrom(hit) {
   buildPanel();
 }
 
+/* ------------------------------------------------- the assistant's hands
+
+   The pointer picks a lamp or a surface for a person with a mouse; these do the
+   same by number, and edit whatever is picked. Every one of them ends in the
+   same three calls the properties panel makes, so a change asked for in words
+   and a change typed into a box land identically. */
+
+function sceneSummary() {
+  return {
+    lights: state.desc.lights.map((l, i) => ({
+      n: i + 1, kind: l.kind, p: l.p, flux: l.fluxValue, unit: l.fluxUnit, spd: l.spd,
+      totalDeg: l.totalDeg,
+    })),
+    prims: state.desc.prims.map((p, i) => ({
+      n: i + 1, kind: p.kind, c: p.c, material: p.material,
+      albedo: (state.desc.materials.find((m) => m.name === p.material) || {}).albedo,
+    })),
+    selection: state.selection,
+  };
+}
+
+/* `n` is what sceneSummary hands out: 1-based, the number the panel reads. */
+function selectByNumber(kind, n) {
+  const list = kind === "light" ? state.desc.lights : state.desc.prims;
+  const obj = list[n - 1];
+  if (!obj) return null;
+  state.selection = { kind, index: n - 1 };
+  view.attachGizmo(kind === "light" ? view.lampObject(n - 1) : null);
+  buildPanel();
+  return { n, kind: obj.kind, obj };
+}
+
+const round = (x) => Math.round(x * 1000) / 1000;
+
+function editSelection(patch) {
+  const sel = state.selection;
+  if (!sel) return null;
+  const obj = sel.kind === "light" ? state.desc.lights[sel.index] : state.desc.prims[sel.index];
+  if (!obj) return null;
+  const said = [];
+
+  if (patch.flux && sel.kind === "light") {
+    obj.fluxValue = Number(patch.flux.value);
+    if (patch.flux.unit) obj.fluxUnit = patch.flux.unit;
+    said.push(`${obj.fluxValue} ${obj.fluxUnit === "lm" ? "lm" : "W"}`);
+  }
+  if (patch.temperature !== undefined && sel.kind === "light") {
+    /* A temperature only means something on a blackbody or daylight spectrum,
+       so asking for one switches to daylight rather than being ignored. */
+    if (obj.spd.kind !== "blackbody" && obj.spd.kind !== "daylight") obj.spd = { kind: "daylight" };
+    obj.spd.a = patch.temperature;
+    said.push(`${patch.temperature} K`);
+  }
+  if (patch.cone !== undefined && sel.kind === "light" && obj.kind === "spot") {
+    obj.totalDeg = patch.cone;
+    obj.falloffDeg = Math.min(obj.falloffDeg ?? patch.cone * 0.6, patch.cone);
+    said.push(`a ${patch.cone}° cone`);
+  }
+  const at = sel.kind === "light" ? obj.p : obj.c;
+  if (patch.position) {
+    for (const k of ["x", "y", "z"]) if (patch.position[k] !== undefined) at[k] = patch.position[k];
+    said.push(`(${round(at.x)}, ${round(at.y)}, ${round(at.z)}) m`);
+  }
+  if (patch.move) {
+    for (const k of ["x", "y", "z"]) at[k] += patch.move[k] || 0;
+    said.push(`(${round(at.x)}, ${round(at.y)}, ${round(at.z)}) m`);
+  }
+  if (patch.radius !== undefined && obj.kind === "sphere") {
+    obj.r = Math.max(0.001, patch.radius);
+    said.push(`a ${round(obj.r)} m radius`);
+  }
+  if (patch.albedo !== undefined && sel.kind === "prim") {
+    const mat = state.desc.materials.find((m) => m.name === obj.material);
+    if (mat && mat.kind === "lambert") {
+      mat.albedo = Math.max(0, Math.min(1, patch.albedo));
+      /* The material is shared by name, so say so rather than letting a change
+         to "wall" look like a change to one wall. */
+      said.push(`material “${mat.name}” at albedo ${mat.albedo}`);
+    }
+  }
+  if (!said.length) return null;
+  refreshLamps();
+  buildPanel();
+  solve(true);
+  return said;
+}
+
+function deleteSelected() {
+  const sel = state.selection;
+  if (!sel) return null;
+  const list = sel.kind === "light" ? state.desc.lights : state.desc.prims;
+  const obj = list[sel.index];
+  if (!obj) return null;
+  list.splice(sel.index, 1);
+  state.selection = null;
+  view.attachGizmo(null);
+  refreshLamps();
+  buildPanel();
+  solve(true);
+  return `${sel.kind === "light" ? "lamp" : "surface"} ${sel.index + 1}, the ${obj.kind}`;
+}
+
 /* Read the field back where the pointer is, with the per-source breakdown the
    attribution rows make free. */
 function probe(hit) {
@@ -608,7 +719,17 @@ async function main() {
 
   /* Open on a shared scene if the URL carries one, else the workcell. */
   let loaded = false;
-  if (location.hash.length > 2) {
+  /* The assistant on the Ask page links here with a scene NAMED rather than
+     encoded, so #preset=workcell opens that one. Checked before decodeScene,
+     which would only reject it as a malformed share code. */
+  const named = /^#preset=([\w-]+)$/.exec(location.hash);
+  if (named && PRESETS.some((p) => p.id === named[1])) {
+    const p = presetById(named[1]);
+    $("#preset").value = p.id;
+    loaded = loadText(p.text, p.blurb);
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  if (!loaded && location.hash.length > 2) {
     try {
       const text = await decodeScene(location.hash.slice(1));
       if (text) loaded = loadText(text, "loaded a shared scene from this link");
@@ -620,6 +741,48 @@ async function main() {
     loadText(p.text, p.blurb);
   }
   window.addEventListener("themechange", () => view.markDirty());
+
+  /* --- the assistant --------------------------------------------------
+
+     Loaded on demand: the panel is chrome around the tool, and the tool must
+     not wait on it. Every action below goes through the control the visitor
+     could have clicked, rather than reaching into `state` itself, so the
+     buttons' pressed states and status line stay the single source of truth
+     about what the scene is doing. */
+  const assistantHost = $("#assistant");
+  if (assistantHost) {
+    import("./assistant.js?v=6725d2de").then(({ mountAssistant }) => {
+      const click = (sel) => $(sel).click();
+      mountAssistant(assistantHost, {
+        loadPreset(id) {
+          const p = presetById(id);
+          if (!p || p.id !== id) return null;
+          $("#preset").value = p.id;
+          $("#preset").dispatchEvent(new Event("change"));
+          return p;
+        },
+        units: () => state.photometric,
+        setUnits: (photometric) => { if (state.photometric !== photometric) click("#btn-units"); },
+        indirect: () => state.includeIndirect,
+        setIndirect: (on) => { if (state.includeIndirect !== on) click("#btn-mode"); },
+        quality: () => state.quality,
+        setQuality: (q) => { if (state.quality !== q) click("#btn-quality"); },
+        addLight: (kind) => click("#add-" + kind),
+        addPrim: (kind) => click("#add-" + kind),
+        fit: frameView,
+        stats: () => state.lastStats,
+        scene: sceneSummary,
+        select: selectByNumber,
+        edit: editSelection,
+        remove: deleteSelected,
+        download: () => click("#btn-scene"),
+        share: () => click("#btn-share"),
+      });
+    }).catch((e) => {
+      console.warn("the assistant panel could not be loaded", e);
+      assistantHost.remove();
+    });
+  }
 }
 
 main();

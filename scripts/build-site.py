@@ -30,6 +30,7 @@ PAGES = {
     "index.html": "",
     "pages/linkage.html": "../",
     "pages/light.html": "../",
+    "pages/chat.html": "../",
 }
 
 BLOCKS = {"nav": "partials/nav.html", "footer": "partials/footer.html"}
@@ -87,6 +88,11 @@ def version_module_imports(src, tag):
     The linkage engine is a set of modules importing each other, so versioning
     only the <script src> would let a fresh entry point pull a stale solver --
     the exact failure the version tag exists to prevent.
+
+    A worker started with `new URL("./x.js", import.meta.url)` is not an import
+    specifier and is not reached from here. Those files carry their parent
+    module's ?v= across at runtime instead; see startWorker() in js/light/app.js
+    and getDedicated() in js/chat/engine.js.
     """
     def sub(m):
         return f'{m.group(1)}{m.group(2)}?v={tag}{m.group(3)}'
