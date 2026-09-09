@@ -6,9 +6,9 @@
    with a mouse, a trackpad, or a finger, and every keyboard shortcut from the
    desktop app is also a toolbar button because a phone has no keyboard. */
 
-import * as M from "./mechanism.js?v=071da3f3";
-import * as S from "./solver.js?v=071da3f3";
-import * as v from "./vec2.js?v=071da3f3";
+import * as M from "./mechanism.js?v=7d7aad78";
+import * as S from "./solver.js?v=7d7aad78";
+import * as v from "./vec2.js?v=7d7aad78";
 
 const CONNECTOR_HIT_RADIUS = 12;   /* screen px */
 const LINK_EDGE_HIT_DIST = 7;
@@ -292,6 +292,123 @@ export function createEditor(canvas, { onChange } = {}) {
     mechanism.links[lid].motorSpeedDegS += delta * MOTOR_SPEED_STEP_DEG_S;
     draw();
     notify();
+  }
+
+  /* ------------------------------------------------- the assistant's hands
+
+     The pointer handlers own selection and placement for a person with a
+     mouse. These give the panel the same two moves without one: name a joint
+     by the number the panel reads back, and put a joint down at a coordinate.
+     Everything else the assistant does is an existing toolbar action, which
+     already works on whatever is selected. */
+
+  function listJoints() {
+    const out = [];
+    mechanism.connectors.forEach((c, id) => {
+      if (!c.alive) return;
+      out.push({ id, n: out.length + 1, x: c.pos.x, y: c.pos.y,
+                 isAnchor: c.isAnchor, traced: c.traced, selected: c.selected });
+    });
+    return out;
+  }
+
+  function listLinks() {
+    const out = [];
+    mechanism.links.forEach((l, id) => {
+      if (!l.alive) return;
+      out.push({ id, n: out.length + 1, joints: l.connectorIds.slice(),
+                 rigid: l.rigid, isDriven: l.isDriven, speed: l.motorSpeedDegS });
+    });
+    return out;
+  }
+
+  /* `ns` are the numbers listJoints() hands out, not raw indices: the panel
+     says "joint 3" and the visitor says "joint 3" back. */
+  function selectJoints(ns, add = false) {
+    if (running) return 0;
+    const live = listJoints();
+    if (!add) clearSelection();
+    let n = 0;
+    for (const want of ns) {
+      const j = live.find((c) => c.n === want);
+      if (!j) continue;
+      mechanism.connectors[j.id].selected = true;
+      n++;
+    }
+    noteSelection();
+    draw();
+    notify();
+    return n;
+  }
+
+  function selectLink(want) {
+    if (running) return false;
+    const l = listLinks().find((x) => x.n === want);
+    clearSelection();
+    if (!l) { draw(); notify(); return false; }
+    mechanism.links[l.id].selected = true;
+    draw();
+    notify();
+    return true;
+  }
+
+  /* A predicate rather than a list, for "select the anchors" and friends. */
+  function selectWhere(pred, add = false) {
+    if (running) return 0;
+    const live = listJoints();
+    if (!add) clearSelection();
+    let n = 0;
+    for (const j of live) {
+      if (!pred(j)) continue;
+      mechanism.connectors[j.id].selected = true;
+      n++;
+    }
+    noteSelection();
+    draw();
+    notify();
+    return n;
+  }
+
+  function addJointAt(x, y, add = false) {
+    if (running) return null;
+    pushUndo();
+    if (!add) clearSelection();
+    const id = M.addConnector(mechanism, { x, y });
+    mechanism.connectors[id].selected = true;
+    noteSelection();
+    fitView();
+    draw();
+    notify();
+    return listJoints().find((j) => j.id === id)?.n ?? null;
+  }
+
+  /* The +/- buttons and the keys act on the SELECTED link, which is the desktop
+     tool's rule and right while you are editing. The assistant has no selection
+     to work with, and run() clears the selection anyway, so it drives whatever
+     motor the mechanism actually has and reports the new speed. */
+  function driveMotor(delta) {
+    const lid = mechanism.links.findIndex((l) => l.alive && l.isDriven);
+    if (lid < 0) return null;
+    mechanism.links[lid].motorSpeedDegS += delta * MOTOR_SPEED_STEP_DEG_S;
+    draw();
+    notify();
+    return mechanism.links[lid].motorSpeedDegS;
+  }
+
+  /* Trace every joint at once. Trace (T) works on a selection because a person
+     picks the point they care about; asked in words, "trace the paths" means
+     all of them. */
+  function traceAll(on) {
+    if (running) return 0;
+    let n = 0;
+    for (let cid = 0; cid < mechanism.connectors.length; cid++) {
+      if (!mechanism.connectors[cid].alive) continue;
+      if (!n) pushUndo();          /* once, and before the first change */
+      M.setTraced(mechanism, cid, on);
+      n++;
+    }
+    if (n) { draw(); notify(); }
+    return n;
   }
 
   function toggleVariable() {
@@ -874,6 +991,8 @@ export function createEditor(canvas, { onChange } = {}) {
     state, draw, fitView, undo, clearSelection: deselectAll,
     linkSelected, slideSelected, toggleAnchor, toggleMotor, toggleVariable, toggleTrace,
     deleteSelection, toggleGravity, toggleRun, clearTraces, nudgeMotorSpeed,
+    driveMotor, traceAll,
+    listJoints, listLinks, selectJoints, selectLink, selectWhere, addJointAt,
     params,
     destroy() {
       window.removeEventListener("keydown", onKeyDown);

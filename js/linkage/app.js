@@ -1,13 +1,14 @@
 /* Page controller for the linkage tool: wires the toolbar, the status line,
    the 3D view, the Blender export and the share link to the editor. */
 
-import { createEditor } from "./editor.js?v=071da3f3";
-import { createView3D } from "./view3d.js?v=071da3f3";
-import { PRESETS, buildPreset } from "./presets.js?v=071da3f3";
-import { exportBlenderScript } from "./blender.js?v=071da3f3";
-import { exportPrintableParts } from "./print3d.js?v=071da3f3";
-import { makeZip } from "./zip.js?v=071da3f3";
-import { encode, decode } from "./serialize.js?v=071da3f3";
+import * as M from "./mechanism.js?v=7d7aad78";
+import { createEditor } from "./editor.js?v=7d7aad78";
+import { createView3D } from "./view3d.js?v=7d7aad78";
+import { PRESETS, buildPreset } from "./presets.js?v=7d7aad78";
+import { exportBlenderScript } from "./blender.js?v=7d7aad78";
+import { exportPrintableParts } from "./print3d.js?v=7d7aad78";
+import { makeZip } from "./zip.js?v=7d7aad78";
+import { encode, decode } from "./serialize.js?v=7d7aad78";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -50,6 +51,15 @@ for (const p of PRESETS) {
 function loadFromHash() {
   const hash = location.hash.replace(/^#/, "");
   if (!hash) return false;
+  /* The assistant on the Ask page links here with a mechanism NAMED rather than
+     encoded, so #preset=hoeken opens that one. Checked before decode(), which
+     would only reject it as a malformed share code. */
+  const named = /^preset=([\w-]+)$/.exec(hash);
+  if (named) {
+    if (!PRESETS.some((p) => p.id === named[1])) return false;
+    loadPreset(named[1]);
+    return true;
+  }
   const shared = decode(hash);
   if (!shared) return false;
   editor.load(shared.mechanism, shared.gravity);
@@ -292,3 +302,50 @@ createView3D(view3dHost, () => editor.mechanism).then((v) => {
 });
 
 refresh();
+
+/* --- the assistant ----------------------------------------------------
+
+   Loaded on demand rather than imported at the top: the panel is chrome around
+   the tool, and the tool must not wait on it. The language model behind it is
+   lazier still -- js/chat/engine.js does not fetch the runtime until a visitor
+   asks for it -- so a visitor who never opens the panel downloads nothing. */
+const assistantHost = $("#assistant");
+if (assistantHost) {
+  import("./assistant.js?v=7d7aad78").then(({ mountAssistant }) => {
+    mountAssistant(assistantHost, {
+      editor,
+      /* The chat needs the preset back to describe what it just did, and
+         loadPreset already owns the "what is on screen" bookkeeping. */
+      loadPreset(id) {
+        loadPreset(id);
+        return PRESETS.find((p) => p.id === id);
+      },
+      showView,
+      fit() {
+        editor.fitView();
+        if (view3d && !view3d.failed) view3d.resetView();
+      },
+      /* Exports and the share link go through the buttons rather than around
+         them, so the status line still reports what happened and there is one
+         copy of each of those flows. */
+      click: (which) => buttons[which]?.click(),
+      /* A generated mechanism is nobody's preset, so the menu must stop
+         claiming one: it still read "Four-bar crank-rocker" over a six-bar. */
+      loadedCustom(text) {
+        presetSelect.value = "";
+        say(text);
+      },
+      /* An empty canvas, which the toolbar cannot ask for: every preset
+         replaces the mechanism, and there is no button for "none of them". */
+      blank() {
+        editor.load(M.create(), false);
+        presetSelect.value = "";
+        say("Empty canvas. Place a joint to start.");
+      },
+      says: () => statusMsg.textContent,
+    });
+  }).catch((e) => {
+    console.warn("the assistant panel could not be loaded", e);
+    assistantHost.remove();
+  });
+}
