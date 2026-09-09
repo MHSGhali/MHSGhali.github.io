@@ -127,6 +127,39 @@ test("a generated linkage of every offered size actually turns", async () => {
   assert.equal(gen.buildBars(7), null);
 });
 
+test("the numbers a generated linkage reports are the numbers the editor shows", async () => {
+  /* The generator used to build the 8-bar coupler with three joints and replace
+     it with a four-joint one, which left a tombstone in mechanism.links. The
+     editor numbers only living links, so everything after the hole was reported
+     one too high: it advertised links 1, 3, 5, 7 as drivable when the editor's
+     drivable links were 1, 2, 4, 7, and following that advice selected a link
+     with no anchored joint at all. */
+  const gen = await import("../js/linkage/generate.js");
+  for (const bars of gen.SIZES) {
+    const built = gen.buildBars(bars);
+    const m = built.mechanism;
+
+    assert.equal(m.links.filter((l) => !l.alive).length, 0,
+      `${bars} bars: a tombstoned link pulls every number after it out of step`);
+
+    /* Rebuild the editor's own view of the mechanism and compare. */
+    const alive = [];
+    m.links.forEach((l) => {
+      if (!l.alive) return;
+      alive.push({
+        n: alive.length + 1,
+        anchors: l.connectorIds.filter((c) => m.connectors[c].isAnchor).length,
+        driven: l.isDriven,
+      });
+    });
+    assert.equal(built.links, alive.length, `${bars} bars: link count`);
+    assert.deepEqual(built.drivable, alive.filter((l) => l.anchors === 1).map((l) => l.n),
+      `${bars} bars: the links it says can be driven are not the ones that can`);
+    assert.equal(built.motorLink, alive.find((l) => l.driven).n,
+      `${bars} bars: the motor is not on the link it claims`);
+  }
+});
+
 test("asking for a sized linkage builds one instead of planning one", async () => {
   const { looksLikeABuild } = await import("../js/chat/plan.js");
   for (const q of ["build me a six bar linkage", "generate a 6 bar linkage",

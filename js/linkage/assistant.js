@@ -5,9 +5,9 @@
    vocabulary. The chat module knows there is a controller; it does not know
    what a coupler is. */
 
-import { mountChat } from "../chat/ui.js?v=6725d2de";
-import * as knowledge from "./knowledge.js?v=6725d2de";
-import { buildBars, SIZES } from "./generate.js?v=6725d2de";
+import { mountChat } from "../chat/ui.js?v=7d7aad78";
+import * as knowledge from "./knowledge.js?v=7d7aad78";
+import { buildBars, SIZES } from "./generate.js?v=7d7aad78";
 
 const deg = (v) => `${v.toFixed(0)}°/s`;
 
@@ -92,7 +92,15 @@ export function mountAssistant(host, api) {
           n: l.n, rigid: l.rigid, driven: l.isDriven, speed: l.speed,
           joints: l.joints.map((id) => (joints.find((j) => j.id === id) || {}).n).filter(Boolean),
         })),
-        selection: { link: s.selectedLink >= 0 ? s.selectedLink + 1 : null },
+        /* state().selectedLink is a raw index into mechanism.links, which keeps
+           tombstones; every other number in this block comes from listLinks(),
+           which counts only living ones. Adding one to the raw index printed a
+           number the model would then quote and selectLink could not resolve. */
+        selection: {
+          link: s.selectedLink >= 0
+            ? (editor.listLinks().find((l) => l.id === s.selectedLink) || {}).n ?? null
+            : null,
+        },
       };
     },
 
@@ -375,13 +383,34 @@ export function mountAssistant(host, api) {
 
         /* --- taking it away ------------------------------------------ */
 
-        case "export":
-          api.click(cmd.what === "blender" ? "download" : "print");
-          return api.says() || "Exported.";
+        /* Both of these go through the toolbar button, which is disabled while
+           the mechanism runs, and the share handler says what it did only after
+           awaiting the clipboard. So the status line cannot be read back
+           straight away: doing that reported whatever the tool last said, which
+           after loading a preset was the preset's blurb, as though the export
+           had succeeded. */
+        case "export": {
+          if (editor.running) {
+            return { text: "Exports are disabled while it runs.", suggest: "stop" };
+          }
+          const what = cmd.what === "blender" ? "download" : "print";
+          if (what === "print" && editor.state().linkCount === 0) {
+            return "There is nothing to print yet: a printable part needs at least one link.";
+          }
+          api.click(what);
+          return cmd.what === "blender"
+            ? "Downloading linkage_export.py. Run it in Blender's Scripting tab, then press Space."
+            : "Downloading linkage_parts.zip. The manifest inside says how the parts stack, and "
+              + "names any that were left out.";
+        }
 
         case "share":
+          if (editor.running) {
+            return { text: "The share link is disabled while it runs.", suggest: "stop" };
+          }
           api.click("share");
-          return api.says() || "Copied a link that carries the whole mechanism.";
+          return "Copied a link that carries the whole mechanism, so anyone who opens it gets "
+            + "exactly this.";
 
         case "list":
           return jointList(editor);

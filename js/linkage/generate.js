@@ -25,7 +25,7 @@
    No DOM in here.
    --------------------------------------------------------------- */
 
-import * as M from "./mechanism.js?v=6725d2de";
+import * as M from "./mechanism.js?v=7d7aad78";
 
 /* The same three helpers presets.js is written with, for the same reason: a
    mechanism has to be stated as lengths, because a link's rest lengths are
@@ -113,7 +113,22 @@ export function buildBars(bars, { motorLink = 1 } = {}) {
        is what makes the whole thing one mechanism instead of two. */
     const cPos = couplerPoint(aPos, bPos, 210, 65);
     const c = M.addConnector(m, cPos);
-    linkIds.push(M.addLink(m, [a, b, c]), M.addLink(m, [b, o4]));
+
+    /* Both apexes are decided before the coupler is created, so it can be made
+       once carrying all of them. Building it with three joints and replacing it
+       with a four-joint one left a tombstone in mechanism.links, and a tombstone
+       is exactly what pulls the numbers here apart from the numbers the editor
+       shows: it counts alive links, so every link after the hole was reported
+       one too high and "select link 3" landed on a link with no anchor. */
+    const couplerJoints = [a, b, c];
+    let e = -1;
+    let ePos = null;
+    if (bars === 8) {
+      ePos = couplerPoint(aPos, bPos, 120, -90);
+      e = M.addConnector(m, ePos);
+      couplerJoints.push(e);
+    }
+    linkIds.push(M.addLink(m, couplerJoints), M.addLink(m, [b, o4]));
 
     /* First dyad, hung below the coupler's path. */
     const path1 = sweepCouplerPoint(210, 65);
@@ -127,14 +142,8 @@ export function buildBars(bars, { motorLink = 1 } = {}) {
     linkIds.push(M.addLink(m, [c, d]), M.addLink(m, [d, o6]));
 
     if (bars === 8) {
-      /* A second dyad off a different coupler point, so the two do not simply
-         mirror each other. */
-      const ePos = couplerPoint(aPos, bPos, 120, -90);
-      const e = M.addConnector(m, ePos);
-      /* Rebuild the coupler to carry both apexes rigidly. */
-      M.deleteLink(m, linkIds[1]);
-      linkIds[1] = M.addLink(m, [a, b, c, e]);
-
+      /* A second dyad off the other coupler apex, so the two do not simply
+         mirror each other. The apex itself was placed above, with the coupler. */
       const path2 = sweepCouplerPoint(120, -90);
       const g2 = { x: Math.round(ePos.x), y: Math.round(ePos.y) - 300 };
       const d2 = planDyad(path2, g2);
@@ -147,6 +156,16 @@ export function buildBars(bars, { motorLink = 1 } = {}) {
     }
   }
 
+  /* Every number handed back is the number the EDITOR will show, worked out
+     from the mechanism itself rather than from the order things were built in.
+     The two agree today because nothing here deletes any more, but a reader of
+     this file should not have to know that to trust the report. */
+  const aliveLinks = [];
+  m.links.forEach((l, id) => { if (l.alive) aliveLinks.push(id); });
+  const aliveJoints = [];
+  m.connectors.forEach((c, id) => { if (c.alive) aliveJoints.push(id); });
+  const linkNo = (id) => aliveLinks.indexOf(id) + 1;
+
   /* The motor. Only a link with exactly one anchored joint can take one, so a
      request for an impossible one is reported rather than silently ignored. */
   const drivable = linkIds.filter((id) =>
@@ -155,19 +174,19 @@ export function buildBars(bars, { motorLink = 1 } = {}) {
   const chosen = drivable.includes(wantId) ? wantId : drivable[0];
   let note = "";
   if (chosen !== wantId) {
-    note = `Link ${linkIds.indexOf(wantId) + 1} has no anchored joint of its own, so it cannot be `
-      + `driven; the motor went on link ${linkIds.indexOf(chosen) + 1} instead.`;
+    note = `Link ${linkNo(wantId)} has no anchored joint of its own, so it cannot be `
+      + `driven; the motor went on link ${linkNo(chosen)} instead.`;
   }
   if (chosen !== undefined) M.toggleDriven(m, chosen, 90);
 
   return {
     mechanism: m,
     bars,
-    joints: m.connectors.length,
-    links: linkIds.length,
-    anchors: anchors.map((id) => id + 1),
-    motorLink: chosen === undefined ? null : linkIds.indexOf(chosen) + 1,
-    drivable: drivable.map((id) => linkIds.indexOf(id) + 1),
+    joints: aliveJoints.length,
+    links: aliveLinks.length,
+    anchors: anchors.map((id) => aliveJoints.indexOf(id) + 1),
+    motorLink: chosen === undefined ? null : linkNo(chosen),
+    drivable: drivable.map(linkNo).sort((x, y) => x - y),
     note,
   };
 }

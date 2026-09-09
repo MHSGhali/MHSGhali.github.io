@@ -16,7 +16,14 @@ function normalizeBullets(text) {
 /* Only same-origin and site-relative hrefs. The assistant offers links into the
    two simulators; it has no business linking anywhere else, and a link it made
    up is a link that should not be clickable. */
-function safeHref(href) {
+export function safeHref(href) {
+  /* A protocol-relative URL is not a site-relative one. "//evil.com/x" matches
+     a leading-slash test with zero dots and contains no "://", so it was being
+     returned verbatim and rendered as a clickable link off this origin; "/\evil"
+     gets there too, because browsers normalise the backslash. Anything whose
+     second character is another slash goes through the URL parse below, which
+     only lets same-origin through. */
+  if (/^[/\\]{2}/.test(href)) return null;
   if (/^(\.{0,2}\/|#)/.test(href) && !href.includes("://")) return href;
   try {
     const u = new URL(href, location.href);

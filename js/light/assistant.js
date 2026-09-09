@@ -2,8 +2,8 @@
    turns the chat's command grammar into this tool's actions, and puts the
    result into words a visitor would recognise from the status line. */
 
-import { mountChat } from "../chat/ui.js?v=6725d2de";
-import * as knowledge from "./knowledge.js?v=6725d2de";
+import { mountChat } from "../chat/ui.js?v=7d7aad78";
+import * as knowledge from "./knowledge.js?v=7d7aad78";
 
 const round = (x) => Math.round(x * 1000) / 1000;
 const at = (p) => `(${round(p.x)}, ${round(p.y)}, ${round(p.z)})`;

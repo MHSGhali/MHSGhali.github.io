@@ -18,6 +18,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { parse, LINKAGE_PRESETS, LIGHT_PRESETS } from "../js/chat/commands.js";
+import { safeHref } from "../js/chat/render.js";
 import { classify, selectContext, SECTIONS, systemPrompt } from "../js/chat/profile.js";
 import { validatePlan, repairPlan, looksLikeABuild, planSystem, planRequest } from "../js/chat/plan.js";
 import * as linkageKnowledge from "../js/linkage/knowledge.js";
@@ -230,6 +231,43 @@ test("the light page has nothing to run, so nothing reads as a run", () => {
      request to start the simulation. The light solver has no such thing. */
   assert.deepEqual(actions("move it to 0.1 0 0.45", "light"), ["edit"]);
   assert.ok(!actions("go to fine quality", "light").includes("run"));
+});
+
+test("a link in an answer can only point back at this site", () => {
+  /* The assistant offers links into the two simulators and has no business
+     linking anywhere else. "//evil.com/x" is protocol-relative, not
+     site-relative: it matched the leading-slash test with zero dots, contained
+     no "://", and was rendered as a clickable cross-origin link. Browsers
+     normalise "/\" the same way, so it got there too. */
+  for (const bad of ["//evil.com/x", "/\\evil.com", "//evil.com"]) {
+    assert.equal(safeHref(bad), null, `${bad} must not become a link`);
+  }
+  for (const good of ["../pages/linkage.html#preset=hoeken", "#top", "./x.html"]) {
+    assert.equal(safeHref(good), good, good);
+  }
+});
+
+test("a question about a control does not operate it", () => {
+  /* The worst class of bug this grammar can have. "Is interreflection off?"
+     turned interreflection off and re-solved the scene, and "how do I add a
+     sphere?" added one: both rules were missing the guard every rule beside
+     them carries. A question must be free. */
+  for (const q of ["is interreflection off?", "is interreflection on?",
+                   "how do i add a sphere?", "should i add a spot light?",
+                   "what does fine quality do?", "is it in lux?"]) {
+    assert.deepEqual(parse(q, "light"), [], q);
+  }
+  for (const q of ["how do i place a joint?", "is gravity on?", "should i anchor it?",
+                   "what does the motor do?"]) {
+    assert.deepEqual(parse(q, "linkage"), [], q);
+  }
+
+  /* And the imperatives they shadow still work, including the polite ones:
+     "could you" and "would you" are requests, not questions. */
+  assert.deepEqual(actions("turn off interreflection", "light"), ["indirect"]);
+  assert.deepEqual(actions("add a sphere", "light"), ["addPrim"]);
+  assert.deepEqual(actions("could you load the hoeken", "linkage"), ["preset"]);
+  assert.deepEqual(actions("would you run it", "linkage"), ["run"]);
 });
 
 /* --------------------------------------------------------- multi-step builds */

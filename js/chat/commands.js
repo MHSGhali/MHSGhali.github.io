@@ -172,7 +172,9 @@ function ordinals(text) {
 
 /* Is this an imperative at all, or a question about the subject? Questions are
    the model's, commands are ours. */
-const ASKING = /^\s*(what|why|how|who|when|which|is|are|does|do|did|can you (?:tell|explain)|tell me|explain|describe (?:how|why|what))\b/i;
+/* "Should I" is asking for advice, not issuing a request. "Could you" and
+   "would you" are the opposite -- polite imperatives -- so they stay out. */
+const ASKING = /^\s*(what|why|how|who|when|which|is|are|does|do|did|should|shall|can you (?:tell|explain)|tell me|explain|describe (?:how|why|what))\b/i;
 
 /* ------------------------------------------------------------------ parse */
 
@@ -308,7 +310,7 @@ function parseClause(text, domain) {
     }
 
     const ind = onOff(raw, "(?:interreflection|bounce|bounces|indirect)");
-    if (ind !== null || /\b(direct only|direct-only|no bounces)\b/i.test(raw)) {
+    if ((ind !== null || /\b(direct only|direct-only|no bounces)\b/i.test(raw)) && !asking) {
       cmds.push({ action: "indirect", value: /\b(direct only|direct-only|no bounces)\b/i.test(raw) ? false : ind });
     }
     if (/\b(fine|high quality|better quality|more samples|accurate)\b/i.test(raw) && !asking) cmds.push({ action: "quality", value: "fine" });
@@ -368,7 +370,10 @@ function parseClause(text, domain) {
       cmds.push({ action: "list" });
     }
 
-    const add = /\b(add|place|put|insert|drop|create)\b/i.test(raw) && !patch.position;
+    /* "How do I add a sphere?" is a question about adding one, and it was
+       adding one. Every other rule in this branch carries the same guard; these
+       two were simply missing it. */
+    const add = /\b(add|place|put|insert|drop|create)\b/i.test(raw) && !patch.position && !asking;
     if (add) {
       if (/\b(rect|rectangular|panel|area)\b/i.test(raw)) cmds.push({ action: "addLight", kind: "rect" });
       else if (/\bspot ?(?:light|lamp)?\b/i.test(raw)) cmds.push({ action: "addLight", kind: "spot" });

@@ -15,11 +15,11 @@
    on it.
    --------------------------------------------------------------- */
 
-import { systemPrompt, toolPrompt, selectContext, triage, REFUSALS, SUGGESTIONS, TOOL_HELP } from "./profile.js?v=6725d2de";
-import { parse } from "./commands.js?v=6725d2de";
-import { planSystem, planRequest, validatePlan, repairPlan, looksLikeABuild } from "./plan.js?v=6725d2de";
-import * as engine from "./engine.js?v=6725d2de";
-import { render, streamInto, attachCopy, stripPreamble, stripRefusalTail, TRY, stripTry } from "./render.js?v=6725d2de";
+import { systemPrompt, toolPrompt, selectContext, triage, REFUSALS, SUGGESTIONS, TOOL_HELP } from "./profile.js?v=7d7aad78";
+import { parse } from "./commands.js?v=7d7aad78";
+import { planSystem, planRequest, validatePlan, repairPlan, looksLikeABuild } from "./plan.js?v=7d7aad78";
+import * as engine from "./engine.js?v=7d7aad78";
+import { render, streamInto, attachCopy, stripPreamble, stripRefusalTail, TRY, stripTry } from "./render.js?v=7d7aad78";
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
