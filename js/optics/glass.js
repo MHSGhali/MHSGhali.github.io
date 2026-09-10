@@ -135,7 +135,9 @@ export function abbe(g) {
 
    Not physical -- no real material has zero dispersion -- and that is the
    point: it is how the IDEAL thin lens is expressed, so there is an optic that
-   contributes no aberration and no colour of its own.
+   contributes no COLOUR of its own. It still refracts, so the surface it is
+   used on still has whatever shape aberration that surface has; only the
+   wavelength dependence is gone.
 
    The trick is that a Sellmeier term with C = 0 reduces to a constant:
    lambda^2/(lambda^2 - 0) is 1 for every lambda, so B_1 = n^2 - 1 gives

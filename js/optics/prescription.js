@@ -31,7 +31,7 @@
      is written here and why lens.build() checks the paraxial focal length
      against the design value before it will hand back a lens. */
 
-import * as G from "./glass.js?v=e7629c32";
+import * as G from "./glass.js?v=265455f0";
 
 export const MAX_SURF = 24;
 
@@ -132,10 +132,19 @@ function buildAchromat() {
 
 /* An ideal thin lens, expressed with a dispersionless medium of index n.
 
-   It exists so there is an optic with NO aberration and NO dispersion to test
-   the exposure and depth-of-field arithmetic against: on a real prescription,
-   changing the aperture also changes the vignetting and the aberration, so a
-   test would have to be loosened until it could no longer see a genuine error.
+   It exists so there is an optic whose FIRST-ORDER behaviour is exact and whose
+   dispersion is zero, to test the exposure and depth-of-field arithmetic
+   against: on a real prescription the paraxial numbers and the traced ones
+   differ, and a test would have to be loosened until it could no longer see a
+   genuine error.
+
+   "Ideal" is therefore a claim about the paraxial trace and the colour, NOT
+   about the real one. A single spherical surface is not aplanatic: this lens
+   has more spherical aberration than the achromat does -- 0.048 mm against
+   0.032 mm on axis at f/5 -- because the doublet's second element is bending
+   the marginal rays back and this has nothing to do that with. It is exactly
+   100 mm at every wavelength and its blue and red foci coincide, which is all
+   it was ever for.
 
    TWO surfaces, not one. A single surface whose following medium is air has
    n = n' on both sides and therefore no power at all -- the C's first version

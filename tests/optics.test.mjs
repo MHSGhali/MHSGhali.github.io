@@ -94,6 +94,24 @@ test("every shipped design comes out at the focal length it claims", () => {
   }
 });
 
+test("the ideal lens is ideal in COLOUR, not in its rays", () => {
+  /* Two comments used to call it aberration-free. It is a single spherical
+     surface, which is not aplanatic: at f/5 it leaves MORE spherical aberration
+     than the achromat does, because the doublet's second element bends the
+     marginal rays back and this has nothing to do that with. What it really
+     guarantees is an exact focal length and no colour. */
+  const ideal = L.build(P.THIN, 100, 5);
+  const achromat = L.build(P.ACHROMAT_100, 100, 5);
+  L.focus(ideal, 2);
+  L.focus(achromat, 2);
+  assert.ok(L.spotMm(ideal, 2, 0, 21) > L.spotMm(achromat, 2, 0, 21),
+    "the ideal lens is not the sharpest one, and nothing should claim it is");
+  /* And stopping down still cleans it up, as spherical aberration does. */
+  const stopped = L.build(P.THIN, 100, 16);
+  L.focus(stopped, 2);
+  assert.ok(L.spotMm(stopped, 2, 0, 21) < L.spotMm(ideal, 2, 0, 21) / 10);
+});
+
 test("the ideal lens is exactly 100 mm at every wavelength", () => {
   const lens = L.build(P.THIN, 100, 5);
   for (const lam of [G.LINE_F, G.LINE_D, G.LINE_C, 380, 800]) {

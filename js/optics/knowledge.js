@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=e7629c32";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=265455f0";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -83,7 +83,10 @@ Set up a camera and see what it records.
 - Three lens designs, all selectable, all 100 mm, and what separates them is
   COLOUR -- where blue light and red light come to a focus relative to each
   other:
-    IDEAL, dispersionless: blue and red focus in exactly the same place.
+    IDEAL, dispersionless: blue and red focus in exactly the same place. It is
+      ideal in COLOUR and in its first-order numbers, not in its rays -- a
+      single spherical surface still has spherical aberration, and at f/5 it
+      has slightly more of it than the achromat does.
     SINGLET, one uncorrected N-BK7 element: their focal lengths differ by about
       1.5 %. It is meant to fringe; that is what it is here for.
     ACHROMAT, a Fraunhofer N-BK7 and F2 cemented doublet: two glasses paired so
