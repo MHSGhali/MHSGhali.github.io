@@ -7,6 +7,7 @@ beyond one Python script that stamps the shared nav and footer into each page.
 index.html            the whole single-page site
 pages/linkage.html    the linkage simulator
 pages/light.html      the light simulator
+pages/optics.html     the optics simulator
 pages/chat.html       the assistant, on its own
 css/main.css          design system and every component
 js/app.js             theme toggle, mobile nav, scroll reveal
@@ -14,6 +15,7 @@ js/hero-walkers.js    the homepage background, driven by the real solver
 js/walker/            Jansen's leg, and the camera that keeps it framed
 js/linkage/           the mechanism engine and the tool's UI
 js/light/             the spectral light engine, its worker and the tool's UI
+js/optics/            the lens, the camera and the renderer behind the optics page
 js/chat/              the in-browser model, the command grammar and the panel
 sw.js                 the service worker that keeps the model resident
 partials/             nav and footer, stamped into pages by the build script
@@ -76,6 +78,81 @@ small enough to be obviously correct rather than a dependency.
 The C also prints gears, racks, cams and Geneva wheels. This engine has pin
 joints and sliders only, so those emitters have no counterpart here rather than
 a broken one.
+
+
+## The optics simulator
+
+`pages/optics.html` is a browser port of
+[Optics-Simulation](https://github.com/MHSGhali/Optics-Simulation), my
+physically-based camera simulator in C. The scene view shows where everything
+is — the camera, the cone it sees, the plane it is focused on and the slab
+either side of it that counts as sharp. The image view under it shows what the
+camera recorded.
+
+Light is traced through a real multi-element lens prescription, surface by
+surface, with a refractive index taken from the Sellmeier coefficients of the
+actual catalogue glass. Spherical aberration, coma, astigmatism, field
+curvature, chromatic aberration, vignetting, distortion and the shape of the
+bokeh are not effects that get applied — they are what happens when you trace
+real glass. A ray that misses a clear aperture is dead, and that is the *only*
+source of vignetting: there is no darkening factor on the corners anywhere in
+the code.
+
+### What it shares, and what is new
+
+The C vendors the same `lightsim` core that Light-Simulation does, and that core
+is already here in JavaScript — so `js/optics/` imports `js/light/` for spectra,
+CIE colour, BSDFs, geometry, lights, scene traversal and PCG32 rather than
+carrying a second copy. The engine underneath this page is the one already
+checked against the C to eighteen significant digits.
+
+What is new is the lens: `glass.js`, `prescription.js`, `lens.js` (the paraxial
+y-nu analysis, the entrance and exit pupils, the iris, and the sequential ray
+trace), `pupil.js`, `spectral.js`, `camera.js`, `trace.js`, `scenedesc.js`,
+`film.js` and `render.js`.
+
+### One wavelength per ray, and why
+
+`js/light/` may carry all 95 bins down one path because every *scene* material
+is non-dispersive. The lens is not, so ray *generation* became wavelength
+dependent: two rays leaving the rear element from the same sensor point at
+450 nm and 650 nm are different rays, going to different places in the world.
+Carrying a whole spectrum down one of them would average the scene over
+wavelengths that never travelled there, which is exactly how a simulator erases
+the chromatic aberration it was built to show. So each camera ray carries one
+wavelength and deposits into one bin.
+
+Two deliberate departures from the C, both in `js/optics/`, both commented where
+they are:
+
+- **The wavelength is importance-sampled against the CIE observer** rather than
+  drawn uniformly over the band. Uniform draws spend an eighth of every render
+  on bins the film cannot see at all, and spread the rest over a response that
+  varies threefold. Drawing proportional to x̄+ȳ+z̄ and dividing by that same
+  probability is unbiased and cuts the variance by about 3.6×. The C's own
+  `inv_pdf` field exists for this; it just had no sensor response to use yet.
+- **The film accumulates XYZ, not 95 bins.** X, Y and Z are linear functionals
+  of the spectrum, so depositing `cmf[bin] × step` per sample gives the same
+  numbers as accumulating the spectrum and projecting its mean — exactly, not
+  approximately, and in three doubles per pixel instead of ninety-five. The C
+  keeps the full spectrum because it writes PFM files; this page has no PFM.
+
+The `IDEAL` design also gains a 20 mm air gap the C does not have. Its two
+surfaces sit at the same z there, which a *sequential* tracer visits in
+prescription order rather than hit order — so every reverse ray flew past the
+sphere, hit the plano behind it, and missed the sphere on the way out. It never
+mattered in C, where that design is only ever used for paraxial arithmetic. A
+plano surface has zero power at any thickness, so the focal length is still
+exactly 100.000000000 mm at every wavelength.
+
+### What this page does not do
+
+The desktop tool lets you arrange the scene, draws the lens in cross-section
+with its ray fans, and has undo. This page fixes the scene and gives you the
+camera: the lens design, focal length, aperture, focus, iris, sensor, exposure
+and sharpness criterion, plus the choice between the placed area lamp and a
+uniform overhead sky. Sampling is not a control — how many rays it takes to
+answer is the program's problem, not the visitor's.
 
 ## The assistant
 
@@ -287,13 +364,21 @@ ten-minute-old JavaScript after a deploy.
 worker is identified by its script URL, so stamping it would register a fresh
 worker on every deploy and leave the old one resident; browsers revalidate a
 service worker script on their own. Files started as workers (`solver.worker.js`,
-`js/chat/worker.js`) are not import specifiers either, so they copy their parent
-module's `?v=` across at runtime instead.
+`js/optics/render.worker.js`, `js/chat/worker.js`) are not import specifiers
+either, so they copy their parent module's `?v=` across at runtime instead.
 
-The engine tests are ported from `tests/test_mechanism.c` in the C repo and keep
-their original names, so a failure here maps straight back to the test that
-covers the same behaviour there. `framing.test.mjs` has no counterpart there --
-the desktop tool has no homepage.
+The engine tests are ported from the C repos -- `tests/test_mechanism.c` for the
+linkage, and `test_lens.c`, `test_camera.c`, `test_glass.c`, `test_spectral.c`
+and `test_trace.c` for the optics -- and keep their original names, so a failure
+here maps straight back to the test that covers the same behaviour there.
+`framing.test.mjs` has no counterpart there -- the desktop tool has no homepage.
+
+Some of `optics.test.mjs` pins behaviour that *looks* like a defect and is not,
+because both halves are worth defending: a hexagonal iris must not change the
+exposure, except wide open, where its corners genuinely do not fit down the
+barrel; and focus decides which target is sharp, except at the edge of the
+field, where an uncorrected doublet's coma beats defocus outright and the
+depth-of-field slab says the opposite of what the camera records.
 
 The contact address is never written out in full. `index.html` and
 `partials/footer.html` carry it as `data-mailto-user` / `data-mailto-domain`,

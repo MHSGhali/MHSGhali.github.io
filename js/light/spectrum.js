@@ -24,8 +24,8 @@
      would require replacing this with hero-wavelength sampling. Do not add one
      casually. */
 
-import { PLANCK_H, LIGHT_C, BOLTZMANN_K, STEFAN_BOLTZMANN, PI, interpTable } from "./core.js?v=7d7aad78";
-import { CIE_DAYLIGHT_LAMBDA, CIE_S0, CIE_S1, CIE_S2, CIE_DAYLIGHT_COUNT } from "./cie-data.js?v=7d7aad78";
+import { PLANCK_H, LIGHT_C, BOLTZMANN_K, STEFAN_BOLTZMANN, PI, interpTable } from "./core.js?v=281bca3b";
+import { CIE_DAYLIGHT_LAMBDA, CIE_S0, CIE_S1, CIE_S2, CIE_DAYLIGHT_COUNT } from "./cie-data.js?v=281bca3b";
 
 export const LAMBDA_MIN_NM = 360;
 export const LAMBDA_MAX_NM = 830;
@@ -34,6 +34,23 @@ export const NBINS = (LAMBDA_MAX_NM - LAMBDA_MIN_NM) / SPECTRAL_STEP_NM + 1; /* 
 
 /* Centre wavelength of bin i, in nanometres. */
 export const binLambda = (i) => LAMBDA_MIN_NM + i * SPECTRAL_STEP_NM;
+
+/* The bin a wavelength falls in, clamped to the band. Nearest bin, matching
+   monochromatic()'s rounding, so a wavelength that came FROM binLambda(i)
+   round-trips back to exactly i. */
+export function binIndex(lambdaNm) {
+  const i = Math.floor((lambdaNm - LAMBDA_MIN_NM) / SPECTRAL_STEP_NM + 0.5);
+  return i < 0 ? 0 : i > NBINS - 1 ? NBINS - 1 : i;
+}
+
+/* The value at one wavelength -- the C's ls_spectrum_at.
+
+   A single-bin read, NOT an interpolation between neighbours. The optics page's
+   camera samples one hero wavelength per path and that wavelength is always a
+   bin CENTRE, so this is exact to the last bit and needs no redistribution on
+   the way back out. Interpolating here would quietly make it approximate for
+   the one caller that depends on it being exact. */
+export const at = (s, lambdaNm) => s[binIndex(lambdaNm)];
 
 /* ---- construction ---- */
 

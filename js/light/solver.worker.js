@@ -16,8 +16,8 @@
    Every array is transferred, not copied. `gen` rises with each request; a
    result carrying a stale gen is ignored by the page and abandoned here. */
 
-import { parseScene, buildScene } from "./scenefile.js?v=7d7aad78";
-import * as F from "./field.js?v=7d7aad78";
+import { parseScene, buildScene } from "./scenefile.js?v=281bca3b";
+import * as F from "./field.js?v=281bca3b";
 
 let gen = 0;
 

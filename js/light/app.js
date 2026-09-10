@@ -1,12 +1,12 @@
 /* Page controller for the light simulator: scene state, the worker, the 3D
    view, the property panel, and the readouts. */
 
-import { createView } from "./view3d.js?v=7d7aad78";
-import { PRESETS, presetById } from "./presets.js?v=7d7aad78";
-import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=7d7aad78";
-import { viridis } from "./viridis.js?v=7d7aad78";
-import { stats } from "./stats.js?v=7d7aad78";
-import * as v from "./vec3.js?v=7d7aad78";
+import { createView } from "./view3d.js?v=281bca3b";
+import { PRESETS, presetById } from "./presets.js?v=281bca3b";
+import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=281bca3b";
+import { viridis } from "./viridis.js?v=281bca3b";
+import { stats } from "./stats.js?v=281bca3b";
+import * as v from "./vec3.js?v=281bca3b";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -751,7 +751,7 @@ async function main() {
      about what the scene is doing. */
   const assistantHost = $("#assistant");
   if (assistantHost) {
-    import("./assistant.js?v=7d7aad78").then(({ mountAssistant }) => {
+    import("./assistant.js?v=281bca3b").then(({ mountAssistant }) => {
       const click = (sel) => $(sel).click();
       mountAssistant(assistantHost, {
         loadPreset(id) {

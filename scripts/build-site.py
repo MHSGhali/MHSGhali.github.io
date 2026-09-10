@@ -30,6 +30,7 @@ PAGES = {
     "index.html": "",
     "pages/linkage.html": "../",
     "pages/light.html": "../",
+    "pages/optics.html": "../",
     "pages/chat.html": "../",
 }
 
