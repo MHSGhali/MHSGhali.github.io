@@ -17,7 +17,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=8425d6a8";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=8da2fe8e";
 
 /* The command forms, which are also what the planner is allowed to write. */
 export const VOCABULARY = [

@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=8425d6a8";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=8da2fe8e";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -103,7 +103,9 @@ Set up a camera and see what it records.
   exposure that is a viewing gain applied after the fact.
 - One scene, the depth rail: five identical targets at 1, 1.5, 2, 3 and 5 m.
 - Two lighting modes: the placed rectangular key lamp, or a uniform overhead
-  sky. A choice, not a blend.
+  sky. A choice, not a blend. The sky lights the scene but is not photographed,
+  so the background is black in both modes and switching between them changes
+  the lighting and nothing else.
 - The scene view draws the camera, the cone it sees, the focus plane and the
   near and far limits of acceptable sharpness, all at their true distances.
 - Derived readouts: focal length, field of view, entrance pupil, T-stop, back
@@ -178,9 +180,10 @@ const PRECONDITIONS =
   cannot be done and is refused rather than approximated.
 - Exposure is a VIEWING GAIN, applied when the measurements become pixels. It
   never re-traces a ray and it is not a photographic control; brightness in this
-  program comes from the aperture. Switching to the sky is about two stops
-  brighter than the key lamp it replaces, so it clips until the exposure comes
-  down.
+  program comes from the aperture. Switching to the sky puts more light on the
+  subjects than the key lamp it replaces, so it may clip until the exposure
+  comes down -- but the background is black either way, so the exposure is
+  comparable between the two in a way it was not when the sky was visible.
 - The image refines progressively. It is grainy for the first second and keeps
   improving for as long as it is left alone, so a reading taken immediately
   after a change is provisional.

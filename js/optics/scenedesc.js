@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=8425d6a8";
-import * as v from "../light/vec3.js?v=8425d6a8";
-import * as S from "../light/spectrum.js?v=8425d6a8";
-import * as B from "../light/bsdf.js?v=8425d6a8";
-import * as Lt from "../light/light.js?v=8425d6a8";
-import * as G from "../light/geom.js?v=8425d6a8";
-import * as U from "../light/units.js?v=8425d6a8";
-import { spectrumToXyz } from "../light/color.js?v=8425d6a8";
-import { createScene } from "../light/scene.js?v=8425d6a8";
+import { PI, clamp } from "../light/core.js?v=8da2fe8e";
+import * as v from "../light/vec3.js?v=8da2fe8e";
+import * as S from "../light/spectrum.js?v=8da2fe8e";
+import * as B from "../light/bsdf.js?v=8da2fe8e";
+import * as Lt from "../light/light.js?v=8da2fe8e";
+import * as G from "../light/geom.js?v=8da2fe8e";
+import * as U from "../light/units.js?v=8da2fe8e";
+import { spectrumToXyz } from "../light/color.js?v=8da2fe8e";
+import { createScene } from "../light/scene.js?v=8da2fe8e";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;
@@ -61,6 +61,10 @@ const RHO_MAX = 0.99;
    as sharpness to the eye, so a scene with no shadows at all is the honest
    place to judge FOCUS. The C has already had one focus question confused by a
    terminator.
+
+   The dome LIGHTS the scene and is not PHOTOGRAPHED -- see the camera-ray note
+   in trace.js. The background stays black, as it is under the lamp, so
+   switching modes changes the lighting and nothing else.
 
    A choice rather than two independent switches because they are answers to the
    same question, and because the interesting comparison is A against B -- a

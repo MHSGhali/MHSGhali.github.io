@@ -738,18 +738,65 @@ test("the clamps refuse every value that would throw inside a light build", () =
 
 /* ---------------------------------------------------------------- transport */
 
-test("an escaping ray sees the dome, and nothing else", () => {
+test("the dome lights the subjects without being photographed", () => {
+  /* The two lighting modes exist to be set against each other, and while the
+     sky was directly visible switching between them changed the LIGHTING and
+     the BACKDROP at once. So the dome is invisible to the CAMERA ray only.
+
+     What must not change is how brightly it lights anything: NEE toward the
+     dome is untouched, and so is every escaping ray at depth 1 or deeper, which
+     is where indirect sky light comes from. */
+  const d = SD.preset(SD.RAIL);
+  d.lightMode = SD.AMBIENT;
+  const b = SD.build(d);
+  const lam = 550;
+
+  /* A camera ray into empty sky is black. */
+  const rng = R.seed(21n, 5n);
+  const up = { o: v.v3(0, 0, 0), d: v.v3(0, 1, 0) };
+  assert.equal(T.radiance(b.scene, b.env, up, lam, rng, 5), 0,
+    "the background must be black under the dome");
+
+  /* And a surface lit by that same dome comes back at exactly rho * L, which is
+     the closed form for a convex Lambertian under a uniform sky -- so nothing
+     was lost from the lighting when the backdrop went. */
+  const one = {
+    objects: [{ kind: "sphere", centre: v.v3(0, 0, -2), radius: 0.4,
+                rgb: [0.5, 0.5, 0.5], colour: "grey", name: "S" }],
+    lights: [], camEye: v.v3(0, 0, 0), camTarget: v.v3(0, 0, -1),
+    lightMode: SD.AMBIENT, ambientLux: 2000, ambientCctK: 6500,
+  };
+  const built = SD.build(one);
+  const rho = SD.spectrumFromRgbReflectance([0.5, 0.5, 0.5]);
+  const want = S.at(rho, lam) * SD.envRadiance(built.env, null, lam);
+
+  const rng2 = R.seed(11n, 3n);
+  let sum = 0;
+  const N = 20000;
+  for (let i = 0; i < N; i++) {
+    sum += T.radiance(built.scene, built.env, { o: v.v3(0, 0, 0), d: v.v3(0, 0, -1) }, lam, rng2, 4);
+  }
+  near(sum / N, want, 0.02, "the sky must still light a surface at rho * L");
+});
+
+test("an escaping ray at depth carries the dome, and a camera ray does not", () => {
+  /* The distinction the invisible backdrop rests on. A ray that has bounced at
+     least once and then escapes IS indirect sky light and must carry it; the
+     camera ray is the picture's background and must not. */
   const d = SD.preset(SD.RAIL);
   d.lightMode = SD.AMBIENT;
   const b = SD.build(d);
   const rng = R.seed(1n, 1n);
   const up = { o: v.v3(0, 0, 0), d: v.v3(0, 1, 0) };
-  near(T.radiance(b.scene, b.env, up, 550, rng, 5), SD.envRadiance(b.env, null, 550), 1e-12,
-    "straight to the sky, unweighted");
+  assert.equal(T.radiance(b.scene, b.env, up, 550, rng, 5), 0, "camera ray: black");
+
+  /* A ray leaving a surface toward open sky still finds it -- which is what the
+     rho * L check above measures end to end. */
+  assert.ok(SD.envRadiance(b.env, null, 550) > 0, "the dome is still emitting");
 
   const lamps = SD.build(SD.preset(SD.RAIL));
   assert.equal(T.radiance(lamps.scene, lamps.env, up, 550, rng, 5), 0,
-    "with no dome and no backdrop there is nothing out there");
+    "and with no dome at all there is nothing out there either");
 });
 
 test("a sphere under a uniform dome comes back at its own reflectance", () => {

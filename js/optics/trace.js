@@ -22,15 +22,15 @@
      sampling the sky in addition -- is what keeps the estimator unbiased when
      both are present. */
 
-import { PI, TWO_PI } from "../light/core.js?v=8425d6a8";
-import * as v from "../light/vec3.js?v=8425d6a8";
-import * as S from "../light/spectrum.js?v=8425d6a8";
-import * as B from "../light/bsdf.js?v=8425d6a8";
-import * as L from "../light/light.js?v=8425d6a8";
-import * as R from "../light/rng.js?v=8425d6a8";
-import { intersect, occluded } from "../light/scene.js?v=8425d6a8";
-import { offsetOrigin, makeHit } from "../light/geom.js?v=8425d6a8";
-import { envRadiance } from "./scenedesc.js?v=8425d6a8";
+import { PI, TWO_PI } from "../light/core.js?v=8da2fe8e";
+import * as v from "../light/vec3.js?v=8da2fe8e";
+import * as S from "../light/spectrum.js?v=8da2fe8e";
+import * as B from "../light/bsdf.js?v=8da2fe8e";
+import * as L from "../light/light.js?v=8da2fe8e";
+import * as R from "../light/rng.js?v=8da2fe8e";
+import { intersect, occluded } from "../light/scene.js?v=8da2fe8e";
+import { offsetOrigin, makeHit } from "../light/geom.js?v=8da2fe8e";
+import { envRadiance } from "./scenedesc.js?v=8da2fe8e";
 
 /* Power-2 MIS heuristic. Squaring sharpens the crossover between the two
    strategies, which is what suppresses the fireflies a balance heuristic leaves
@@ -103,8 +103,24 @@ export function radiance(sc, env, ray, lambdaNm, rng, maxDepth) {
     if (!intersect(sc, r, hit)) {
       /* Escaped, so the sky is what is out there -- and it is the ONLY thing an
          escaping ray can see, which is what makes the dome cost nothing to look
-         up. */
-      if (haveEnv) {
+         up.
+
+         EXCEPT ON THE CAMERA RAY, which sees black. The dome lights the scene
+         and is not photographed: a standard renderer's invisible environment,
+         and here it earns its place by making the two lighting modes
+         comparable. They exist to be set against each other, and while the sky
+         was directly visible, switching between them changed the LIGHTING and
+         the BACKDROP at once -- a flat grey field under the dome against black
+         under the lamp. Two differences is one too many for an A-against-B, and
+         the grey also drove the exposure, so the same number was wrong in one
+         mode and right in the other.
+
+         Only the directly visible term goes. Next-event estimation toward the
+         dome is untouched, and so is every escaping ray at depth 1 or deeper,
+         which is where indirect sky light comes from -- so the subjects are lit
+         exactly as brightly as before. The estimator is unchanged; what changed
+         is the definition of the picture. */
+      if (haveEnv && depth > 0) {
         const w = prevWasDelta ? 1 : mis2(prevPdf, prevEnvPdf / nstrat);
         out += beta * envRadiance(env, r.d, lambdaNm) * w;
       }
