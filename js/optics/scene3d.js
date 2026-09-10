@@ -27,10 +27,10 @@
    COORDINATES
      Y-up, camera at the origin looking down -z, matching scenedesc.js. */
 
-import { TWO_PI } from "../light/core.js?v=8da2fe8e";
-import * as v from "../light/vec3.js?v=8da2fe8e";
-import * as LENS from "./lens.js?v=8da2fe8e";
-import { AMBIENT } from "./scenedesc.js?v=8da2fe8e";
+import { TWO_PI } from "../light/core.js?v=7a60899b";
+import * as v from "../light/vec3.js?v=7a60899b";
+import * as LENS from "./lens.js?v=7a60899b";
+import { AMBIENT } from "./scenedesc.js?v=7a60899b";
 
 /* What a segment is FOR, which is what decides how it is drawn. */
 export const GRID = "grid";         /* the ground, and its distance rings   */
@@ -162,25 +162,43 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
     s.nearM = nr; s.farM = fr;
     s.hyperfocalM = LENS.hyperfocalM(lens, cocLimitMm);
 
-    /* The three planes crowd together whenever the depth of field is shallow,
-       so their labels are staggered vertically -- stacked on one line they
-       overprint exactly when the numbers matter most. */
-    if (nr > 0.02 && nr <= reach) {
-      planeAt(s, nr, nr * tanH, nr * tanV, DOF);
-      label(s, v.v3(-nr * tanH * 1.08, -nr * tanV * 0.9, -nr), DOF, `AXIS NEAR ${nr.toFixed(2)}M`);
+    /* DRAWN ON THE AXIS, because that is the only place the number is true.
+
+       These used to be full-frame rectangles with four edges joining them into
+       a box, which says "everything in this volume is sharp". It is a paraxial,
+       ON-AXIS, defocus-only figure, and this scene's targets are deliberately
+       staggered ACROSS the frame so they do not occlude each other -- so all
+       but one of them is off axis, where an uncorrected doublet's coma decides
+       the answer instead.
+
+       At 12 mm and f/10 focused at 1 m the box landed around the 1 m target,
+       whose on-axis defocus is exactly zero and whose real spot is 0.0249 mm,
+       the WORST of the five -- while the 2 m target, the only one actually on
+       the axis, resolves at 0.0055 mm and sat outside the box. Both numbers
+       were right. The rectangle was the lie.
+
+       A tick on the axis and a line between them claims exactly what the
+       calculation claims: this stretch OF THE AXIS is within the limit. */
+    const tick = (dist) => {
+      const r = dist * tanV * 0.10;
+      seg(s, v.v3(-r, 0, -dist), v.v3(r, 0, -dist), DOF);
+      seg(s, v.v3(0, -r, -dist), v.v3(0, r, -dist), DOF);
+      return r;
+    };
+    const haveNear = nr > 0.02 && nr <= reach;
+    const haveFar = Number.isFinite(fr) && fr <= reach;
+    /* Labels staggered above and below: shallow depth of field puts these two
+       within a few centimetres of each other, and on one line they overprint
+       exactly when the numbers matter most. */
+    if (haveNear) {
+      const r = tick(nr);
+      label(s, v.v3(0, -r - nr * tanV * 0.12, -nr), DOF, `AXIS NEAR ${nr.toFixed(2)}M`);
     }
-    if (Number.isFinite(fr) && fr <= reach) {
-      planeAt(s, fr, fr * tanH, fr * tanV, DOF);
-      label(s, v.v3(-fr * tanH * 1.08, fr * tanV * 0.9, -fr), DOF, `AXIS FAR ${fr.toFixed(2)}M`);
+    if (haveFar) {
+      const r = tick(fr);
+      label(s, v.v3(0, r + fr * tanV * 0.12, -fr), DOF, `AXIS FAR ${fr.toFixed(2)}M`);
     }
-    if (nr > 0.02 && Number.isFinite(fr) && fr <= reach) {
-      for (let i = 0; i < 4; i++) {
-        const sx = i === 0 || i === 3 ? -1 : 1;
-        const sy = i < 2 ? -1 : 1;
-        seg(s, v.v3(sx * nr * tanH, sy * nr * tanV, -nr),
-               v.v3(sx * fr * tanH, sy * fr * tanV, -fr), DOF);
-      }
-    }
+    if (haveNear && haveFar) seg(s, v.v3(0, 0, -nr), v.v3(0, 0, -fr), DOF);
   }
 
   /* ---- the subjects, at the distances the description says ----

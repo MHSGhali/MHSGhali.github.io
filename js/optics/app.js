@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=8da2fe8e";
-import * as SD from "./scenedesc.js?v=8da2fe8e";
-import * as S3 from "./scene3d.js?v=8da2fe8e";
-import * as LENS from "./lens.js?v=8da2fe8e";
-import { createView } from "./view3d.js?v=8da2fe8e";
-import { derivedOf } from "./render.js?v=8da2fe8e";
+import * as ST from "./settings.js?v=7a60899b";
+import * as SD from "./scenedesc.js?v=7a60899b";
+import * as S3 from "./scene3d.js?v=7a60899b";
+import * as LENS from "./lens.js?v=7a60899b";
+import { createView } from "./view3d.js?v=7a60899b";
+import { derivedOf } from "./render.js?v=7a60899b";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -475,7 +475,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=8da2fe8e")
+  import("./assistant.js?v=7a60899b")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);

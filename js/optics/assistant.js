@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=8da2fe8e";
-import * as knowledge from "./knowledge.js?v=8da2fe8e";
-import * as SD from "./scenedesc.js?v=8da2fe8e";
-import * as P from "./prescription.js?v=8da2fe8e";
+import { mountChat } from "../chat/ui.js?v=7a60899b";
+import * as knowledge from "./knowledge.js?v=7a60899b";
+import * as SD from "./scenedesc.js?v=7a60899b";
+import * as P from "./prescription.js?v=7a60899b";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
