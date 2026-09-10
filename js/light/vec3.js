@@ -5,7 +5,7 @@
    angle with projected solid angle is the classic way to get a renderer that
    looks right and integrates wrong. */
 
-import { PI, TWO_PI, INV_PI } from "./core.js?v=408e651f";
+import { PI, TWO_PI, INV_PI } from "./core.js?v=9191330b";
 
 export const v3 = (x, y, z) => ({ x, y, z });
 export const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });

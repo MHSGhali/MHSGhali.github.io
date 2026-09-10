@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=408e651f";
-import * as v from "../light/vec3.js?v=408e651f";
-import * as S from "../light/spectrum.js?v=408e651f";
-import * as B from "../light/bsdf.js?v=408e651f";
-import * as Lt from "../light/light.js?v=408e651f";
-import * as G from "../light/geom.js?v=408e651f";
-import * as U from "../light/units.js?v=408e651f";
-import { spectrumToXyz } from "../light/color.js?v=408e651f";
-import { createScene } from "../light/scene.js?v=408e651f";
+import { PI, clamp } from "../light/core.js?v=9191330b";
+import * as v from "../light/vec3.js?v=9191330b";
+import * as S from "../light/spectrum.js?v=9191330b";
+import * as B from "../light/bsdf.js?v=9191330b";
+import * as Lt from "../light/light.js?v=9191330b";
+import * as G from "../light/geom.js?v=9191330b";
+import * as U from "../light/units.js?v=9191330b";
+import { spectrumToXyz } from "../light/color.js?v=9191330b";
+import { createScene } from "../light/scene.js?v=9191330b";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;
@@ -313,7 +313,7 @@ export function build(d) {
        that was actually built -- derived, so it cannot drift from where the
        object really is. */
     markers.push({ label: o.name, prim: sc.prims.length, depthM: -o.centre.z,
-                   rgb: o.rgb, colour: o.colour, radius: o.radius });
+                   centre: o.centre, rgb: o.rgb, colour: o.colour, radius: o.radius });
     sc.prims.push(prim);
   }
 

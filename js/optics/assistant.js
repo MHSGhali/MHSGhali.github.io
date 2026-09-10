@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=408e651f";
-import * as knowledge from "./knowledge.js?v=408e651f";
-import * as SD from "./scenedesc.js?v=408e651f";
-import * as P from "./prescription.js?v=408e651f";
+import { mountChat } from "../chat/ui.js?v=9191330b";
+import * as knowledge from "./knowledge.js?v=9191330b";
+import * as SD from "./scenedesc.js?v=9191330b";
+import * as P from "./prescription.js?v=9191330b";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -228,9 +228,14 @@ export function mountAssistant(host, api) {
          doublet that can be the opposite of what the render shows at the edge
          of the field. Saying so here costs one clause and stops the number
          being read as the whole truth. */
-      const caveat = targets.length && sharp.length
-        ? ` ${sharp.join(" and ")} ${sharp.length > 1 ? "are" : "is"} inside that, on the axis — off `
-          + "axis this design's coma can still soften a target the numbers call sharp."
+      /* The best-resolved target, by the traced spot -- which is what the
+         picture shows, and which is not always what the slab predicts. */
+      const best = targets.filter((t) => Number.isFinite(t.spotMm))
+        .sort((a, b) => a.spotMm - b.spotMm)[0];
+      const caveat = best
+        ? ` The sharpest thing in frame is ${best.label}${best.colour ? `, the ${best.colour} one` : ""}, `
+          + `at ${r2(best.spotMm)} mm on the film`
+          + (best.sharp ? "." : " — which is over the sharpness limit, so nothing formally qualifies.")
         : "";
 
       return `The ${sceneName()}, lit by ${SD.MODE_NAMES[s.lightMode].toLowerCase()}, through the `

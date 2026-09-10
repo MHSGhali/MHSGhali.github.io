@@ -1,15 +1,15 @@
 /* The transport estimators, from src/integrator.c. */
 
-import { PI } from "./core.js?v=408e651f";
-import * as v from "./vec3.js?v=408e651f";
-import * as S from "./spectrum.js?v=408e651f";
-import * as L from "./light.js?v=408e651f";
-import * as B from "./bsdf.js?v=408e651f";
-import { intersect, occluded } from "./scene.js?v=408e651f";
-import { cmfYbar } from "./color.js?v=408e651f";
-import { KM_LM_PER_W } from "./core.js?v=408e651f";
-import { offsetOrigin, makeHit } from "./geom.js?v=408e651f";
-import * as R from "./rng.js?v=408e651f";
+import { PI } from "./core.js?v=9191330b";
+import * as v from "./vec3.js?v=9191330b";
+import * as S from "./spectrum.js?v=9191330b";
+import * as L from "./light.js?v=9191330b";
+import * as B from "./bsdf.js?v=9191330b";
+import { intersect, occluded } from "./scene.js?v=9191330b";
+import { cmfYbar } from "./color.js?v=9191330b";
+import { KM_LM_PER_W } from "./core.js?v=9191330b";
+import { offsetOrigin, makeHit } from "./geom.js?v=9191330b";
+import * as R from "./rng.js?v=9191330b";
 
 /* Which sampling strategies the path tracer uses to find emitted light.
 

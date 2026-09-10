@@ -27,10 +27,10 @@
    COORDINATES
      Y-up, camera at the origin looking down -z, matching scenedesc.js. */
 
-import { TWO_PI } from "../light/core.js?v=408e651f";
-import * as v from "../light/vec3.js?v=408e651f";
-import * as LENS from "./lens.js?v=408e651f";
-import { AMBIENT } from "./scenedesc.js?v=408e651f";
+import { TWO_PI } from "../light/core.js?v=9191330b";
+import * as v from "../light/vec3.js?v=9191330b";
+import * as LENS from "./lens.js?v=9191330b";
+import { AMBIENT } from "./scenedesc.js?v=9191330b";
 
 /* What a segment is FOR, which is what decides how it is drawn. */
 export const GRID = "grid";         /* the ground, and its distance rings   */
@@ -162,11 +162,11 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
        overprint exactly when the numbers matter most. */
     if (nr > 0.02 && nr <= reach) {
       planeAt(s, nr, nr * tanH, nr * tanV, DOF);
-      label(s, v.v3(-nr * tanH * 1.08, -nr * tanV * 0.9, -nr), DOF, `NEAR ${nr.toFixed(2)}M`);
+      label(s, v.v3(-nr * tanH * 1.08, -nr * tanV * 0.9, -nr), DOF, `AXIS NEAR ${nr.toFixed(2)}M`);
     }
     if (Number.isFinite(fr) && fr <= reach) {
       planeAt(s, fr, fr * tanH, fr * tanV, DOF);
-      label(s, v.v3(-fr * tanH * 1.08, fr * tanV * 0.9, -fr), DOF, `FAR ${fr.toFixed(2)}M`);
+      label(s, v.v3(-fr * tanH * 1.08, fr * tanV * 0.9, -fr), DOF, `AXIS FAR ${fr.toFixed(2)}M`);
     }
     if (nr > 0.02 && Number.isFinite(fr) && fr <= reach) {
       for (let i = 0; i < 4; i++) {
@@ -181,31 +181,48 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
   /* ---- the subjects, at the distances the description says ---- */
   for (const o of d.objects) {
     if (o.kind === "plane") continue;
-    /* Marked means INSIDE THE DEPTH OF FIELD: between the near and far limits
-       the same dof() draws its slab at. Every subject in the slab is marked, on
-       axis or not -- the slab and the marks are then one statement rather than
-       two, and a subject sitting visibly inside the drawn planes can never come
-       out unmarked.
+    /* Marked means THE TRACED SPOT IS INSIDE THE SHARPNESS LIMIT -- the real
+       one, through the real glass, at this subject's real field position.
 
-       This is defocus only, which is what depth of field has always meant. It
-       is NOT the whole of how sharp a subject looks: off axis an uncorrected
-       doublet adds coma and astigmatism that no depth-of-field formula knows
-       about, so a marked subject near the frame edge can still be soft in the
-       render.
+       NOT "inside the depth-of-field slab", which is what this used to be and
+       which made the diagram disagree with the picture beside it. Depth of
+       field is a paraxial, ON-AXIS statement from defocus alone, and off axis
+       an uncorrected doublet's coma and astigmatism can dwarf defocus entirely.
+       At 25 mm with the achromat scaled down, focused at 1 m, the 1 m target
+       sits 8 degrees off axis: the slab calls its defocus exactly zero while
+       the trace puts its spot at 0.114 mm -- the WORST of the five -- and the
+       2 m target, which is the only one on the axis, comes out sharpest at
+       0.052 mm. The render showed that plainly and the diagram contradicted it.
 
-       The C's panel reports lens.spotMm for the SELECTED subject, which is the
-       honest answer for one. This page has no selection, so it has no such row
-       and the rendered image is the only place the discrepancy shows -- which
-       it does, plainly, and a test pins it. Do not read this mark as a promise
-       about the corners. */
+       So the slab is still drawn, because it is a real quantity and the number
+       every depth-of-field table gives; its labels now say AXIS. What is marked
+       is what the camera actually resolves. Where the two disagree you can see
+       both, which is the whole point of having a diagram beside a render. */
     const dist = -o.centre.z;
-    const sharp = !!dofRes && dist >= nr && dist <= fr;
+    const height = Math.hypot(o.centre.x, o.centre.y);
+    /* 15 rays across the pupil, not the 9 that would do for a yes/no: the spot
+       is PRINTED now, and at 9 it wobbles by nearly a tenth between one field
+       position and the next. A whole diagram costs 0.3 ms, so precision here is
+       free. */
+    const spot = LENS.spotMm(lens, dist, height, 15);
+    const sharp = Number.isFinite(spot) && spot <= cocLimitMm;
     sphereWire(s, o.centre, o.radius, sharp ? SUBJECT : OBJECT);
     /* A dropped line to the ground: a sphere floating in a perspective view has
        no readable depth on its own. */
     seg(s, o.centre, v.v3(o.centre.x, ground, o.centre.z), GRID);
+    /* The spot goes IN THE LABEL, not just into the highlight colour. A binary
+       mark has one bad case and this scene lands on it: the shipped achromat
+       leaves 0.032 mm of spherical aberration wide open, a hair over the
+       0.030 mm the sharpness criterion asks for, so at the default settings
+       nothing qualifies and nothing would be marked -- while the picture beside
+       it obviously has one target sharper than the rest. A number is never
+       wrong in that way: 0.03 against 0.38 says which one the camera is
+       resolving even when neither has met the standard. */
+    const size = Number.isFinite(spot)
+      ? `${o.name} ${spot < 0.1 ? spot.toFixed(3) : spot.toFixed(2)}MM`
+      : o.name;
     label(s, v.v3(o.centre.x, o.centre.y + o.radius + 0.14, o.centre.z),
-          sharp ? SUBJECT : OBJECT, o.name);
+          sharp ? SUBJECT : OBJECT, size);
   }
 
   /* ---- the lamps ---- */

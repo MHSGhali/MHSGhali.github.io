@@ -904,15 +904,48 @@ test("the diagram's distances come from the lens, not from a formula of its own"
   assert.equal(s.hyperfocalM, L.hyperfocalM(lens, 0.03));
 });
 
-test("exactly the targets inside the slab are marked sharp", () => {
-  const lens = L.build(P.ACHROMAT_100, 100, 5);
-  const d = SD.preset(SD.RAIL);
-  for (const [at, want] of [[1.0, ["1M"]], [2.0, ["2M"]], [5.0, ["5M"]]]) {
-    L.focus(lens, at);
-    const s = S3.build(d, lens, 36, 24, 0.03);
-    const marked = s.labels.filter((l) => l.kind === S3.SUBJECT).map((l) => l.text);
-    assert.deepEqual(marked, want, `focused at ${at} m`);
-  }
+test("the diagram marks what the camera resolves, not what the slab predicts", () => {
+  /* These two disagree, and the render sides with the trace. At 25 mm focused
+     at 1 m the 1 m target sits 8 degrees off axis: its DEFOCUS is exactly zero,
+     so the paraxial slab calls it perfectly sharp -- while the traced spot puts
+     it at the worst of the five, and the on-axis 2 m target, which the slab
+     excludes entirely, comes out best. The picture shows the 2 m one sharpest,
+     so the diagram has to as well. */
+  const lens = L.build(P.ACHROMAT_100, 25, 1);
+  L.focus(lens, 1.0);
+  const coc = 0.052;
+
+  const slab = L.dof(lens, coc);
+  assert.ok(1.0 >= slab.near && 1.0 <= slab.far, "the slab contains the 1 m target");
+  assert.ok(!(2.0 >= slab.near && 2.0 <= slab.far), "and excludes the 2 m one");
+
+  const spotAt = (dist, frac) => L.spotMm(lens, dist, Math.abs(frac) * dist, 15);
+  const oneM = spotAt(1.0, -0.140);
+  const twoM = spotAt(2.0, 0);
+  assert.ok(twoM < oneM,
+    `the trace must put the on-axis 2 m target ahead of the 1 m one: ${twoM} vs ${oneM}`);
+
+  /* And the diagram prints the spot beside every target, so the comparison is
+     legible even when none of them meets the criterion. */
+  const s = S3.build(SD.preset(SD.RAIL), lens, 10, 10 * 2 / 3, coc);
+  const targets = s.labels.filter((l) => l.kind === S3.SUBJECT || l.kind === S3.OBJECT);
+  assert.equal(targets.length, 5);
+  for (const t of targets) assert.match(t.text, /\d+MM$/, `"${t.text}" should carry its spot`);
+
+  /* The slab is still drawn, and its labels say which question it answers. */
+  const dofLabels = s.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text);
+  for (const t of dofLabels) assert.match(t, /^AXIS /, `"${t}" must say it is an on-axis figure`);
+});
+
+test("stopped down, the focused target is marked and the numbers agree", () => {
+  /* The other half: when the lens can actually meet the criterion, the mark
+     appears, and it appears on the target the trace says is best. */
+  const lens = L.build(P.ACHROMAT_100, 100, 8);
+  L.focus(lens, 2.0);
+  const s = S3.build(SD.preset(SD.RAIL), lens, 36, 24, 0.030);
+  const marked = s.labels.filter((l) => l.kind === S3.SUBJECT).map((l) => l.text);
+  assert.equal(marked.length, 1, `expected one sharp target, got ${JSON.stringify(marked)}`);
+  assert.match(marked[0], /^2M /, "the 2 m target is the one in focus and on the axis");
 });
 
 test("the lamp is drawn as off, and the sky appears, under AMBIENT", () => {

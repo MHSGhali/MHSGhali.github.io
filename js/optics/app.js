@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=408e651f";
-import * as SD from "./scenedesc.js?v=408e651f";
-import * as S3 from "./scene3d.js?v=408e651f";
-import * as LENS from "./lens.js?v=408e651f";
-import { createView } from "./view3d.js?v=408e651f";
-import { derivedOf } from "./render.js?v=408e651f";
+import * as ST from "./settings.js?v=9191330b";
+import * as SD from "./scenedesc.js?v=9191330b";
+import * as S3 from "./scene3d.js?v=9191330b";
+import * as LENS from "./lens.js?v=9191330b";
+import { createView } from "./view3d.js?v=9191330b";
+import { derivedOf } from "./render.js?v=9191330b";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -438,17 +438,23 @@ const assistantApi = {
   derived: () => derived,
   spp: () => passesSeen,
 
-  /* The rail's targets with the depth-of-field verdict the scene view drew, so
-     the assistant and the diagram cannot disagree about which one is sharp. */
+  /* The same verdict the scene view marks with, from the same traced spot, so
+     the assistant and the diagram cannot disagree about which one is sharp --
+     and neither can disagree with the render, which is where the spot comes
+     from. */
   targets() {
     if (!lensForDiagram || !markers.length) return [];
-    const d = LENS.dof(lensForDiagram, settings.cocLimitMm);
-    return markers.map((m) => ({
-      label: m.label,
-      colour: m.colour,
-      depthM: m.depthM,
-      sharp: !!d && m.depthM >= d.near && m.depthM <= d.far,
-    }));
+    return markers.map((m) => {
+      const height = Math.hypot(m.centre?.x ?? 0, m.centre?.y ?? 0);
+      const spot = LENS.spotMm(lensForDiagram, m.depthM, height, 15);
+      return {
+        label: m.label,
+        colour: m.colour,
+        depthM: m.depthM,
+        spotMm: spot,
+        sharp: Number.isFinite(spot) && spot <= settings.cocLimitMm,
+      };
+    });
   },
 
   /* Returns true when the value actually moved -- the assistant says "already
@@ -466,7 +472,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=408e651f")
+  import("./assistant.js?v=9191330b")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);

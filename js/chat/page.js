@@ -2,8 +2,8 @@
    nothing to wire but the mount: everything else lives in ui.js, which the two
    simulator panels mount the same way. */
 
-import { mountChat } from "./ui.js?v=408e651f";
-import { linksController } from "./links.js?v=408e651f";
+import { mountChat } from "./ui.js?v=9191330b";
+import { linksController } from "./links.js?v=9191330b";
 
 mountChat(document.getElementById("assistant"), {
   mode: "page",

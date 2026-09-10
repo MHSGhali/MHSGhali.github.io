@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=408e651f";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=9191330b";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -151,7 +151,10 @@ What the derived numbers mean. Every one is measured from the mounted lens.
   Compare it against SHARP IF.
 - COVERS: the image circle the design throws, against the diagonal the sensor
   needs. First smaller than second means the corners are outside what it covers.
-- AXIS SHARP FROM/TO: the near and far limits of sharpness on the axis.
+- AXIS SHARP FROM/TO: the near and far limits of sharpness on the axis, from
+  defocus alone. Off the axis they can be badly optimistic -- see
+  <preconditions>. The per-target SPOT beside each target in the scene view is
+  the honest figure.
 - AXIS HYPERFOCAL: focus there and everything from about half of it out is
   sharp.
 - SAMPLES: rays per pixel traced so far. Still refining until it stops climbing.
@@ -174,10 +177,22 @@ const PRECONDITIONS =
 - The image refines progressively. It is grainy for the first second and keeps
   improving for as long as it is left alone, so a reading taken immediately
   after a change is provisional.
-- The depth-of-field numbers are ON AXIS and come from defocus alone. Off axis
-  an uncorrected doublet adds coma and astigmatism that no depth-of-field
-  formula knows about, so a target inside the sharp limits can still be visibly
-  soft near the edge of the frame. The rendered image is the honest answer.
+- There are TWO sharpness figures and they routinely disagree. The
+  depth-of-field slab (AXIS SHARP FROM/TO) is paraxial, ON AXIS, and from
+  defocus alone. The per-target SPOT is the real ray traced through the real
+  glass at that target's real field position, and it is the one the rendered
+  image agrees with.
+  Off axis an uncorrected doublet's coma and astigmatism dwarf defocus, so the
+  disagreement can be total: at 25 mm focused at 1 m, the 1 m target has exactly
+  zero defocus and the slab calls it perfect, while its traced spot is the worst
+  of the five and the on-axis 2 m target -- which the slab excludes -- is the
+  sharpest thing in frame. Quote the SPOT when asked what looks sharp. The slab
+  is the textbook number, not the photograph.
+- The shipped achromat leaves about 0.032 mm of spherical aberration on axis
+  wide open, which is just over the 0.030 mm the sharpness criterion asks for.
+  So at the default settings nothing formally qualifies as sharp, and one third
+  of a stop down it does. That is the lens being aberration limited at f/5, not
+  a fault.
 - The 100 mm designs cover a 20 mm image circle, which is smaller than a 36 mm
   sensor. The corners are outside what the lens covers, and the page says so.
 </preconditions>`;
@@ -376,9 +391,10 @@ export function formatState(s) {
   }
   out.push(`render: ${s.spp ? `${Math.round(s.spp)} samples a pixel so far` : "not started"}`);
   if (s.targets && s.targets.length) {
-    out.push("targets: " + s.targets
+    out.push("targets, with the spot each really makes on the film: " + s.targets
       .map((t) => `${t.label}${t.colour ? ` the ${t.colour} one` : ""} at ${t.depthM} m`
-        + `${t.sharp ? " (sharp)" : ""}`)
+        + `${Number.isFinite(t.spotMm) ? `, spot ${n2(t.spotMm)} mm` : ""}`
+        + `${t.sharp ? " (within the sharpness limit)" : ""}`)
       .join("; "));
   }
 
