@@ -13,8 +13,8 @@
 const THREE_URL = "three";
 const ORBIT_URL = "three/addons/controls/OrbitControls.js";
 
-import { createViewControl } from "../viewcontrol.js?v=265455f0";
-import * as S3 from "./scene3d.js?v=265455f0";
+import { createViewControl } from "../viewcontrol.js?v=8425d6a8";
+import * as S3 from "./scene3d.js?v=8425d6a8";
 
 /* How each kind of segment is drawn. Colour comes from a CSS custom property so
    the diagram follows the page's theme; `w` is the opacity, which is what
@@ -29,6 +29,10 @@ const STYLE = {
   [S3.DOF]:     { token: "--text-dim",     opacity: 0.70 },
   [S3.OBJECT]:  { token: "--text-faint",   opacity: 0.60 },
   [S3.SUBJECT]: { token: "--accent",       opacity: 0.95 },
+  /* Between the two: brighter than an ordinary object, so the eye finds it when
+     nothing has met the sharpness criterion, but not the full accent that means
+     "this is sharp". */
+  [S3.BEST]:    { token: "--text",         opacity: 0.90 },
   [S3.LIGHT]:   { token: "--text",         opacity: 0.80 },
   [S3.SKY]:     { token: "--text-dim",     opacity: 0.60 },
 };

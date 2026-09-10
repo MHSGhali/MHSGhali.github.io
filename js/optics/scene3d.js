@@ -27,10 +27,10 @@
    COORDINATES
      Y-up, camera at the origin looking down -z, matching scenedesc.js. */
 
-import { TWO_PI } from "../light/core.js?v=265455f0";
-import * as v from "../light/vec3.js?v=265455f0";
-import * as LENS from "./lens.js?v=265455f0";
-import { AMBIENT } from "./scenedesc.js?v=265455f0";
+import { TWO_PI } from "../light/core.js?v=8425d6a8";
+import * as v from "../light/vec3.js?v=8425d6a8";
+import * as LENS from "./lens.js?v=8425d6a8";
+import { AMBIENT } from "./scenedesc.js?v=8425d6a8";
 
 /* What a segment is FOR, which is what decides how it is drawn. */
 export const GRID = "grid";         /* the ground, and its distance rings   */
@@ -40,10 +40,12 @@ export const FRUSTUM = "frustum";   /* what the sensor can see              */
 export const FOCUS = "focus";       /* the plane in focus                   */
 export const DOF = "dof";           /* the near and far limits of sharpness */
 export const OBJECT = "object";     /* a subject, at its true distance      */
-export const SUBJECT = "subject";   /* one inside the depth of field        */
+export const SUBJECT = "subject";   /* one the camera actually resolves     */
+export const BEST = "best";         /* the sharpest thing in frame, whether  */
+                                    /* or not it met the criterion           */
 export const LIGHT = "light";       /* a lamp                               */
 export const SKY = "sky";           /* the ambient dome, when that is the light */
-export const KINDS = [GRID, AXIS, CAMERA, FRUSTUM, FOCUS, DOF, OBJECT, SUBJECT, LIGHT, SKY];
+export const KINDS = [GRID, AXIS, CAMERA, FRUSTUM, FOCUS, DOF, OBJECT, SUBJECT, BEST, LIGHT, SKY];
 
 const seg = (s, a, b, k) => { s.segs.push({ a, b, kind: k }); };
 const label = (s, at, k, text) => { s.labels.push({ at, kind: k, text }); };
@@ -147,7 +149,10 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
   const f = lens.focusDistanceM;
   if (Number.isFinite(f) && f > 0 && f <= reach) {
     planeAt(s, f, f * tanH, f * tanV, FOCUS);
-    label(s, v.v3(f * tanH * 1.08, f * tanV * 0.9, -f), FOCUS, `FOCUS ${f.toFixed(2)}M`);
+    /* "FILM SET FOR", not "FOCUS": this plane is where the film is placed, and
+       a bare "FOCUS 1.00M" reads as a claim that the thing at 1 m is the sharp
+       one. Off axis it frequently is not. */
+    label(s, v.v3(f * tanH * 1.08, f * tanV * 0.9, -f), FOCUS, `FILM SET FOR ${f.toFixed(2)}M`);
   }
 
   const dofRes = LENS.dof(lens, cocLimitMm);
@@ -178,7 +183,20 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
     }
   }
 
-  /* ---- the subjects, at the distances the description says ---- */
+  /* ---- the subjects, at the distances the description says ----
+
+     Spots are measured for ALL of them first, because the most useful single
+     thing this view can say is which one the camera resolves best, and that
+     cannot be known one object at a time. */
+  const spots = new Map();
+  let bestObj = null;
+  for (const o of d.objects) {
+    if (o.kind === "plane") continue;
+    const sp = LENS.spotMm(lens, -o.centre.z, Math.hypot(o.centre.x, o.centre.y), 15);
+    spots.set(o, sp);
+    if (Number.isFinite(sp) && (!bestObj || sp < spots.get(bestObj))) bestObj = o;
+  }
+
   for (const o of d.objects) {
     if (o.kind === "plane") continue;
     /* Marked means THE TRACED SPOT IS INSIDE THE SHARPNESS LIMIT -- the real
@@ -199,14 +217,20 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
        is what the camera actually resolves. Where the two disagree you can see
        both, which is the whole point of having a diagram beside a render. */
     const dist = -o.centre.z;
-    const height = Math.hypot(o.centre.x, o.centre.y);
-    /* 15 rays across the pupil, not the 9 that would do for a yes/no: the spot
-       is PRINTED now, and at 9 it wobbles by nearly a tenth between one field
-       position and the next. A whole diagram costs 0.3 ms, so precision here is
-       free. */
-    const spot = LENS.spotMm(lens, dist, height, 15);
+    const spot = spots.get(o);
     const sharp = Number.isFinite(spot) && spot <= cocLimitMm;
-    sphereWire(s, o.centre, o.radius, sharp ? SUBJECT : OBJECT);
+    /* THE SHARPEST THING IN FRAME IS ALWAYS MARKED, whether or not it met the
+       criterion. "Nothing qualifies" leaves the view with no highlight at all,
+       and the strongest visual left is then the focus plane -- which sits at
+       the distance the FILM is set for and says nothing about what the lens
+       resolves there. A visitor reads that plane as the answer.
+
+       It is not the answer. At 25 mm focused at 1 m the plane lands on the 1 m
+       target while the camera resolves the 2 m one twice as well, and with the
+       sharpness limit set tight enough that neither qualifies, the diagram was
+       pointing at the wrong ball with nothing on screen to contradict it. */
+    const best = o === bestObj;
+    sphereWire(s, o.centre, o.radius, sharp ? SUBJECT : best ? BEST : OBJECT);
     /* A dropped line to the ground: a sphere floating in a perspective view has
        no readable depth on its own. */
     seg(s, o.centre, v.v3(o.centre.x, ground, o.centre.z), GRID);
@@ -219,10 +243,10 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
        wrong in that way: 0.03 against 0.38 says which one the camera is
        resolving even when neither has met the standard. */
     const size = Number.isFinite(spot)
-      ? `${o.name} ${spot < 0.1 ? spot.toFixed(3) : spot.toFixed(2)}MM`
+      ? `${o.name} ${spot < 0.1 ? spot.toFixed(3) : spot.toFixed(2)}MM${best ? " SHARPEST" : ""}`
       : o.name;
     label(s, v.v3(o.centre.x, o.centre.y + o.radius + 0.14, o.centre.z),
-          sharp ? SUBJECT : OBJECT, size);
+          sharp ? SUBJECT : best ? BEST : OBJECT, size);
   }
 
   /* ---- the lamps ---- */

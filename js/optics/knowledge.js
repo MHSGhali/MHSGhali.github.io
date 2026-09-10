@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=265455f0";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=8425d6a8";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -189,6 +189,10 @@ const PRECONDITIONS =
   defocus alone. The per-target SPOT is the real ray traced through the real
   glass at that target's real field position, and it is the one the rendered
   image agrees with.
+  The scene view marks the sharpest target SHARPEST whether or not it met the
+  criterion, and labels the focus plane FILM SET FOR rather than FOCUS, because
+  that plane is where the film is placed and is not a claim about what the lens
+  resolves there.
   Off axis an uncorrected doublet's coma and astigmatism dwarf defocus, so the
   disagreement can be total: at 25 mm focused at 1 m, the 1 m target has exactly
   zero defocus and the slab calls it perfect, while its traced spot is the worst

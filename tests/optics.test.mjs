@@ -981,9 +981,34 @@ test("the diagram marks what the camera resolves, not what the slab predicts", (
   /* And the diagram prints the spot beside every target, so the comparison is
      legible even when none of them meets the criterion. */
   const s = S3.build(SD.preset(SD.RAIL), lens, 10, 10 * 2 / 3, coc);
-  const targets = s.labels.filter((l) => l.kind === S3.SUBJECT || l.kind === S3.OBJECT);
+  const targets = s.labels.filter((l) =>
+    l.kind === S3.SUBJECT || l.kind === S3.OBJECT || l.kind === S3.BEST);
   assert.equal(targets.length, 5);
-  for (const t of targets) assert.match(t.text, /\d+MM$/, `"${t.text}" should carry its spot`);
+  for (const t of targets) {
+    assert.match(t.text, /\d+MM( SHARPEST)?$/, `"${t.text}" should carry its spot`);
+  }
+
+  /* At this limit the 2 m target does qualify, and it is the one marked. */
+  const marked = s.labels.filter((l) => l.kind === S3.SUBJECT);
+  assert.equal(marked.length, 1, `expected the 2 m target, got ${JSON.stringify(marked.map(m => m.text))}`);
+  assert.match(marked[0].text, /^2M /);
+
+  /* Tighten the criterion past what the lens can do and NOTHING qualifies. That
+     is the case with no highlight at all, where the only strong visual left is
+     the focus plane -- sitting on the 1 m target, which is the blurriest of the
+     five. So the sharpest thing in frame is marked regardless, and says so. */
+  const strict = S3.build(SD.preset(SD.RAIL), lens, 10, 10 * 2 / 3, 0.002);
+  assert.equal(strict.labels.filter((l) => l.kind === S3.SUBJECT).length, 0,
+    "nothing should meet a 0.002 mm criterion");
+  const bestLabels = strict.labels.filter((l) => l.kind === S3.BEST);
+  assert.equal(bestLabels.length, 1, "exactly one target is the best");
+  assert.match(bestLabels[0].text, /^2M /, "the 2 m target is the sharpest thing in frame");
+  assert.match(bestLabels[0].text, /SHARPEST$/, "and it has to say so in words");
+
+  /* And the focus plane must not read as a claim about what is sharp. */
+  const focusLabel = strict.labels.find((l) => l.kind === S3.FOCUS);
+  assert.match(focusLabel.text, /^FILM SET FOR /,
+    `"${focusLabel.text}" reads as a promise the lens does not keep off axis`);
 
   /* The slab is still drawn, and its labels say which question it answers. */
   const dofLabels = s.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text);
@@ -999,6 +1024,10 @@ test("stopped down, the focused target is marked and the numbers agree", () => {
   const marked = s.labels.filter((l) => l.kind === S3.SUBJECT).map((l) => l.text);
   assert.equal(marked.length, 1, `expected one sharp target, got ${JSON.stringify(marked)}`);
   assert.match(marked[0], /^2M /, "the 2 m target is the one in focus and on the axis");
+  /* When something does meet the criterion it is marked sharp, and since it is
+     also the best it still says so -- one target, not two markings. */
+  assert.match(marked[0], /SHARPEST$/);
+  assert.equal(s.labels.filter((l) => l.kind === S3.BEST).length, 0);
 });
 
 test("the lamp is drawn as off, and the sky appears, under AMBIENT", () => {

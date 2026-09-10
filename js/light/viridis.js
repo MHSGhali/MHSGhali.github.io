@@ -5,7 +5,7 @@
    Perceptually uniform and legible in greyscale, which a rainbow ramp is not:
    a rainbow introduces bands that look like features of the data and are not. */
 
-import { clamp, lerp } from "./core.js?v=265455f0";
+import { clamp, lerp } from "./core.js?v=8425d6a8";
 
 const VIRIDIS = [
   [0.267004, 0.004874, 0.329415], [0.282623, 0.140926, 0.457517],

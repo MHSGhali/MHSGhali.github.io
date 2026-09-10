@@ -20,9 +20,9 @@
    `rgb` is transferred, not copied. `gen` rises with each request; a result
    carrying a stale gen is ignored by the page and abandoned here. */
 
-import * as FILM from "./film.js?v=265455f0";
-import { setup, renderRows, derivedOf } from "./render.js?v=265455f0";
-import { prescriptionName } from "./prescription.js?v=265455f0";
+import * as FILM from "./film.js?v=8425d6a8";
+import { setup, renderRows, derivedOf } from "./render.js?v=8425d6a8";
+import { prescriptionName } from "./prescription.js?v=8425d6a8";
 
 let gen = 0;
 /* Kept between messages so an exposure change can re-tonemap without tracing a
