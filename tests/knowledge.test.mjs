@@ -61,7 +61,7 @@ test("every suggestion a refusal can offer is runnable", () => {
     linkage: ["stop", "select all", "select link 1", "put a motor on it",
               "anchor joint 3", "unanchor joint 3"],
     light: ["select lamp 1"],
-    optics: ["switch to the sky"],
+    optics: ["switch to the sky", "switch to the lamps"],
   };
   for (const [domain, says] of Object.entries(suggestions)) {
     for (const say of says) {
@@ -473,6 +473,24 @@ test("the two units that collide are told apart by the control they name", () =>
   assert.deepEqual(ff, [{ action: "sensor", value: 36 }]);
 });
 
+test("the unit says which source a number is for", () => {
+  /* Lux is the sky's and lumens is the lamp's, so neither needs to be told
+     which it means. Kelvin is shared, so the noun decides -- and a bare colour
+     temperature becomes a generic `colour` for the controller to apply to
+     whichever source is actually lighting the scene, because guessing one of
+     them would be wrong half the time. */
+  assert.deepEqual(parse("set the lamp to 60000 lumens", "optics"),
+    [{ action: "lampLumens", value: 60000 }]);
+  assert.deepEqual(parse("40000 lm", "optics"), [{ action: "lampLumens", value: 40000 }]);
+  assert.deepEqual(parse("set the sky to 5000 lx", "optics"),
+    [{ action: "ambientLux", value: 5000 }]);
+  assert.deepEqual(parse("make the lamp 3000 K", "optics"),
+    [{ action: "lampColour", value: 3000 }]);
+  assert.deepEqual(parse("make the sky 5600 K", "optics"),
+    [{ action: "skyColour", value: 5600 }]);
+  assert.deepEqual(parse("make it 3000 K", "optics"), [{ action: "colour", value: 3000 }]);
+});
+
 test("adjusting the sky is not the same as switching to it", () => {
   /* The word "sky" names both the lighting mode and the thing being adjusted.
      Firing both rules gave two answers to one question: "the sky is already
@@ -537,6 +555,7 @@ test("no two tools claim the same preset name", () => {
 test("the optics state block stays small however much is on screen", () => {
   const s = optics.formatState({
     scene: "RAIL", lighting: "AMBIENT", ambientLux: 2000, ambientCctK: 6500,
+    lampLm: 20800, lampCctK: 5500,
     design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2,
     sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03, spp: 412,
     derived: { eflMm: 100, hfovDeg: 20.41, pupilMm: 20, tstop: 5.26, colourErrPct: -0.058,
@@ -551,10 +570,19 @@ test("the optics state block stays small however much is on screen", () => {
 
 test("an unbuilt lens says so rather than inventing numbers", () => {
   const s = optics.formatState({
-    scene: "RAIL", lighting: "LAMPS", design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2,
+    scene: "RAIL", lighting: "LAMPS", lampLm: 20800, lampCctK: 5500,
+    design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2,
     sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03,
     derived: null, spp: 0, targets: [],
   });
   assert.match(s, /has not been built yet/);
   assert.ok(!/NaN|undefined/.test(s), `the state block leaked a placeholder: ${s}`);
+
+  /* And a snapshot missing a field entirely must go quiet rather than print the
+     word "undefined", which the model reads as a value and repeats. */
+  const bare = optics.formatState({
+    scene: "RAIL", lighting: "LAMPS", design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2,
+    sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03, derived: null, spp: 0, targets: [],
+  });
+  assert.ok(!/NaN|undefined/.test(bare), `a partial snapshot leaked a placeholder: ${bare}`);
 });

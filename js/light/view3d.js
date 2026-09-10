@@ -11,7 +11,7 @@ const THREE_URL = "three";
 const ORBIT_URL = "three/addons/controls/OrbitControls.js";
 const GIZMO_URL = "three/addons/controls/TransformControls.js";
 
-import { createViewControl } from "../viewcontrol.js?v=9191330b";
+import { createViewControl } from "../viewcontrol.js?v=e7629c32";
 
 export async function createView(container, opts = {}) {
   let THREE, OrbitControls, TransformControls;

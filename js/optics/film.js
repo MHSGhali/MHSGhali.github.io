@@ -27,9 +27,9 @@
      count rose, so the control would visibly stop doing anything at high
      quality. A real photograph is one readout, not the mean of a thousand. */
 
-import { SPECTRAL_STEP_NM } from "../light/spectrum.js?v=9191330b";
-import { cmfXbar, cmfYbar, cmfZbar, xyzToLinearSrgb, srgbEncode } from "../light/color.js?v=9191330b";
-import { clamp } from "../light/core.js?v=9191330b";
+import { SPECTRAL_STEP_NM } from "../light/spectrum.js?v=e7629c32";
+import { cmfXbar, cmfYbar, cmfZbar, xyzToLinearSrgb, srgbEncode } from "../light/color.js?v=e7629c32";
+import { clamp } from "../light/core.js?v=e7629c32";
 
 export function create(width, height) {
   const n = width * height;

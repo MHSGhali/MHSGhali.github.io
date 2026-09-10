@@ -604,6 +604,41 @@ test("AMBIENT turns the lamps off entirely rather than dimming them", () => {
   assert.equal(lamps.env.on, false, "and the dome is off when the lamps are on");
 });
 
+test("the lamp's brightness and colour are controls, and independent", () => {
+  /* LAMPS had no controls at all while AMBIENT had two. The lamp's flux is
+     AUTHORED IN LUMENS -- the number printed on a real bulb -- and that is the
+     number held fixed: watts are recomputed from the lumens and the colour on
+     every build, so changing the colour of an 80000 lm lamp leaves it an
+     80000 lm lamp. Storing watts instead would silently change the brightness
+     every time the colour moved. */
+  const at = (lm, k) => {
+    const d = SD.preset(SD.RAIL);
+    d.lampLm = lm; d.lampCctK = k;
+    return SD.build(d).scene.lights[0];
+  };
+
+  /* Watts are exactly linear in lumens at a fixed colour. */
+  const perLumen = at(20800, 5500).phiE / 20800;
+  for (const lm of [10400, 41600, 208000]) {
+    near(at(lm, 5500).phiE / lm, perLumen, 1e-12, `${lm} lm should scale exactly`);
+  }
+
+  /* And the authored lumens survive any colour, which is the whole point of
+     authoring in lumens. */
+  for (const k of [2700, 5500, 9000]) {
+    const l = at(20800, k);
+    near(U.photometric(S.scale(l.sHat, l.phiE)), 20800, 1e-6,
+      `at ${k} K the lamp must still be a 20800 lm lamp`);
+  }
+
+  /* Each mode shows its own source's controls and only its own. */
+  const lamps = ST.defaults();
+  const sky = { ...ST.defaults(), lightMode: SD.AMBIENT };
+  const ids = (s) => ST.visibleFields(s).filter((f) => f.section === "SCENE").map((f) => f.id);
+  assert.deepEqual(ids(lamps), ["lightMode", "lampLm", "lampCctK"]);
+  assert.deepEqual(ids(sky), ["lightMode", "ambientLux", "ambientCctK"]);
+});
+
 test("the dome is authored in lux and stored as radiance", () => {
   /* A uniform dome of radiance L puts exactly pi*L on a surface facing it, so
      the radiance is E/pi -- and the division happens in one place. */

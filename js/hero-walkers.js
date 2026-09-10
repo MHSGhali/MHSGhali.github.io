@@ -32,10 +32,10 @@
 
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
 
-import * as M from "./linkage/mechanism.js?v=9191330b";
-import * as S from "./linkage/solver.js?v=9191330b";
-import { buildLeg, gait, legExtent } from "./walker/jansen.js?v=9191330b";
-import { sweptBox, fitCamera } from "./walker/framing.js?v=9191330b";
+import * as M from "./linkage/mechanism.js?v=e7629c32";
+import * as S from "./linkage/solver.js?v=e7629c32";
+import { buildLeg, gait, legExtent } from "./walker/jansen.js?v=e7629c32";
+import { sweptBox, fitCamera } from "./walker/framing.js?v=e7629c32";
 
 const LEGS = 3;
 const LEG_SPACING = 52;          /* along the crankshaft */

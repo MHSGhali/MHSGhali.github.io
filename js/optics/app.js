@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=9191330b";
-import * as SD from "./scenedesc.js?v=9191330b";
-import * as S3 from "./scene3d.js?v=9191330b";
-import * as LENS from "./lens.js?v=9191330b";
-import { createView } from "./view3d.js?v=9191330b";
-import { derivedOf } from "./render.js?v=9191330b";
+import * as ST from "./settings.js?v=e7629c32";
+import * as SD from "./scenedesc.js?v=e7629c32";
+import * as S3 from "./scene3d.js?v=e7629c32";
+import * as LENS from "./lens.js?v=e7629c32";
+import { createView } from "./view3d.js?v=e7629c32";
+import { derivedOf } from "./render.js?v=e7629c32";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -111,6 +111,7 @@ function requestRender(delay = 90) {
         design: settings.design, focalMm: settings.focalMm, fno: settings.fno,
         focusM: settings.focusM,
         preset: settings.preset, lightMode: settings.lightMode,
+        lampLm: settings.lampLm, lampCctK: settings.lampCctK,
         ambientLux: settings.ambientLux, ambientCctK: settings.ambientCctK,
         sensorWMm: settings.sensorWMm, resW: settings.resW,
         exposure: settings.exposure, cocLimitMm: settings.cocLimitMm,
@@ -140,6 +141,8 @@ function requestExpose() {
 function rebuildDiagram() {
   const desc = SD.preset(settings.preset);
   desc.lightMode = settings.lightMode;
+  desc.lampLm = settings.lampLm;
+  desc.lampCctK = settings.lampCctK;
   desc.ambientLux = settings.ambientLux;
   desc.ambientCctK = settings.ambientCctK;
 
@@ -472,7 +475,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=9191330b")
+  import("./assistant.js?v=e7629c32")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);

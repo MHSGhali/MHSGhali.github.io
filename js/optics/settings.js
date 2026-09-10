@@ -22,9 +22,9 @@
      decides the step a number input takes and how a value is formatted, since
      there is no drag-to-scrub. */
 
-import { clamp } from "../light/core.js?v=9191330b";
-import * as P from "./prescription.js?v=9191330b";
-import * as SD from "./scenedesc.js?v=9191330b";
+import { clamp } from "../light/core.js?v=e7629c32";
+import * as P from "./prescription.js?v=e7629c32";
+import * as SD from "./scenedesc.js?v=e7629c32";
 
 export function defaults() {
   return {
@@ -37,6 +37,8 @@ export function defaults() {
     /* scene */
     preset: SD.RAIL,
     lightMode: SD.LAMPS,
+    lampLm: 20800.0,
+    lampCctK: 5500.0,
     ambientLux: 2000.0,
     ambientCctK: 6500.0,
 
@@ -77,6 +79,13 @@ export const FIELDS = [
   { id: "preset", section: "SCENE", label: "scene", enumOf: () => SD.PRESETS,
     names: SD.PRESET_NAMES, when: () => SD.PRESETS.length > 1 },
   { id: "lightMode", section: "SCENE", label: "lighting", enumOf: () => SD.LIGHT_MODES, names: SD.MODE_NAMES },
+  /* Each mode shows its own source's controls and only its own. Showing the
+     lamp's brightness beside a sky that is doing the work would be two answers
+     to one question -- the same rule the dome's rows already follow. */
+  { id: "lampLm", section: "SCENE", label: "lamp", unit: "lm", lo: 0, hi: SD.FLUX_MAX_LM,
+    log: true, when: (s) => s.lightMode === SD.LAMPS },
+  { id: "lampCctK", section: "SCENE", label: "lamp colour", unit: "K",
+    lo: SD.CCT_MIN_K, hi: SD.CCT_MAX_K, log: true, when: (s) => s.lightMode === SD.LAMPS },
   /* The dome's own controls appear only when the dome is what is lighting the
      scene. A lux figure sitting next to lamps that are doing the work would be
      two answers to one question. */

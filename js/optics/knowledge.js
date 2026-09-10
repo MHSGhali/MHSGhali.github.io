@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=9191330b";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=e7629c32";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -41,6 +41,8 @@ export const VOCABULARY = [
   "make it darker",
   "switch to the sky",
   "switch to the lamps",
+  "set the lamp to <lumens> lumens",
+  "make the lamp <kelvin> K",
   "set the sky to <lux> lx",
   "make the sky <kelvin> K",
   "fit the view",
@@ -129,8 +131,10 @@ What each control does, and what changes on screen when it moves.
   that still counts as sharp, in millimetres on the film. Moves the
   depth-of-field numbers and the slab in the scene view, and nothing about the
   photograph.
-- LIGHTING: the placed key lamp or a uniform sky. AMBIENT and SKY COLOUR set
-  that sky when it is the one in use.
+- LIGHTING: the placed key lamp or a uniform sky, and each mode shows its own
+  source's two controls. LAMP and LAMP COLOUR set the panel's flux in lumens
+  and its colour temperature; AMBIENT and SKY COLOUR do the same for the dome
+  in lux. Only the pair belonging to the source in use is on screen.
 </controls>`;
 
 const READOUTS =
@@ -248,8 +252,9 @@ const NUMBERS =
   them apart from focus: they are equally bright on purpose, because the eye
   reads brightness as sharpness and a darker target would look defocused for the
   wrong reason.
-- The key lamp is a 1 m square panel at (1.6, 1.8, -1.4), 20800 lumens at
-  5500 K, facing down. The sky defaults to 2000 lx at 6500 K, a bright overcast
+- The key lamp is a 1 m square panel at (1.6, 1.8, -1.4) facing down, and
+  starts at 20800 lumens and 5500 K. Both are adjustable: 0 to 1e7 lumens, and
+  1200 to 20000 K. The sky defaults to 2000 lx at 6500 K, a bright overcast
   day.
 - Sharpness is judged against a 0.030 mm circle of confusion, the number every
   depth-of-field table has used for a century on a 36 mm frame.
@@ -364,8 +369,16 @@ const n2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "infinity");
 
 export function formatState(s) {
   const out = [];
-  out.push(`scene: ${s.scene}; lighting: ${s.lighting}`
-    + (s.lighting === "ambient" ? `, sky ${s.ambientLux} lx at ${s.ambientCctK} K` : ""));
+  /* Only the source that is actually lighting the scene, so the model cannot
+     quote the other one's numbers at a visitor -- and only when the numbers are
+     actually there. A snapshot is assembled by hand in more than one place, and
+     a missing field must go quiet rather than print the word "undefined" into
+     the prompt, where the model will read it as a value and repeat it. */
+  const sky = /ambient/i.test(String(s.lighting));
+  const lit = sky
+    ? (s.ambientLux != null && s.ambientCctK != null ? `, sky ${s.ambientLux} lx at ${s.ambientCctK} K` : "")
+    : (s.lampLm != null && s.lampCctK != null ? `, lamp ${s.lampLm} lm at ${s.lampCctK} K` : "");
+  out.push(`scene: ${s.scene}; lighting: ${s.lighting}${lit}`);
   out.push(`lens: ${s.design}, ${n2(s.focalMm)} mm at f/${n2(s.fno)}`
     + `, focused at ${n2(s.focusM)} m`
     );

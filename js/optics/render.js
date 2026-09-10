@@ -13,14 +13,14 @@
      on how the scheduler happened to slice it, so a bug would reproduce only
      sometimes and a regression test could not exist at all. */
 
-import * as SD from "./scenedesc.js?v=9191330b";
-import * as CAM from "./camera.js?v=9191330b";
-import * as LENS from "./lens.js?v=9191330b";
-import * as FILM from "./film.js?v=9191330b";
-import * as T from "./trace.js?v=9191330b";
-import * as G from "./glass.js?v=9191330b";
-import * as R from "../light/rng.js?v=9191330b";
-import { PI } from "../light/core.js?v=9191330b";
+import * as SD from "./scenedesc.js?v=e7629c32";
+import * as CAM from "./camera.js?v=e7629c32";
+import * as LENS from "./lens.js?v=e7629c32";
+import * as FILM from "./film.js?v=e7629c32";
+import * as T from "./trace.js?v=e7629c32";
+import * as G from "./glass.js?v=e7629c32";
+import * as R from "../light/rng.js?v=e7629c32";
+import { PI } from "../light/core.js?v=e7629c32";
 
 /* The same seed constant the light engine's grid uses. */
 const SEED = 0x2545f4914f6cdd1dn;
@@ -80,6 +80,8 @@ export function setup(s) {
 
   const desc = SD.preset(s.preset);
   desc.lightMode = s.lightMode;
+  desc.lampLm = s.lampLm;
+  desc.lampCctK = s.lampCctK;
   desc.ambientLux = s.ambientLux;
   desc.ambientCctK = s.ambientCctK;
   const built = SD.build(desc);

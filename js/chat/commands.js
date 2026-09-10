@@ -517,18 +517,38 @@ function parseClause(text, domain) {
        "Set the sky to 5000 lx" is not a request to switch lighting mode, and
        treating it as one produced two answers to one question: "the sky is
        already lighting it" followed immediately by "sky at 5000 lx". */
+    /* THE UNIT DISAMBIGUATES THE SOURCE. Lux is the sky's -- it is an
+       illuminance on a surface facing the dome -- and lumens is the lamp's,
+       being the number printed on a real bulb. So neither needs to be told
+       which source it means. */
     const lux = /(\d+(?:\.\d+)?)\s*(?:lx\b|lux\b)/i.exec(raw);
-    const skyK = /(\d{3,5})\s*(?:k\b|kelvin)/i.exec(raw);
-    const adjustingTheSky = Boolean(lux || skyK);
+    const lumens = /(\d+(?:\.\d+)?)\s*(?:lm\b|lumens?\b)/i.exec(raw);
 
-    if (!asking && !adjustingTheSky
+    /* Kelvin is shared, so here the NOUN decides, and a bare colour temperature
+       with no noun at all becomes a generic `colour` for the assistant to apply
+       to whichever source is actually lighting the scene. Guessing one of them
+       would be wrong half the time. */
+    const kelvin = /(\d{3,5})\s*(?:k\b|kelvin)/i.exec(raw);
+    const namesSky = /\b(sky|dome|ambient|overcast)\b/i.test(raw);
+    const namesLamp = /\b(lamps?|key light|panel|bulb)\b/i.test(raw);
+
+    const adjustingASource = Boolean(lux || lumens || kelvin);
+
+    if (!asking && !adjustingASource
         && /\b(sky|dome|ambient|overcast|lightbox|light box|no shadows|shadowless)\b/i.test(raw)) {
       cmds.push({ action: "lighting", value: "ambient" });
-    } else if (!asking && /\b(lamps?|key light|the panel|placed light|shadows back)\b/i.test(raw)) {
+    } else if (!asking && !adjustingASource
+        && /\b(lamps?|key light|the panel|placed light|shadows back)\b/i.test(raw)) {
       cmds.push({ action: "lighting", value: "lamps" });
     }
     if (lux && !asking) cmds.push({ action: "ambientLux", value: Number(lux[1]) });
-    if (skyK && !asking) cmds.push({ action: "skyColour", value: Number(skyK[1]) });
+    if (lumens && !asking) cmds.push({ action: "lampLumens", value: Number(lumens[1]) });
+    if (kelvin && !asking) {
+      cmds.push({
+        action: namesSky ? "skyColour" : namesLamp ? "lampColour" : "colour",
+        value: Number(kelvin[1]),
+      });
+    }
 
     /* --- the sharpness criterion --- */
     const coc = /\b(?:sharp if|circle of confusion|coc|blur limit)\b[^.]{0,20}?(-?\d*\.?\d+)/i.exec(raw);

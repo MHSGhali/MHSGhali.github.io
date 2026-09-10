@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=9191330b";
-import * as knowledge from "./knowledge.js?v=9191330b";
-import * as SD from "./scenedesc.js?v=9191330b";
-import * as P from "./prescription.js?v=9191330b";
+import { mountChat } from "../chat/ui.js?v=e7629c32";
+import * as knowledge from "./knowledge.js?v=e7629c32";
+import * as SD from "./scenedesc.js?v=e7629c32";
+import * as P from "./prescription.js?v=e7629c32";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -39,6 +39,8 @@ export function mountAssistant(host, api) {
       return {
         scene: SD.PRESET_NAMES[s.preset],
         lighting: SD.MODE_NAMES[s.lightMode],
+        lampLm: s.lampLm,
+        lampCctK: s.lampCctK,
         ambientLux: s.ambientLux,
         ambientCctK: s.ambientCctK,
         design: P.NAMES[s.design],
@@ -164,6 +166,40 @@ export function mountAssistant(host, api) {
               + "about two stops brighter than the lamp, so bring the exposure down."
             : "Back to the placed key lamp, up and to the right. The shadows and the terminator "
               + "come back with it.";
+        }
+
+        case "lampLumens": {
+          if (api.settings().lightMode !== SD.LAMPS) {
+            return {
+              text: "The lamp is not what is lighting the scene, so its brightness does nothing yet.",
+              suggest: "switch to the lamps",
+            };
+          }
+          if (!put("lampLm", cmd.value)) return `The lamp is already ${r2(s.lampLm)} lm.`;
+          return `Lamp at ${r2(api.settings().lampLm)} lm — the number printed on a real bulb. `
+            + "It becomes watts once, when the scene is built, so changing the colour later "
+            + "leaves the lumens where they are.";
+        }
+
+        /* Kelvin with no noun: apply it to whichever source is doing the work,
+           because that is what "make it warmer" means. */
+        case "colour":
+          return controller.apply({
+            action: api.settings().lightMode === SD.AMBIENT ? "skyColour" : "lampColour",
+            value: cmd.value,
+          });
+
+        case "lampColour": {
+          if (api.settings().lightMode !== SD.LAMPS) {
+            return {
+              text: "The lamp is not lighting the scene, so its colour does nothing yet.",
+              suggest: "switch to the lamps",
+            };
+          }
+          if (!put("lampCctK", cmd.value)) return `The lamp is already ${r2(s.lampCctK)} K.`;
+          return `Lamp at ${r2(api.settings().lampCctK)} K. The lumens are unchanged: watts are `
+            + "recomputed from the flux and the colour together, so moving one does not move the "
+            + "other.";
         }
 
         case "ambientLux": {

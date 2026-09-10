@@ -1,4 +1,4 @@
-import { makeRetriever, MARKDOWN } from "./retrieve.js?v=9191330b";
+import { makeRetriever, MARKDOWN } from "./retrieve.js?v=e7629c32";
 
 /* ---------------------------------------------------------------
    Everything the in-browser model is told about Mark, and the rules

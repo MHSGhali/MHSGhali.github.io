@@ -151,7 +151,7 @@ The desktop tool lets you arrange the scene, draws the lens in cross-section
 with its ray fans, and has undo. This page fixes the scene and gives you the
 camera: the lens design, focal length, aperture, focus, sensor, exposure
 and sharpness criterion, plus the choice between the placed area lamp and a
-uniform overhead sky. Sampling is not a control — how many rays it takes to
+uniform overhead sky and that source's own brightness and colour. Sampling is not a control — how many rays it takes to
 answer is the program's problem, not the visitor's.
 
 The assistant panel drives all of it without the model; see below.

@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=9191330b";
-import * as v from "../light/vec3.js?v=9191330b";
-import * as S from "../light/spectrum.js?v=9191330b";
-import * as B from "../light/bsdf.js?v=9191330b";
-import * as Lt from "../light/light.js?v=9191330b";
-import * as G from "../light/geom.js?v=9191330b";
-import * as U from "../light/units.js?v=9191330b";
-import { spectrumToXyz } from "../light/color.js?v=9191330b";
-import { createScene } from "../light/scene.js?v=9191330b";
+import { PI, clamp } from "../light/core.js?v=e7629c32";
+import * as v from "../light/vec3.js?v=e7629c32";
+import * as S from "../light/spectrum.js?v=e7629c32";
+import * as B from "../light/bsdf.js?v=e7629c32";
+import * as Lt from "../light/light.js?v=e7629c32";
+import * as G from "../light/geom.js?v=e7629c32";
+import * as U from "../light/units.js?v=e7629c32";
+import { spectrumToXyz } from "../light/color.js?v=e7629c32";
+import { createScene } from "../light/scene.js?v=e7629c32";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;
@@ -245,6 +245,12 @@ export function preset(id) {
        trying to imitate, and roughly what the rail's key lamp puts on the near
        targets, so the two modes are comparable at one exposure. */
     lightMode: LAMPS,
+    /* The lamp's brightness and colour sit at scene level, exactly as the
+       dome's do, because while there is one lamp they ARE the scene's lighting
+       rather than a property of some object in it. If a second lamp is ever
+       added these move back onto the lights themselves. */
+    lampLm: 20800.0,
+    lampCctK: 5500.0,
     ambientLux: 2000.0,
     ambientCctK: 6500.0,
   };
@@ -326,7 +332,13 @@ export function build(d) {
   const lampMarkers = [];
   if (d.lightMode === LAMPS) {
     d.lights.forEach((raw) => {
-      const l = clampLight(raw);
+      /* Scene-level brightness and colour win over whatever the preset seeded,
+         so the panel's number is the one that renders. */
+      const l = clampLight({
+        ...raw,
+        fluxLm: d.lampLm ?? raw.fluxLm,
+        cctK: d.lampCctK ?? raw.cctK,
+      });
       const spd = S.blackbody(l.cctK);
       /* Lumens in, watts stored. js/light/units.js owns this conversion, and
          no lumen is ever stored past this line. */
