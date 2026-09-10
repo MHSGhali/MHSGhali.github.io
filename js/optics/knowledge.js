@@ -15,11 +15,10 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=901aad0b";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=008be1e5";
 
 export const VOCABULARY = [
   "load the depth rail",
-  "show me the bokeh lights",
   "fit the achromat",
   "use the singlet",
   "use the ideal lens",
@@ -100,12 +99,10 @@ Set up a camera and see what it records.
 - Focus from 0.15 m to 1000 m, or infinity. Focusing moves the film, not the
   glass, so the camera does not walk while racking.
 - An iris of 3 to 14 straight blades, rounded by a blade curve, or a perfect
-  circle. The blade count changes the shape of the blur and the number of
-  starburst spikes, never the exposure.
+  circle. The blade count changes the shape of the blur, never the exposure.
 - Sensor width from 4 to 80 mm at 3:2, a render grid from 64 to 640 px, and an
   exposure that is a viewing gain applied after the fact.
-- Two scenes: the depth rail, five identical targets at 1, 1.5, 2, 3 and 5 m;
-  and the bokeh lights, twelve small bright sources at 6 m.
+- One scene, the depth rail: five identical targets at 1, 1.5, 2, 3 and 5 m.
 - Two lighting modes: the placed rectangular key lamp, or a uniform overhead
   sky. A choice, not a blend.
 - The scene view draws the camera, the cone it sees, the focus plane and the
@@ -127,9 +124,13 @@ What each control does, and what changes on screen when it moves.
   where brightness comes from here, which is why exposure is not a substitute.
 - FOCUS: the distance the film is set for. What sits there is sharp; everything
   else blurs by how far it is from it.
-- BLADES: the shape of the iris, and so of every out-of-focus highlight. Also
-  the starburst spikes on a point source: N of them if N is even, 2N if odd. It
-  does not change the exposure.
+- BLADES: the shape of the iris. A defocused POINT source images the aperture,
+  so six blades would give hexagonal discs -- but the shipped scene has no point
+  sources in frame, so this is a change to the blur kernel rather than something
+  you will see as a polygon. It does not change the exposure.
+  It does NOT give the starburst spikes a real lens shows on a bright point.
+  Those come from diffraction at the blade edges, and there is no diffraction
+  here (see <limits>). Say so if asked, rather than promising them.
 - BLADE CURVE: rounds the blades off. 0 is a straight-edged polygon, 1 a circle.
   Shape only.
 - SENSOR WIDTH: the film format. Wider sees more at the same focal length, and
@@ -174,8 +175,7 @@ What the derived numbers mean. Every one is measured from the mounted lens.
 const PRECONDITIONS =
 `<preconditions>
 - The scene is FIXED. Nothing in it can be added, moved, deleted or recoloured.
-  The camera is what changes, and the choice of which of the two scenes is in
-  front of it.
+  The camera is what changes; the scene never does.
 - The aperture is limited by the glass. The shipped 100 mm achromat has a 20 mm
   front element, so it is wide open at about f/5 and asking for f/2.8 gives f/5
   with the pupil that really exists.
@@ -222,8 +222,10 @@ Things this tool genuinely cannot do. Say so plainly when one is asked for.
 - No real photographic prescriptions: no double Gauss, Tessar, telephoto or
   retrofocus, and no lens by brand or model name. Three designs only, and two of
   them exist to be compared with each other.
-- No diffraction of any kind, so there is no diffraction limit, no Airy disc and
-  no softening on stopping right down. Blur here is geometric only.
+- No diffraction of any kind, so there is no diffraction limit, no Airy disc, no
+  softening on stopping right down, and no starburst or sunstar on a bright
+  point however many blades the iris has. Blur here is geometric only: it is
+  where rays land, never how they interfere.
 - No polarisation, no fluorescence and no participating media.
 - No undo, and no way to save the rendered image out.
 </limits>`;
@@ -238,8 +240,6 @@ const NUMBERS =
   offset scale with its distance, so all five subtend the same angle and the
   only difference in the image is focus. The 2 m target is the warm-coloured
   one.
-- The bokeh scene's twelve sources sit at 6 m, 30 mm across, 5800 lumens at
-  3000 K.
 - The key lamp is a 1 m square panel at (1.6, 1.8, -1.4), 20800 lumens at
   5500 K, facing down. The sky defaults to 2000 lx at 6500 K, a bright overcast
   day.
@@ -279,8 +279,8 @@ const HOW =
 
 const PROCEDURE =
 `<procedure>
-The scene is fixed: you can choose which of the two arrangements is in front of
-the camera, and set the camera. You cannot add, move or delete anything.
+The scene is fixed. You set the camera and nothing else: you cannot add, move or
+delete anything, and there is no other arrangement to switch to.
 Distances are metres and focal lengths are millimetres.
 Set the lens design before the focal length and aperture, because a design has
 its own limits.

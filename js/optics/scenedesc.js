@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=901aad0b";
-import * as v from "../light/vec3.js?v=901aad0b";
-import * as S from "../light/spectrum.js?v=901aad0b";
-import * as B from "../light/bsdf.js?v=901aad0b";
-import * as Lt from "../light/light.js?v=901aad0b";
-import * as G from "../light/geom.js?v=901aad0b";
-import * as U from "../light/units.js?v=901aad0b";
-import { spectrumToXyz } from "../light/color.js?v=901aad0b";
-import { createScene } from "../light/scene.js?v=901aad0b";
+import { PI, clamp } from "../light/core.js?v=008be1e5";
+import * as v from "../light/vec3.js?v=008be1e5";
+import * as S from "../light/spectrum.js?v=008be1e5";
+import * as B from "../light/bsdf.js?v=008be1e5";
+import * as Lt from "../light/light.js?v=008be1e5";
+import * as G from "../light/geom.js?v=008be1e5";
+import * as U from "../light/units.js?v=008be1e5";
+import { spectrumToXyz } from "../light/color.js?v=008be1e5";
+import { createScene } from "../light/scene.js?v=008be1e5";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;
@@ -71,9 +71,11 @@ export const LIGHT_MODES = [LAMPS, AMBIENT];
 export const MODE_NAMES = { [LAMPS]: "LAMPS", [AMBIENT]: "AMBIENT" };
 
 export const RAIL = "rail";
-export const BOKEH = "bokeh";
-export const PRESETS = [RAIL, BOKEH];
-export const PRESET_NAMES = { [RAIL]: "RAIL", [BOKEH]: "BOKEH" };
+/* One scene, so the panel hides the selector -- see settings.js. The list and
+   the lookup stay because everything downstream is written against them, and a
+   second scene is then a one-line addition rather than a refactor. */
+export const PRESETS = [RAIL];
+export const PRESET_NAMES = { [RAIL]: "RAIL" };
 
 /* ---- Smits' RGB-to-reflectance basis, from src/color.c -------------------
 
@@ -205,32 +207,9 @@ function presetRail(d) {
   });
 }
 
-/* Small, very bright sources against nothing at all: defocus these and the blur
-   disc takes the shape of the iris, which is what bokeh IS. */
-function presetBokeh(d) {
-  /* 30 mm lamps at 6 m, in a grid well behind a 2 m focus.
-
-     The size is a SAMPLING decision. A camera ray reaches an emitter only by
-     landing on it, and for a defocused source the fraction of pupil samples
-     that do is about (source image / blur disc)^2 -- at 3 mm that is 0.001,
-     seven samples in six thousand, which comes out as colour confetti rather
-     than as bokeh. At 30 mm it is 0.12 and the same render converges. */
-  for (let gy = -1; gy <= 1; gy++) {
-    for (let gx = -2; gx <= 1; gx++) {
-      d.lights.push({
-        kind: "sphere",
-        centre: v.v3(0.62 * (gx + 0.5), 0.62 * gy, -6.0),
-        radius: 0.015,
-        /* 5800 lm at 3000 K restates the 45 W the C's hard-coded stage used;
-           a 3000 K blackbody is worth about 129 lm/W in band. */
-        fluxLm: 5800.0, cctK: 3000.0,
-        name: `LAMP ${d.lights.length + 1}`,
-      });
-    }
-  }
-}
-
-/* Seed a description from one of the presets. */
+/* Seed a description from one of the presets. `id` is unused while there is
+   only one, and kept so adding a second changes this function and nothing that
+   calls it. */
 export function preset(id) {
   const d = {
     objects: [],
@@ -246,7 +225,7 @@ export function preset(id) {
     ambientLux: 2000.0,
     ambientCctK: 6500.0,
   };
-  if (id === BOKEH) presetBokeh(d); else presetRail(d);
+  presetRail(d);
   return d;
 }
 

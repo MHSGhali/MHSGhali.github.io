@@ -22,9 +22,9 @@
      decides the step a number input takes and how a value is formatted, since
      there is no drag-to-scrub. */
 
-import { clamp } from "../light/core.js?v=901aad0b";
-import * as P from "./prescription.js?v=901aad0b";
-import * as SD from "./scenedesc.js?v=901aad0b";
+import { clamp } from "../light/core.js?v=008be1e5";
+import * as P from "./prescription.js?v=008be1e5";
+import * as SD from "./scenedesc.js?v=008be1e5";
 
 export function defaults() {
   return {
@@ -83,7 +83,10 @@ export const FIELDS = [
   { id: "curvature", section: "LENS", label: "blade curve", unit: "", lo: 0, hi: 1 },
   { id: "rotDeg", section: "LENS", label: "blade angle", unit: "deg", lo: 0, hi: 90 },
 
-  { id: "preset", section: "SCENE", label: "scene", enumOf: () => SD.PRESETS, names: SD.PRESET_NAMES },
+  /* A select with one option is not a choice, so it is not drawn. `when` rather
+     than deletion: add a second scene and the control comes back on its own. */
+  { id: "preset", section: "SCENE", label: "scene", enumOf: () => SD.PRESETS,
+    names: SD.PRESET_NAMES, when: () => SD.PRESETS.length > 1 },
   { id: "lightMode", section: "SCENE", label: "lighting", enumOf: () => SD.LIGHT_MODES, names: SD.MODE_NAMES },
   /* The dome's own controls appear only when the dome is what is lighting the
      scene. A lux figure sitting next to lamps that are doing the work would be

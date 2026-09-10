@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=901aad0b";
-import * as knowledge from "./knowledge.js?v=901aad0b";
-import * as SD from "./scenedesc.js?v=901aad0b";
-import * as P from "./prescription.js?v=901aad0b";
+import { mountChat } from "../chat/ui.js?v=008be1e5";
+import * as knowledge from "./knowledge.js?v=008be1e5";
+import * as SD from "./scenedesc.js?v=008be1e5";
+import * as P from "./prescription.js?v=008be1e5";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -61,11 +61,8 @@ export function mountAssistant(host, api) {
       switch (cmd.action) {
         case "preset": {
           if (!put("preset", cmd.id)) return `Already showing the ${cmd.name}.`;
-          return cmd.id === SD.BOKEH
-            ? "Loaded the bokeh lights: twelve small bright sources at 6 m. Defocus them and the "
-              + "blur takes the shape of the iris — try “focus at 1 m”."
-            : "Loaded the depth rail: five identical targets at 1, 1.5, 2, 3 and 5 m. They all "
-              + "subtend the same angle, so the only difference between them is focus.";
+          return "Loaded the depth rail: five identical targets at 1, 1.5, 2, 3 and 5 m. They all "
+            + "subtend the same angle, so the only difference between them is focus.";
         }
 
         case "design": {
@@ -151,12 +148,13 @@ export function mountAssistant(host, api) {
           }
           const now = api.settings().blades;
           if (now < 3) return "The iris is a perfect circle now, so the blur discs are round.";
-          /* An odd blade count gives 2N starburst spikes rather than N, which is
-             why most real lenses have an odd one. */
-          const spikes = now % 2 ? `${now * 2} starburst spikes` : `${now} starburst spikes`;
-          return `A ${now}-blade iris: the blur discs take that shape, and point sources get `
-            + `${spikes}. It does not change the exposure — the polygon is sized to enclose the `
-            + "same area as the circle it replaced.";
+          /* NOT a word about starbursts. A real lens's sunstars are diffraction
+             at these same blade edges, and this renderer is geometric -- it
+             knows where rays land, not how they interfere -- so promising them
+             would be promising something that can never appear. */
+          return `A ${now}-blade iris: every defocused highlight is an image of the aperture, `
+            + `so they take that shape. It does not change the exposure — the polygon is sized `
+            + "to enclose the same area as the circle it replaced.";
         }
 
         case "curvature":

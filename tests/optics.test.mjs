@@ -11,6 +11,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import * as G from "../js/optics/glass.js";
 import * as P from "../js/optics/prescription.js";
@@ -23,6 +24,7 @@ import * as S3 from "../js/optics/scene3d.js";
 import * as T from "../js/optics/trace.js";
 import * as FILM from "../js/optics/film.js";
 import * as ST from "../js/optics/settings.js";
+import * as optics from "../js/optics/knowledge.js";
 import { setup, renderRows, derivedOf, } from "../js/optics/render.js";
 
 import * as S from "../js/light/spectrum.js";
@@ -913,6 +915,27 @@ test("the blade count changes the blur's shape and not the exposure", () => {
   }
 });
 
+test("nothing promises a starburst this renderer cannot produce", () => {
+  /* A real lens's sunstars are diffraction at the blade edges. This renderer is
+     geometric -- it knows where rays land, not how they interfere -- so a blade
+     count changes the SHAPE of a defocused highlight and nothing else. The
+     prompt said otherwise in three places, which would have had the assistant
+     confidently describing an effect that can never appear on screen. */
+  const K = readFileSync("js/optics/knowledge.js", "utf8");
+  const A = readFileSync("js/optics/assistant.js", "utf8");
+  for (const [name, src] of [["knowledge", K], ["assistant", A]]) {
+    for (const m of src.matchAll(/^.*\b(starburst|sunstar|spike)\w*\b.*$/gim)) {
+      const line = m[0];
+      /* Saying it is ABSENT is the point; saying it is present is the bug. */
+      assert.match(line, /\bno\b|\bNOT\b|never|cannot|diffraction/i,
+        `${name} mentions a starburst without denying it: ${line.trim()}`);
+    }
+  }
+  /* And the limits section has to name it, since a visitor will ask. */
+  assert.match(optics.LIMITS_TEXT ?? K, /starburst|sunstar/i,
+    "the limits should say plainly that there are no sunstars");
+});
+
 test("wide open, the blade corners really are clipped by the barrel", () => {
   /* The one case where a blade count DOES change the exposure, and it is not a
      violation of the area invariant -- it is the invariant meeting a real
@@ -1051,7 +1074,6 @@ test("every settable field survives a hash round trip", () => {
   ST.set(s, "blades", 7);
   ST.set(s, "curvature", 0.4);
   ST.set(s, "lightMode", SD.AMBIENT);
-  ST.set(s, "preset", SD.BOKEH);
 
   const back = ST.defaults();
   ST.fromHash(`#${ST.toHash(s)}`, back);
@@ -1095,8 +1117,8 @@ test("an incoming link is a whole state, not a diff against this one", () => {
 
 test("a bare preset link loads that preset", () => {
   const s = ST.defaults();
-  assert.ok(ST.fromHash("#preset=bokeh", s));
-  assert.equal(s.preset, SD.BOKEH);
+  assert.ok(ST.fromHash("#preset=rail", s));
+  assert.equal(s.preset, SD.RAIL);
   const t = ST.defaults();
   assert.equal(ST.fromHash("#preset=not-a-scene", t), false);
   assert.equal(t.preset, SD.RAIL);

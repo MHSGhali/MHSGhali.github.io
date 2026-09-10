@@ -378,7 +378,7 @@ test("the role is instructions, not subject matter", () => {
     assert.ok(light.TERMS.has(w), `the gate should recognise "${w}"`);
   }
   assert.equal(optics.TERMS.has("write"), false);
-  for (const w of ["aperture", "bokeh", "achromat", "vignetting", "pupil", "hyperfocal"]) {
+  for (const w of ["aperture", "achromat", "vignetting", "pupil", "hyperfocal"]) {
     assert.ok(optics.TERMS.has(w), `the gate should recognise "${w}"`);
   }
 });
@@ -522,7 +522,6 @@ test("the Ask page can hand over a link to any of the three tools", () => {
   const named = {
     hoeken: "load the Hoeken",
     workcell: "load the workcell",
-    bokeh: "show me the bokeh lights",
     rail: "open the optics simulator with the depth rail",
   };
   for (const [id, said] of Object.entries(named)) {

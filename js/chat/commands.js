@@ -80,8 +80,8 @@ export const LIGHT_PRESETS = [
 ];
 
 /* The optics page fixes its scene, so a "preset" here is which arrangement is
-   in front of the camera rather than something to build. Two of them, and both
-   are asked for by what they show far more often than by name. */
+   in front of the camera rather than something to build. One of them, and it is
+   asked for by what it shows far more often than by name. */
 export const OPTICS_PRESETS = [
   { id: "rail", name: "depth rail",
     aliases: ["depth rail", "rail", "targets", "five spheres", "depth targets", "focus chart"],
@@ -93,10 +93,6 @@ export const OPTICS_PRESETS = [
        phrase only names the scene when a looking-at verb comes with it. */
     does: /\b(?:see|show|showing|shows|demonstrat\w*|illustrat\w*|look at|compare)\b[^.]{0,28}?\b(?:depth of field|depth-of-field|focus)\b|\b(?:focus test|focus chart|rack focus|how much is sharp|what.{0,4}s in focus)\b/i,
     because: "five identical targets at known distances, so the only difference between them in the image is how far out of focus they are" },
-  { id: "bokeh", name: "bokeh lights",
-    aliases: ["bokeh", "blur disc", "blur discs", "out of focus lights", "point lights", "highlights"],
-    does: /\b(bokeh|shape of the blur|blur shape|iris shape|aperture shape|what the iris looks like)\b/i,
-    because: "small bright sources against nothing, so a defocused one takes the shape of the iris" },
 ];
 
 /* ------------------------------------------------------------- the grammar */

@@ -93,7 +93,7 @@ Light is traced through a real multi-element lens prescription, surface by
 surface, with a refractive index taken from the Sellmeier coefficients of the
 actual catalogue glass. Spherical aberration, coma, astigmatism, field
 curvature, chromatic aberration, vignetting, distortion and the shape of the
-bokeh are not effects that get applied — they are what happens when you trace
+and distortion are not effects that get applied — they are what happens when you trace
 real glass. A ray that misses a clear aperture is dead, and that is the *only*
 source of vignetting: there is no darkening factor on the corners anywhere in
 the code.

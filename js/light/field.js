@@ -25,15 +25,15 @@
    The pay-off: switching lux <-> W/m^2, or isolating one lamp's contribution,
    is a dot product over stored numbers. Neither re-solves anything. */
 
-import { PI } from "./core.js?v=901aad0b";
-import * as v from "./vec3.js?v=901aad0b";
-import * as S from "./spectrum.js?v=901aad0b";
-import * as U from "./units.js?v=901aad0b";
-import * as I from "./integrator.js?v=901aad0b";
-import * as R from "./rng.js?v=901aad0b";
-import { offsetOrigin } from "./geom.js?v=901aad0b";
-import { cmfYbar } from "./color.js?v=901aad0b";
-import { KM_LM_PER_W } from "./core.js?v=901aad0b";
+import { PI } from "./core.js?v=008be1e5";
+import * as v from "./vec3.js?v=008be1e5";
+import * as S from "./spectrum.js?v=008be1e5";
+import * as U from "./units.js?v=008be1e5";
+import * as I from "./integrator.js?v=008be1e5";
+import * as R from "./rng.js?v=008be1e5";
+import { offsetOrigin } from "./geom.js?v=008be1e5";
+import { cmfYbar } from "./color.js?v=008be1e5";
+import { KM_LM_PER_W } from "./core.js?v=008be1e5";
 
 /* Same seed constant the C's grid uses, and the same rule: seeded from the
    POINT index, never a worker or tile id, so the result does not depend on how

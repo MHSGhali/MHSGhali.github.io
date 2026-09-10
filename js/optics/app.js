@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=901aad0b";
-import * as SD from "./scenedesc.js?v=901aad0b";
-import * as S3 from "./scene3d.js?v=901aad0b";
-import * as LENS from "./lens.js?v=901aad0b";
-import { createView } from "./view3d.js?v=901aad0b";
-import { derivedOf } from "./render.js?v=901aad0b";
+import * as ST from "./settings.js?v=008be1e5";
+import * as SD from "./scenedesc.js?v=008be1e5";
+import * as S3 from "./scene3d.js?v=008be1e5";
+import * as LENS from "./lens.js?v=008be1e5";
+import { createView } from "./view3d.js?v=008be1e5";
+import { derivedOf } from "./render.js?v=008be1e5";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -418,9 +418,9 @@ async function start() {
     if (location.hash === lastWritten) return;   /* our own write, echoed back */
     /* An incoming link is a whole state, not a patch: start from the defaults
        so that fields the link omits go back to their defaults rather than
-       keeping whatever this session happened to leave them at. Otherwise
-       "#preset=bokeh" would inherit the aperture and lighting of whatever was
-       on screen, and the link would show two different pictures to two
+       keeping whatever this session happened to leave them at. Otherwise a link
+       naming one field would inherit the aperture and the lighting of whatever
+       was on screen, and the same link would show two different pictures to two
        people. */
     const next = ST.defaults();
     if (!ST.fromHash(location.hash, next)) return;
@@ -470,7 +470,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=901aad0b")
+  import("./assistant.js?v=008be1e5")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);
