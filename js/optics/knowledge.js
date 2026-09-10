@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=3da9737a";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=408e651f";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -225,10 +225,14 @@ const NUMBERS =
   there, in metres.
 - It starts as the achromat at 100 mm, f/5, focused at 2 m, with a 36 mm sensor,
   320 px wide and an exposure of 100.
-- The depth rail's targets sit at 1, 1.5, 2, 3 and 5 m. Each one's size and
-  offset scale with its distance, so all five subtend the same angle and the
-  only difference in the image is focus. The 2 m target is the warm-coloured
-  one.
+- The depth rail's targets sit at 1, 1.5, 2, 3 and 5 m, and are coloured red,
+  amber, green, cyan and violet in that order -- so the green one is at 2 m, and
+  a target can be named by its colour. Each one's size and offset scale with its
+  distance, so all five subtend the same angle, and all five reflect the same
+  0.48 of the light falling on them. Hue is the ONLY thing that differs between
+  them apart from focus: they are equally bright on purpose, because the eye
+  reads brightness as sharpness and a darker target would look defocused for the
+  wrong reason.
 - The key lamp is a 1 m square panel at (1.6, 1.8, -1.4), 20800 lumens at
   5500 K, facing down. The sky defaults to 2000 lx at 6500 K, a bright overcast
   day.
@@ -372,7 +376,10 @@ export function formatState(s) {
   }
   out.push(`render: ${s.spp ? `${Math.round(s.spp)} samples a pixel so far` : "not started"}`);
   if (s.targets && s.targets.length) {
-    out.push("targets: " + s.targets.map((t) => `${t.label} at ${t.depthM} m${t.sharp ? " (sharp)" : ""}`).join("; "));
+    out.push("targets: " + s.targets
+      .map((t) => `${t.label}${t.colour ? ` the ${t.colour} one` : ""} at ${t.depthM} m`
+        + `${t.sharp ? " (sharp)" : ""}`)
+      .join("; "));
   }
 
   const text = out.join("\n");

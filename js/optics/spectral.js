@@ -50,8 +50,8 @@
      divides by whatever density it drew from -- and every sample now lands
      where the film can see it. */
 
-import { NBINS, binLambda } from "../light/spectrum.js?v=3da9737a";
-import { cmfXbar, cmfYbar, cmfZbar } from "../light/color.js?v=3da9737a";
+import { NBINS, binLambda } from "../light/spectrum.js?v=408e651f";
+import { cmfXbar, cmfYbar, cmfZbar } from "../light/color.js?v=408e651f";
 
 /* A cheap, well-mixed hash of a pixel coordinate.
 

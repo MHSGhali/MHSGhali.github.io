@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=3da9737a";
-import * as SD from "./scenedesc.js?v=3da9737a";
-import * as S3 from "./scene3d.js?v=3da9737a";
-import * as LENS from "./lens.js?v=3da9737a";
-import { createView } from "./view3d.js?v=3da9737a";
-import { derivedOf } from "./render.js?v=3da9737a";
+import * as ST from "./settings.js?v=408e651f";
+import * as SD from "./scenedesc.js?v=408e651f";
+import * as S3 from "./scene3d.js?v=408e651f";
+import * as LENS from "./lens.js?v=408e651f";
+import { createView } from "./view3d.js?v=408e651f";
+import { derivedOf } from "./render.js?v=408e651f";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -445,6 +445,7 @@ const assistantApi = {
     const d = LENS.dof(lensForDiagram, settings.cocLimitMm);
     return markers.map((m) => ({
       label: m.label,
+      colour: m.colour,
       depthM: m.depthM,
       sharp: !!d && m.depthM >= d.near && m.depthM <= d.far,
     }));
@@ -465,7 +466,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=3da9737a")
+  import("./assistant.js?v=408e651f")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);

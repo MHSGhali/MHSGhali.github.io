@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=3da9737a";
-import * as knowledge from "./knowledge.js?v=3da9737a";
-import * as SD from "./scenedesc.js?v=3da9737a";
-import * as P from "./prescription.js?v=3da9737a";
+import { mountChat } from "../chat/ui.js?v=408e651f";
+import * as knowledge from "./knowledge.js?v=408e651f";
+import * as SD from "./scenedesc.js?v=408e651f";
+import * as P from "./prescription.js?v=408e651f";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -125,7 +125,8 @@ export function mountAssistant(host, api) {
               + "the nearest it can do.";
           }
           const d = api.derived();
-          const sharp = (api.targets() || []).filter((t) => t.sharp).map((t) => t.label);
+          const sharp = (api.targets() || []).filter((t) => t.sharp)
+            .map((t) => (t.colour ? `the ${t.colour} target at ${t.label}` : t.label));
           return `Focused at ${r2(now)} m.`
             + (d ? ` Sharp on the axis from ${r2(d.nearM)} to ${r2(d.farM)} m.` : "")
             + (sharp.length ? ` That puts ${sharp.join(" and ")} inside it.` : "");
@@ -219,7 +220,8 @@ export function mountAssistant(host, api) {
       if (!d) return `Setting up the ${sceneName()}; the lens has not been built yet.`;
 
       const targets = api.targets() || [];
-      const sharp = targets.filter((t) => t.sharp).map((t) => t.label);
+      const sharp = targets.filter((t) => t.sharp)
+        .map((t) => (t.colour ? `${t.label} (the ${t.colour} one)` : t.label));
       const spp = api.spp();
 
       /* The depth-of-field claim is on-axis and from defocus alone, and on this

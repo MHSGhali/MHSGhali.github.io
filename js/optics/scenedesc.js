@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=3da9737a";
-import * as v from "../light/vec3.js?v=3da9737a";
-import * as S from "../light/spectrum.js?v=3da9737a";
-import * as B from "../light/bsdf.js?v=3da9737a";
-import * as Lt from "../light/light.js?v=3da9737a";
-import * as G from "../light/geom.js?v=3da9737a";
-import * as U from "../light/units.js?v=3da9737a";
-import { spectrumToXyz } from "../light/color.js?v=3da9737a";
-import { createScene } from "../light/scene.js?v=3da9737a";
+import { PI, clamp } from "../light/core.js?v=408e651f";
+import * as v from "../light/vec3.js?v=408e651f";
+import * as S from "../light/spectrum.js?v=408e651f";
+import * as B from "../light/bsdf.js?v=408e651f";
+import * as Lt from "../light/light.js?v=408e651f";
+import * as G from "../light/geom.js?v=408e651f";
+import * as U from "../light/units.js?v=408e651f";
+import { spectrumToXyz } from "../light/color.js?v=408e651f";
+import { createScene } from "../light/scene.js?v=408e651f";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;
@@ -171,14 +171,37 @@ function presetRail(d) {
      100 mm lens covers on full frame. */
   const FRAC = [-0.140, -0.070, 0.0, 0.070, 0.140];
 
+  /* One hue each, so a target can be named in a sentence and so the five stay
+     apart under a flat sky, where neutral greys are nearly indistinguishable.
+
+     EQUAL LUMINANCE, deliberately. All five reflect 0.48 of the light falling
+     on them and differ only in hue. The rail exists to show that the sole
+     difference between these targets is how far out of focus they are; a
+     brighter or darker one would be a second difference, and the eye reads
+     brightness as sharpness readily enough to confuse the demonstration this
+     scene is for.
+
+     The values are moderate rather than saturated for two reasons: Smits'
+     reconstruction in spectrumFromRgbReflectance is least faithful in the
+     saturated corners, and a reflectance near 1.0 in any band is not a paint
+     anybody has. Each comes back within 0.0005 of 0.48 through the uplift, and
+     the closest pair sits 0.079 apart in chromaticity. */
+  const COLOURS = [
+    ["red",    [0.995, 0.343, 0.320]],
+    ["amber",  [0.724, 0.449, 0.072]],
+    ["green",  [0.169, 0.599, 0.212]],
+    ["cyan",   [0.118, 0.565, 0.706]],
+    ["violet", [0.650, 0.377, 0.996]],
+  ];
+
   for (let i = 0; i < 5; i++) {
     const dist = DEPTHS[i];
     d.objects.push({
       kind: "sphere",
       centre: v.v3(FRAC[i] * dist, 0, -dist),
       radius: 0.030 * dist,
-      /* The focus target is the warm one, so it can be named in a sentence. */
-      rgb: i === 2 ? [0.55, 0.20, 0.18] : [0.75, 0.75, 0.78],
+      rgb: COLOURS[i][1],
+      colour: COLOURS[i][0],
       name: NAMES[i],
     });
   }
@@ -289,7 +312,8 @@ export function build(d) {
     /* The ground truth the stage exists to provide, recorded against the prim
        that was actually built -- derived, so it cannot drift from where the
        object really is. */
-    markers.push({ label: o.name, prim: sc.prims.length, depthM: -o.centre.z, rgb: o.rgb, radius: o.radius });
+    markers.push({ label: o.name, prim: sc.prims.length, depthM: -o.centre.z,
+                   rgb: o.rgb, colour: o.colour, radius: o.radius });
     sc.prims.push(prim);
   }
 

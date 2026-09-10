@@ -616,6 +616,43 @@ test("the dome is authored in lux and stored as radiance", () => {
   near(ePerp, 2000, 1e-6, "lux in, lux back out");
 });
 
+test("the rail's targets differ in hue and in nothing else", () => {
+  /* The rail exists to show that the ONLY difference between these five is how
+     far out of focus they are. Colouring them made them tellable apart under a
+     flat sky, where neutral greys are nearly identical -- but a brighter or
+     darker one would be a second difference, and the eye reads brightness as
+     sharpness readily enough to confuse exactly the demonstration this scene is
+     for. So: five hues, one reflectance. */
+  const { markers } = SD.build(SD.preset(SD.RAIL));
+  assert.equal(markers.length, 5);
+
+  const white = S.daylight(6504);
+  const yWhite = C.spectrumToXyz(white).y;
+  const lum = [], chrom = [];
+  for (const m of markers) {
+    assert.ok(m.colour, `${m.label} should be nameable by colour`);
+    const spd = SD.spectrumFromRgbReflectance(m.rgb);
+    const seen = C.spectrumToXyz(S.mul(spd, white));
+    lum.push(seen.y / yWhite);
+    chrom.push(C.xyzChromaticity(seen));
+  }
+  for (const y of lum) near(y, lum[0], 0.005, "every target reflects the same fraction");
+
+  /* And they have to be far enough apart in colour to actually read as
+     different, or the exercise was pointless. */
+  let closest = Infinity;
+  for (let i = 0; i < chrom.length; i++) {
+    for (let j = i + 1; j < chrom.length; j++) {
+      closest = Math.min(closest, Math.hypot(chrom[i].x - chrom[j].x, chrom[i].y - chrom[j].y));
+    }
+  }
+  assert.ok(closest > 0.05, `the closest two targets are only ${closest.toFixed(3)} apart`);
+
+  /* Every colour name must be distinct, since the assistant identifies a target
+     by it. */
+  assert.equal(new Set(markers.map((m) => m.colour)).size, 5);
+});
+
 test("an object's colour keeps its luminance through the spectral uplift", () => {
   /* Smits' basis reproduces a colour approximately, and the approximation is
      worst in the saturated corners. The quantity this simulator reports is
