@@ -26,14 +26,14 @@
    reproduces what was read. buildScene() turns a description into the runtime
    Scene the estimators use. */
 
-import { PI } from "./core.js?v=008be1e5";
-import * as v from "./vec3.js?v=008be1e5";
-import * as S from "./spectrum.js?v=008be1e5";
-import * as U from "./units.js?v=008be1e5";
-import * as B from "./bsdf.js?v=008be1e5";
-import * as L from "./light.js?v=008be1e5";
-import * as G from "./geom.js?v=008be1e5";
-import { createScene } from "./scene.js?v=008be1e5";
+import { PI } from "./core.js?v=3da9737a";
+import * as v from "./vec3.js?v=3da9737a";
+import * as S from "./spectrum.js?v=3da9737a";
+import * as U from "./units.js?v=3da9737a";
+import * as B from "./bsdf.js?v=3da9737a";
+import * as L from "./light.js?v=3da9737a";
+import * as G from "./geom.js?v=3da9737a";
+import { createScene } from "./scene.js?v=3da9737a";
 
 export function emptyDesc() {
   return { materials: [], prims: [], lights: [], grid: null, camera: null };

@@ -33,12 +33,12 @@
      The cos^4 falloff is DERIVED here, not applied. Nothing else in this
      program may multiply by a vignetting factor -- see lens.js. */
 
-import { PI } from "../light/core.js?v=008be1e5";
-import * as v from "../light/vec3.js?v=008be1e5";
-import * as R from "../light/rng.js?v=008be1e5";
-import * as L from "./lens.js?v=008be1e5";
-import * as PU from "./pupil.js?v=008be1e5";
-import { pixelHash, lambdaPick } from "./spectral.js?v=008be1e5";
+import { PI } from "../light/core.js?v=3da9737a";
+import * as v from "../light/vec3.js?v=3da9737a";
+import * as R from "../light/rng.js?v=3da9737a";
+import * as L from "./lens.js?v=3da9737a";
+import * as PU from "./pupil.js?v=3da9737a";
+import { pixelHash, lambdaPick } from "./spectral.js?v=3da9737a";
 
 const MM_PER_M = 1000.0;
 
@@ -60,7 +60,7 @@ export function build(design, eflMm, fno, sensorWMm, w, h) {
   };
   lookAt(c, v.v3(0, 0, 0), v.v3(0, 0, -1), v.v3(0, 1, 0));
   /* NO refresh here. The pupil cache costs ~74 000 lens traces, and every
-     caller changes the iris, the aperture or the focus immediately afterwards,
+     caller changes the aperture or the focus immediately afterwards,
      which invalidates it -- so building it now is a build thrown away. The
      caller refreshes once, when the lens is finally the lens it wants. */
   return c;

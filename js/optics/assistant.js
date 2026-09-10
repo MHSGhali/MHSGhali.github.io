@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=008be1e5";
-import * as knowledge from "./knowledge.js?v=008be1e5";
-import * as SD from "./scenedesc.js?v=008be1e5";
-import * as P from "./prescription.js?v=008be1e5";
+import { mountChat } from "../chat/ui.js?v=3da9737a";
+import * as knowledge from "./knowledge.js?v=3da9737a";
+import * as SD from "./scenedesc.js?v=3da9737a";
+import * as P from "./prescription.js?v=3da9737a";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -43,7 +43,6 @@ export function mountAssistant(host, api) {
         ambientCctK: s.ambientCctK,
         design: P.NAMES[s.design],
         focalMm: s.focalMm, fno: s.fno, focusM: s.focusM,
-        blades: s.blades, curvature: s.curvature,
         sensorWMm: s.sensorWMm, resW: s.resW,
         exposure: s.exposure, cocLimitMm: s.cocLimitMm,
         derived: api.derived(),
@@ -141,26 +140,6 @@ export function mountAssistant(host, api) {
             + (short ? ` This design only covers ${r2(d.coversMm)} mm of the ${r2(d.coveredMm)} mm `
               + "that needs, so the corners are outside its image circle." : "");
         }
-
-        case "blades": {
-          if (!put("blades", cmd.value)) {
-            return s.blades >= 3 ? `Already a ${s.blades}-blade iris.` : "The iris is already a circle.";
-          }
-          const now = api.settings().blades;
-          if (now < 3) return "The iris is a perfect circle now, so the blur discs are round.";
-          /* NOT a word about starbursts. A real lens's sunstars are diffraction
-             at these same blade edges, and this renderer is geometric -- it
-             knows where rays land, not how they interfere -- so promising them
-             would be promising something that can never appear. */
-          return `A ${now}-blade iris: every defocused highlight is an image of the aperture, `
-            + `so they take that shape. It does not change the exposure — the polygon is sized `
-            + "to enclose the same area as the circle it replaced.";
-        }
-
-        case "curvature":
-          if (!put("curvature", cmd.value)) return `The blade curve is already ${r2(s.curvature)}.`;
-          return `Blade curve ${r2(api.settings().curvature)} — 0 is a straight-edged polygon, `
-            + "1 is a circle.";
 
         case "exposure": {
           const want = cmd.factor !== undefined ? s.exposure * cmd.factor : cmd.value;

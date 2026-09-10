@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=008be1e5";
-import * as SD from "./scenedesc.js?v=008be1e5";
-import * as S3 from "./scene3d.js?v=008be1e5";
-import * as LENS from "./lens.js?v=008be1e5";
-import { createView } from "./view3d.js?v=008be1e5";
-import { derivedOf } from "./render.js?v=008be1e5";
+import * as ST from "./settings.js?v=3da9737a";
+import * as SD from "./scenedesc.js?v=3da9737a";
+import * as S3 from "./scene3d.js?v=3da9737a";
+import * as LENS from "./lens.js?v=3da9737a";
+import { createView } from "./view3d.js?v=3da9737a";
+import { derivedOf } from "./render.js?v=3da9737a";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -109,8 +109,7 @@ function requestRender(delay = 90) {
       type: "render", gen,
       settings: {
         design: settings.design, focalMm: settings.focalMm, fno: settings.fno,
-        focusM: settings.focusM, blades: settings.blades,
-        curvature: settings.curvature, rotDeg: settings.rotDeg,
+        focusM: settings.focusM,
         preset: settings.preset, lightMode: settings.lightMode,
         ambientLux: settings.ambientLux, ambientCctK: settings.ambientCctK,
         sensorWMm: settings.sensorWMm, resW: settings.resW,
@@ -147,10 +146,6 @@ function rebuildDiagram() {
   let lens = null;
   try {
     lens = LENS.build(settings.design, settings.focalMm, settings.fno);
-    lens.blades = settings.blades >= 3 ? settings.blades : 0;
-    lens.bladeCurvature = settings.curvature;
-    lens.bladeRotRad = (settings.rotDeg * Math.PI) / 180;
-    LENS.setFnumber(lens, settings.fno);
     if (!LENS.focus(lens, settings.focusM)) lens = null;
   } catch {
     /* The worker reports the reason; the diagram just draws what it can. */
@@ -470,7 +465,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=008be1e5")
+  import("./assistant.js?v=3da9737a")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);

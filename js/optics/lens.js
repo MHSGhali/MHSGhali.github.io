@@ -2,7 +2,7 @@
 
    THE INVARIANT THIS MODULE OWNS
      Every ray that reaches the world passed through the clear aperture of every
-     surface AND through the iris, exactly once each. Nothing is faked, nothing
+     surface, and through the stop, exactly once each. Nothing is faked, nothing
      is clipped twice, and the ONLY vignetting in this program is geometric --
      it emerges from those clips and from nowhere else.
 
@@ -33,11 +33,11 @@
          per surface:  u' = (n u - y (n' - n)/R) / n'      then  y += u' t
          EFL = -y_first / u'_last      BFD = -y_last / u'_last */
 
-import { PI, TWO_PI, clamp, lerp } from "../light/core.js?v=008be1e5";
-import * as v from "../light/vec3.js?v=008be1e5";
-import { fresnelDielectric } from "../light/bsdf.js?v=008be1e5";
-import * as G from "./glass.js?v=008be1e5";
-import * as P from "./prescription.js?v=008be1e5";
+import { PI } from "../light/core.js?v=3da9737a";
+import * as v from "../light/vec3.js?v=3da9737a";
+import { fresnelDielectric } from "../light/bsdf.js?v=3da9737a";
+import * as G from "./glass.js?v=3da9737a";
+import * as P from "./prescription.js?v=3da9737a";
 
 /* Index of the medium AFTER surface i. */
 export function nAfter(L, i, lambdaNm) {
@@ -248,7 +248,7 @@ export function setFnumber(L, fno) {
 
   let stop = wantEpSemi / m;
 
-  /* The iris cannot open wider than the mechanical hole it sits in: a 50 mm
+  /* The stop cannot open wider than the mechanical hole it sits in: a 50 mm
      design whose front element is 20 mm across cannot be an f/1.4 lens no
      matter what the caller asks for. Clamping is the right behaviour -- a UI
      dragging the aperture should stop at the limit rather than error -- but the
@@ -413,16 +413,6 @@ export function build(id, eflMm, fno) {
     L.ffdMm *= k;
   }
 
-  /* Nine straight blades: the common photographic default. An odd blade count
-     gives 2N starburst spikes instead of N, which is why most lenses have an
-     odd one. Changing this changes the SHAPE of the blur and the spike count;
-     irisCircumradius keeps it from changing the exposure by so much as a
-     photon. The page's default is a perfect circle (blades = 0) so the first
-     thing a visitor sees is not a nonagon. */
-  L.blades = 9;
-  L.bladeRotRad = 0;
-  L.bladeCurvature = 0;
-
   if (!setFnumber(L, fno > 0 ? fno : p.designFno)) {
     throw new Error(`${p.name}: f/${fno} is not a usable aperture`);
   }
@@ -496,78 +486,19 @@ export function refract(d, n, eta) {
   return v.normalize(v.add(v.scale(d, eta), v.scale(n, eta * cosI - Math.sqrt(k))));
 }
 
-/* The circumradius an N-blade iris needs in order to enclose the SAME AREA as a
-   circle of radius `a`.
-
-   The blade boundary at angle phi from an edge's midpoint normal is
-
-       r(phi) = rho [ (1-c) k / cos(phi) + c ],   k = cos(pi/N)
-
-   blending the straight chord toward the circumscribed circle. Its area is the
-   integral of r^2/2 over the full turn, which has a closed form: with m = pi/N
-   and using  int sec^2 = tan,  int sec = ln|sec + tan|,
-
-       A(rho=1) = N [ (1-c)^2 k^2 tan m + 2c(1-c) k ln(sec m + tan m) + c^2 m ]
-
-   and rho then follows from A(rho) = rho^2 A(1) = pi a^2.
-
-   The obvious shortcut -- blend rho linearly between the polygon value and the
-   circle value -- is WRONG, and wrong in a way that hides: area goes as rho^2,
-   so a linear blend of rho is not a linear blend of area. It is exact at c = 0
-   and c = 1 and worst in between, which is precisely where nobody thinks to
-   check. It overshot by 9 % on a three-blade iris at half curvature: a third of
-   a stop of exposure error produced by a control that is supposed to change
-   only the shape of the blur.
-
-   The f-number is a statement about how much light gets through, so the iris
-   AREA is what must equal pi a^2. Without this, switching from a circular iris
-   to seven blades would darken the image by 13 %. */
-export function irisCircumradius(a, blades, curvature) {
-  if (blades < 3) return a;
-
-  const c = clamp(curvature, 0, 1);
-  const m = PI / blades;
-  const k = Math.cos(m);
-  const tanM = Math.tan(m);
-  const secM = 1 / k;
-
-  const a1 = blades * ((1 - c) * (1 - c) * k * k * tanM
-                     + 2 * c * (1 - c) * k * Math.log(secM + tanM)
-                     + c * c * m);
-  if (a1 <= 0) return a;
-  return a * Math.sqrt(PI / a1);
-}
-
-/* Is (x, y) inside the iris? Circular when blades < 3, otherwise the blade
-   polygon, blended toward a circle by bladeCurvature. */
-export function apertureContains(L, xMm, yMm) {
-  const r = Math.sqrt(xMm * xMm + yMm * yMm);
-  if (L.blades < 3) return r <= L.stopSemiApMm;
-
-  const rho = irisCircumradius(L.stopSemiApMm, L.blades, L.bladeCurvature);
-  const th = TWO_PI / L.blades;
-
-  /* Angle to the nearest blade's midpoint, folded into one sector. */
-  let phi = Math.atan2(yMm, xMm) - L.bladeRotRad;
-  phi = phi % th;
-  if (phi < 0) phi += th;
-  phi -= th * 0.5;
-
-  /* A straight blade edge is the chord at distance rho cos(pi/N) from the
-     centre, so its radius at angle phi is rho cos(pi/N)/cos(phi). Blending that
-     toward rho gives the rounded blades a real iris has. */
-  const straight = (rho * Math.cos(PI / L.blades)) / Math.cos(phi);
-  return r <= lerp(L.bladeCurvature, straight, rho);
-}
-
-/* The clear radius that actually clips at surface i: the iris at the stop, the
-   mechanical bore everywhere else. */
+/* The clear radius that actually clips at surface i: the aperture at the stop,
+   the mechanical bore everywhere else. */
 const clipRadius = (L, i) => (i === L.stopIndex ? L.stopSemiApMm : L.surf[i].semiApMm);
 
 /* Is this point blocked at surface i? THE clip. This, and only this, is where
-   vignetting comes from. */
+   vignetting comes from.
+
+   The stop is a circle, so it is the same radial test as every other surface
+   and needs no case of its own. It used to be a blade polygon, which had to be
+   area-normalised against the circle it replaced so that changing the blade
+   count could not change the exposure -- all of which existed to shape a blur
+   that nothing in the shipped scene shows. */
 function blockedAt(L, i, p) {
-  if (i === L.stopIndex) return !apertureContains(L, p.x, p.y);
   const rad = clipRadius(L, i);
   return p.x * p.x + p.y * p.y > rad * rad;
 }
@@ -577,7 +508,7 @@ function blockedAt(L, i, p) {
    `r` is updated in place to the ray leaving the rear surface, and `tr.value`,
    when a transmittance box is passed, is multiplied by (1 - R_fresnel) at each
    interface. Returns false the moment the ray is clipped by any clear aperture,
-   by the iris, or by total internal reflection -- and a clipped ray is what
+   by the stop, or by total internal reflection -- and a clipped ray is what
    mechanical vignetting IS. */
 export function trace(L, lambdaNm, r, tr) {
   for (let i = 0; i < L.surf.length; i++) {

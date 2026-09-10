@@ -22,9 +22,9 @@
      decides the step a number input takes and how a value is formatted, since
      there is no drag-to-scrub. */
 
-import { clamp } from "../light/core.js?v=008be1e5";
-import * as P from "./prescription.js?v=008be1e5";
-import * as SD from "./scenedesc.js?v=008be1e5";
+import { clamp } from "../light/core.js?v=3da9737a";
+import * as P from "./prescription.js?v=3da9737a";
+import * as SD from "./scenedesc.js?v=3da9737a";
 
 export function defaults() {
   return {
@@ -33,9 +33,6 @@ export function defaults() {
     focalMm: 100.0,
     fno: 5.0,
     focusM: 2.0,
-    blades: 0,               /* 0 = perfect circle, else 3..14 */
-    curvature: 0.0,          /* 0 straight blades, 1 circular */
-    rotDeg: 0.0,
 
     /* scene */
     preset: SD.RAIL,
@@ -77,14 +74,6 @@ export const FIELDS = [
   { id: "focalMm", section: "LENS", label: "focal", unit: "mm", lo: 12, hi: 400, log: true },
   { id: "fno", section: "LENS", label: "aperture", unit: "f/", lo: 1, hi: 45, log: true },
   { id: "focusM", section: "LENS", label: "focus", unit: "m", lo: 0.15, hi: 1000, log: true },
-  /* 0 is a perfect circle; 1 and 2 are not irises, so the range skips them.
-     set() enforces that gap rather than the input's step doing it. */
-  { id: "blades", section: "LENS", label: "blades", unit: "", lo: 0, hi: 14, int: true },
-  { id: "curvature", section: "LENS", label: "blade curve", unit: "", lo: 0, hi: 1 },
-  { id: "rotDeg", section: "LENS", label: "blade angle", unit: "deg", lo: 0, hi: 90 },
-
-  /* A select with one option is not a choice, so it is not drawn. `when` rather
-     than deletion: add a second scene and the control comes back on its own. */
   { id: "preset", section: "SCENE", label: "scene", enumOf: () => SD.PRESETS,
     names: SD.PRESET_NAMES, when: () => SD.PRESETS.length > 1 },
   { id: "lightMode", section: "SCENE", label: "lighting", enumOf: () => SD.LIGHT_MODES, names: SD.MODE_NAMES },
@@ -126,11 +115,6 @@ export function set(s, id, value) {
     if (!Number.isFinite(x)) return false;
     x = clamp(x, f.lo, f.hi);
     if (f.int) x = Math.round(x);
-    /* An iris needs at least three blades. Two would be a slit and one is not a
-       shape at all, so the range 1..2 is a hole rather than a limit -- and the
-       hole has to be enforced HERE, not by an input's step attribute, or a
-       value arriving from a URL would land in it. */
-    if (id === "blades" && x > 0 && x < 3) x = s[id] > 0 ? 0 : 3;
     next = x;
   }
 

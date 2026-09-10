@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=008be1e5";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=3da9737a";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -33,10 +33,6 @@ export const VOCABULARY = [
   "focus further away",
   "zoom in",
   "zoom out",
-  "<blades> blades",
-  "round iris",
-  "set the blade curve to <curve>",
-  "straight blades",
   "make the sensor <sensor> mm",
   "full frame",
   "render at <pixels> px",
@@ -98,8 +94,6 @@ Set up a camera and see what it records.
   actually passes rather than the one asked for.
 - Focus from 0.15 m to 1000 m, or infinity. Focusing moves the film, not the
   glass, so the camera does not walk while racking.
-- An iris of 3 to 14 straight blades, rounded by a blade curve, or a perfect
-  circle. The blade count changes the shape of the blur, never the exposure.
 - Sensor width from 4 to 80 mm at 3:2, a render grid from 64 to 640 px, and an
   exposure that is a viewing gain applied after the fact.
 - One scene, the depth rail: five identical targets at 1, 1.5, 2, 3 and 5 m.
@@ -124,15 +118,6 @@ What each control does, and what changes on screen when it moves.
   where brightness comes from here, which is why exposure is not a substitute.
 - FOCUS: the distance the film is set for. What sits there is sharp; everything
   else blurs by how far it is from it.
-- BLADES: the shape of the iris. A defocused POINT source images the aperture,
-  so six blades would give hexagonal discs -- but the shipped scene has no point
-  sources in frame, so this is a change to the blur kernel rather than something
-  you will see as a polygon. It does not change the exposure.
-  It does NOT give the starburst spikes a real lens shows on a bright point.
-  Those come from diffraction at the blade edges, and there is no diffraction
-  here (see <limits>). Say so if asked, rather than promising them.
-- BLADE CURVE: rounds the blades off. 0 is a straight-edged polygon, 1 a circle.
-  Shape only.
 - SENSOR WIDTH: the film format. Wider sees more at the same focal length, and
   demands a bigger image circle from the lens.
 - RENDER: how many pixels wide the photograph is computed at. Quality and speed;
@@ -224,8 +209,12 @@ Things this tool genuinely cannot do. Say so plainly when one is asked for.
   them exist to be compared with each other.
 - No diffraction of any kind, so there is no diffraction limit, no Airy disc, no
   softening on stopping right down, and no starburst or sunstar on a bright
-  point however many blades the iris has. Blur here is geometric only: it is
-  where rays land, never how they interfere.
+  point. Blur here is geometric only: it is where rays land, never how they
+  interfere.
+- No iris blades. The aperture is a circle at every setting, so there is no
+  blade count, no blade curve and no aperture-shaped bokeh. A real iris is a
+  ring of overlapping leaves and its polygon is what shapes a defocused
+  highlight; that is a real effect and this does not have it.
 - No polarisation, no fluorescence and no participating media.
 - No undo, and no way to save the rendered image out.
 </limits>`;
@@ -234,8 +223,8 @@ const NUMBERS =
 `<numbers>
 - The camera stands at the origin looking down the axis; every distance is from
   there, in metres.
-- It starts as the achromat at 100 mm, f/5, focused at 2 m, a circular iris, a
-  36 mm sensor, 320 px wide and an exposure of 100.
+- It starts as the achromat at 100 mm, f/5, focused at 2 m, with a 36 mm sensor,
+  320 px wide and an exposure of 100.
 - The depth rail's targets sit at 1, 1.5, 2, 3 and 5 m. Each one's size and
   offset scale with its distance, so all five subtend the same angle and the
   only difference in the image is focus. The 2 m target is the warm-coloured
@@ -260,19 +249,15 @@ const HOW =
   over wavelengths that never travelled there, which is how a simulator erases
   the chromatic aberration it was built to show.
 - Vignetting is entirely geometric. A ray that misses the clear aperture of any
-  surface, or the iris, is dead. There is no darkening factor applied to the
+  surface, or the stop, is dead. There is no darkening factor applied to the
   corners anywhere in the program, so a dark corner means rays aimed at it hit
   the edge of real glass.
-- The f-number is set from the ENTRANCE pupil, which is the image of the iris
+- The f-number is set from the ENTRANCE pupil, which is the image of the stop
   formed by the glass in front of it, not from focal length over diameter
   directly. Ignoring that magnification is wrong by 10 to 20 % on a real design.
 - The circle of confusion is computed from the EXIT pupil and the real film
   position, not from the textbook thin-lens expression, which assumes both
   pupils are the same size.
-- An N-blade iris is sized to enclose the same AREA as the circle it replaces,
-  so changing the blade count changes the shape of the blur and not the
-  exposure. Wide open its corners can reach past the barrel and be clipped,
-  which is real mechanical vignetting rather than an exception to that rule.
 - The wavelength is drawn in proportion to the CIE observer's response, so no
   ray is spent on a wavelength the film cannot see.
 </how>`;
@@ -333,13 +318,13 @@ const retriever = makeRetriever({
        Without the corner words here it pulled <preconditions>, which mentions
        the image circle but never says what makes a corner go dark, and the
        model filled the gap from the state block and got the wrong number. */
-    [/\b(wavelength|spectral|dispersion|sellmeier|vignett\w*|pupil|entrance pupil|exit pupil|blade|blades|iris|area|estimator|sampling|how does it|why does|corner|corners|falloff|fall.?off|darker at the edge)\b/i, "how"],
+    [/\b(wavelength|spectral|dispersion|sellmeier|vignett\w*|pupil|entrance pupil|exit pupil|stop|area|estimator|sampling|how does it|why does|corner|corners|falloff|fall.?off|darker at the edge)\b/i, "how"],
     [/\b(what can|capabilit\w*|features?|able to|support|supports|do here|possible|designs?|achromat|singlet)\b/i, "capabilities"],
     /* "What does X do" is the commonest question a control invites, and until
        <controls> existed the answer came back as whatever section happened to
        mention X -- for the aperture, the paragraph explaining why it will not
        open past f/5, which is a different question. */
-    [/\b(?:what|which|how)\b[^.]{0,24}\b(?:does|do|is|are)\b[^.]{0,24}\b(?:aperture|f.?number|f.?stop|focal|focus|blade|blades|curve|sensor|render|resolution|exposure|sharp if|lighting|design|control|slider|setting)\b/i, "controls"],
+    [/\b(?:what|which|how)\b[^.]{0,24}\b(?:does|do|is|are)\b[^.]{0,24}\b(?:aperture|f.?number|f.?stop|focal|focus|sensor|render|resolution|exposure|sharp if|lighting|design|control|slider|setting)\b/i, "controls"],
     [/\b(t.?stop|entrance pupil|exit pupil|back focus|film at|colour err|color err|image circle|covers|hyperfocal|blur at|h field|field of view|derived|read ?out|read ?outs|samples)\b/i, "readouts"],
   ],
 
@@ -364,7 +349,7 @@ export function formatState(s) {
     + (s.lighting === "ambient" ? `, sky ${s.ambientLux} lx at ${s.ambientCctK} K` : ""));
   out.push(`lens: ${s.design}, ${n2(s.focalMm)} mm at f/${n2(s.fno)}`
     + `, focused at ${n2(s.focusM)} m`
-    + `; iris: ${s.blades >= 3 ? `${s.blades} blades, curve ${n2(s.curvature)}` : "a circle"}`);
+    );
   out.push(`sensor: ${n2(s.sensorWMm)} mm wide, rendering ${s.resW} px`
     + `, exposure x${n2(s.exposure)}, sharp within ${s.cocLimitMm} mm`);
 

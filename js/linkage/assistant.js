@@ -5,9 +5,9 @@
    vocabulary. The chat module knows there is a controller; it does not know
    what a coupler is. */
 
-import { mountChat } from "../chat/ui.js?v=008be1e5";
-import * as knowledge from "./knowledge.js?v=008be1e5";
-import { buildBars, SIZES } from "./generate.js?v=008be1e5";
+import { mountChat } from "../chat/ui.js?v=3da9737a";
+import * as knowledge from "./knowledge.js?v=3da9737a";
+import { buildBars, SIZES } from "./generate.js?v=3da9737a";
 
 const deg = (v) => `${v.toFixed(0)}°/s`;
 

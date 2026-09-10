@@ -24,9 +24,9 @@
      fall inside the box but miss the real pupil are traced and rejected, which
      costs time and no accuracy. That asymmetry is why the build pads. */
 
-import * as L from "./lens.js?v=008be1e5";
-import { LINE_D } from "./glass.js?v=008be1e5";
-import * as v from "../light/vec3.js?v=008be1e5";
+import * as L from "./lens.js?v=3da9737a";
+import { LINE_D } from "./glass.js?v=3da9737a";
+import * as v from "../light/vec3.js?v=3da9737a";
 
 /* Probes per axis per zone, and how far the found box is inflated, in grid
    cells. The C's values, kept.

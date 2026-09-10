@@ -107,7 +107,7 @@ carrying a second copy. The engine underneath this page is the one already
 checked against the C to eighteen significant digits.
 
 What is new is the lens: `glass.js`, `prescription.js`, `lens.js` (the paraxial
-y-nu analysis, the entrance and exit pupils, the iris, and the sequential ray
+y-nu analysis, the entrance and exit pupils, and the sequential ray
 trace), `pupil.js`, `spectral.js`, `camera.js`, `trace.js`, `scenedesc.js`,
 `film.js` and `render.js`.
 
@@ -149,7 +149,7 @@ exactly 100.000000000 mm at every wavelength.
 
 The desktop tool lets you arrange the scene, draws the lens in cross-section
 with its ray fans, and has undo. This page fixes the scene and gives you the
-camera: the lens design, focal length, aperture, focus, iris, sensor, exposure
+camera: the lens design, focal length, aperture, focus, sensor, exposure
 and sharpness criterion, plus the choice between the placed area lamp and a
 uniform overhead sky. Sampling is not a control — how many rays it takes to
 answer is the program's problem, not the visitor's.
@@ -174,7 +174,7 @@ the lamps out with numbers, and those numbers are what it takes back.
 
 On the optics page the scene is fixed, so there is nothing to build and the
 whole vocabulary is the camera: "stop down to f/16", "open it up", "focus at
-5 metres", "use the singlet", "nine blades", "switch to the sky". It answers
+5 metres", "use the singlet", "zoom in", "switch to the sky". It answers
 with the numbers the lens actually produced rather than the ones that were
 asked for — request f/2.8 on a design that is wide open at f/5 and it says so,
 with the entrance pupil that really exists.
@@ -383,11 +383,10 @@ here maps straight back to the test that covers the same behaviour there.
 `framing.test.mjs` has no counterpart there -- the desktop tool has no homepage.
 
 Some of `optics.test.mjs` pins behaviour that *looks* like a defect and is not,
-because both halves are worth defending: a hexagonal iris must not change the
-exposure, except wide open, where its corners genuinely do not fit down the
-barrel; and focus decides which target is sharp, except at the edge of the
-field, where an uncorrected doublet's coma beats defocus outright and the
-depth-of-field slab says the opposite of what the camera records.
+because both halves are worth defending: focus decides which target is sharp,
+except at the edge of the field, where an uncorrected doublet's coma beats
+defocus outright and the depth-of-field slab says the opposite of what the
+camera records.
 
 The contact address is never written out in full. `index.html` and
 `partials/footer.html` carry it as `data-mailto-user` / `data-mailto-domain`,

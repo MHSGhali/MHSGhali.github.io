@@ -34,8 +34,8 @@ function fill(form) {
     .replace(/<lumens>/g, "400").replace(/<kelvin>/g, "2700")
     .replace(/<degrees>/g, "25").replace(/<albedo>/g, "0.8")
     .replace(/<metres>/g, "0.05")
-    .replace(/<focal>/g, "85").replace(/<fno>/g, "2.8").replace(/<blades>/g, "7")
-    .replace(/<curve>/g, "0.5").replace(/<sensor>/g, "24").replace(/<pixels>/g, "480")
+    .replace(/<focal>/g, "85").replace(/<fno>/g, "2.8")
+    .replace(/<sensor>/g, "24").replace(/<pixels>/g, "480")
     .replace(/<exposure>/g, "40").replace(/<lux>/g, "5000");
 }
 
@@ -496,24 +496,6 @@ test("a question about a control is not an instruction to change it", () => {
   }
 });
 
-test("a blade CURVE is not a blade COUNT", () => {
-  /* The loose count form matched "blade ... 0" inside "set the blade curve to
-     0.5", so rounding the blades of a seven-blade iris asked for a ZERO-blade
-     one at the same time and silently threw the seven away. It is a documented
-     vocabulary line, so the planner emits it verbatim -- and the vocabulary
-     test only asserts that a line parses, not that it parses to the right
-     thing. */
-  assert.deepEqual(parse("set the blade curve to 0.5", "optics"),
-    [{ action: "curvature", value: 0.5 }]);
-  assert.deepEqual(parse("round the blades to 0.7", "optics"),
-    [{ action: "curvature", value: 0.7 }]);
-  /* A count still lands, in every wording. */
-  assert.deepEqual(parse("nine blades", "optics"), [{ action: "blades", value: 9 }]);
-  assert.deepEqual(parse("9 blades", "optics"), [{ action: "blades", value: 9 }]);
-  assert.deepEqual(parse("set the blades to 11", "optics"), [{ action: "blades", value: 11 }]);
-  assert.deepEqual(parse("round iris", "optics"), [{ action: "blades", value: 0 }]);
-});
-
 test("the Ask page can hand over a link to any of the three tools", () => {
   /* It searched the linkage table only, which made links.js's light branch
      unreachable: it looked up an id in LIGHT_PRESETS that could never have come
@@ -555,7 +537,7 @@ test("no two tools claim the same preset name", () => {
 test("the optics state block stays small however much is on screen", () => {
   const s = optics.formatState({
     scene: "RAIL", lighting: "AMBIENT", ambientLux: 2000, ambientCctK: 6500,
-    design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2, blades: 9, curvature: 0.5,
+    design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2,
     sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03, spp: 412,
     derived: { eflMm: 100, hfovDeg: 20.41, pupilMm: 20, tstop: 5.26, colourErrPct: -0.058,
                nearM: 1.94, farM: 2.06, hyperfocalM: 66.77, coversMm: 20.07, coveredMm: 43.25,
@@ -570,7 +552,7 @@ test("the optics state block stays small however much is on screen", () => {
 test("an unbuilt lens says so rather than inventing numbers", () => {
   const s = optics.formatState({
     scene: "RAIL", lighting: "LAMPS", design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2,
-    blades: 0, curvature: 0, sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03,
+    sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03,
     derived: null, spp: 0, targets: [],
   });
   assert.match(s, /has not been built yet/);

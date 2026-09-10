@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="../css/main.css?v=008be1e5">
+<link rel="stylesheet" href="../css/main.css?v=3da9737a">
 <script>/* Runs before paint: marks JS alive so the reveal animation can hide
    things it will later show, and settles the theme so there is no flash. */
 document.documentElement.classList.add("js");
@@ -25,7 +25,7 @@ try{var t=localStorage.getItem("theme");
 /* No stored choice means the visitor has not chosen; follow the OS. */
 if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
 document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="../js/app.js?v=008be1e5" defer></script>
+<script src="../js/app.js?v=3da9737a" defer></script>
 <!-- three.js is pinned here rather than in view3d.js because OrbitControls
      imports the bare specifier "three" internally, which only resolves through
      an import map. One place to bump the version. -->
@@ -37,7 +37,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
   }
 }
 </script>
-<script type="module" src="../js/optics/app.js?v=008be1e5"></script>
+<script type="module" src="../js/optics/app.js?v=3da9737a"></script>
 </head>
 <body>
 <div class="sheen" aria-hidden="true"></div>
@@ -147,7 +147,6 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
           <div><dt>focus</dt><dd>the distance the film is set for. At 2&nbsp;m the third sphere is the sharp one</dd></div>
           <div><dt>aperture</dt><dd>stop down and the sharp slab widens &mdash; and the picture darkens, because that is what stopping down does</dd></div>
           <div><dt>design</dt><dd>swap the achromat for the single element and the colour error jumps about twenty-fold</dd></div>
-          <div><dt>blades</dt><dd>0 is a perfect circle; 3&ndash;14 gives the iris that many straight blades, and blade&nbsp;curve rounds them</dd></div>
           <div><dt>lamps &rlarr; sky</dt><dd>a placed area light, or a uniform dome. Shadows and the terminator vanish with the lamp</dd></div>
           <div><dt>exposure</dt><dd>a viewing gain only. It never re-traces a ray &mdash; see below</dd></div>
           <div><dt>drag / scroll</dt><dd>orbit and zoom the scene view</dd></div>
@@ -164,7 +163,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
     </div>
   </details>
 
-  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Optics-Simulation" target="_blank" rel="noopener">Optics-Simulation</a>, my physically-based camera simulator in C. It shares that project&rsquo;s vendored spectral core with <a href="light.html">the light simulator</a> &mdash; the same 95-bin spectra, the same CIE 1931 photometry, the same PCG32 stream &mdash; so the engine underneath this page is the one already checked against the C to eighteen significant digits. What is new here is the lens: the paraxial analysis, the pupils, the iris and the sequential ray trace through real glass. The desktop tool lets you arrange the scene and draws the lens in cross-section; this page fixes the scene and gives you the camera.</p>
+  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Optics-Simulation" target="_blank" rel="noopener">Optics-Simulation</a>, my physically-based camera simulator in C. It shares that project&rsquo;s vendored spectral core with <a href="light.html">the light simulator</a> &mdash; the same 95-bin spectra, the same CIE 1931 photometry, the same PCG32 stream &mdash; so the engine underneath this page is the one already checked against the C to eighteen significant digits. What is new here is the lens: the paraxial analysis, the pupils and the sequential ray trace through real glass. The desktop tool lets you arrange the scene and draws the lens in cross-section; this page fixes the scene and gives you the camera.</p>
 </section>
 </main>
 

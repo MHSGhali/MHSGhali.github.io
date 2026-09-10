@@ -5,7 +5,8 @@
 
    The ones that carry real weight are the ones where a wrong answer still
    produces a completely convincing picture: a lens of the wrong focal length,
-   an iris that changes the exposure, a pupil bound that eats the corners.
+   a pupil bound that eats the corners, a wavelength sampler that is not
+   unbiased.
 
    Run: node --test tests/optics.test.mjs */
 
@@ -175,7 +176,7 @@ test("a clamped aperture reports the f-number it actually passes", () => {
   near(2 * lens.epSemiApMm, lens.eflMm / lens.fNumber, 1e-9,
     "the reported f-number matches the pupil that exists");
   assert.ok(lens.stopSemiApMm <= lens.surf[lens.stopIndex].semiApMm + 1e-12,
-    "the iris cannot open wider than the hole it sits in");
+    "the stop cannot open wider than the hole it sits in");
 });
 
 test("the coc is zero at the focused distance and grows either side", () => {
@@ -222,62 +223,6 @@ test("past the hyperfocal distance the far limit is infinity", () => {
   assert.equal(L.dof(lens, 0.030).far, Infinity, "just past hyperfocal reaches infinity");
   L.focus(lens, h * 0.9);
   assert.ok(Number.isFinite(L.dof(lens, 0.030).far), "just inside it does not");
-});
-
-/* ---------------------------------------------------------------- the iris */
-
-test("the iris holds its AREA constant across every blade count and curvature", () => {
-  /* The f-number is a statement about how much light gets through, so the iris
-     AREA is what must equal pi a^2. Without this, switching from a circular
-     iris to seven blades would darken the image by 13 % -- an exposure change
-     with no cause, produced by a control that is supposed to affect only the
-     SHAPE of the blur.
-
-     And the obvious shortcut, blending rho linearly between the polygon value
-     and the circle value, is exact at c = 0 and c = 1 and worst in between --
-     precisely where nobody thinks to check. Hence the curvatures in the middle
-     of this list. */
-  const a = 10;
-  const wantArea = Math.PI * a * a;
-  for (const blades of [3, 4, 5, 6, 7, 9, 11, 14]) {
-    for (const curve of [0, 0.25, 0.5, 0.75, 1]) {
-      const rho = L.irisCircumradius(a, blades, curve);
-      /* Numeric area of the blended blade boundary, in polar form. */
-      const N = 200000;
-      let area = 0;
-      const m = Math.PI / blades;
-      for (let k = 0; k < N; k++) {
-        const phi = (2 * Math.PI * (k + 0.5)) / N;
-        let p = phi % (2 * m);
-        p -= m;
-        const straight = (rho * Math.cos(m)) / Math.cos(p);
-        const r = straight + curve * (rho - straight);
-        area += 0.5 * r * r * ((2 * Math.PI) / N);
-      }
-      near(area, wantArea, 1e-4, `iris area at ${blades} blades, curvature ${curve}`);
-    }
-  }
-});
-
-test("blades under three are a perfect circle, and the iris contains what it should", () => {
-  const lens = L.build(P.ACHROMAT_100, 100, 5);
-  lens.blades = 0;
-  const a = lens.stopSemiApMm;
-  assert.ok(L.apertureContains(lens, a * 0.99, 0));
-  assert.ok(!L.apertureContains(lens, a * 1.01, 0));
-
-  /* A hexagonal iris reaches further at a corner than at an edge midpoint, and
-     both have to stay inside the circumradius. */
-  lens.blades = 6;
-  lens.bladeCurvature = 0;
-  lens.bladeRotRad = 0;
-  const rho = L.irisCircumradius(a, 6, 0);
-  assert.ok(L.apertureContains(lens, rho * 0.99, 0), "reaches the corner");
-  assert.ok(!L.apertureContains(lens, rho * 1.01, 0), "and no further");
-  const edge = rho * Math.cos(Math.PI / 6);
-  const mid = Math.PI / 6;
-  assert.ok(!L.apertureContains(lens, edge * 1.02 * Math.cos(mid), edge * 1.02 * Math.sin(mid)),
-    "an edge midpoint is closer in than a corner");
 });
 
 /* ------------------------------------------------------- sequential tracing */
@@ -781,7 +726,6 @@ test("an unsampled pixel is black and opaque, not transparent", () => {
 
 const baseSettings = () => ({
   design: P.ACHROMAT_100, focalMm: 100, fno: 5, focusM: 2,
-  blades: 0, curvature: 0, rotDeg: 0,
   preset: SD.RAIL, lightMode: SD.LAMPS, ambientLux: 2000, ambientCctK: 6500,
   sensorWMm: 36, resW: 48, exposure: 100, cocLimitMm: 0.03, spp: 2, depth: 3,
 });
@@ -888,38 +832,11 @@ test("stopping down darkens the frame by about the right number of stops", () =>
     `two stops should be about 4x, got ${ratio.toFixed(2)}x`);
 });
 
-test("the blade count changes the blur's shape and not the exposure", () => {
-  /* The visible half of the iris-area invariant: a hexagonal iris encloses the
-     same area as the circle it replaces, so it must not darken the picture.
-
-     Measured at f/8, where the blade polygon fits comfortably inside the
-     barrel. Wide open it does not, and that is a different effect entirely --
-     see the test below.
-
-     Enough passes that Monte Carlo noise is well under the effect being denied:
-     at one pass the three shapes differ by a couple of percent purely because
-     they draw different rays; by 64 spp that is a tenth of a percent, so a 1 %
-     tolerance is a real claim rather than a loose one. */
-  const meanY = (blades) => {
-    const s = { ...baseSettings(), blades, fno: 8, lightMode: SD.AMBIENT, resW: 36, spp: 4 };
-    const st = setup(s);
-    const f = FILM.create(st.width, st.height);
-    for (let pass = 0; pass < 16; pass++) renderRows(st, f, s, pass, 0, st.height);
-    let sum = 0;
-    for (let i = 0; i < f.n.length; i++) sum += f.xyz[i * 3 + 1] / f.n[i];
-    return sum / f.n.length;
-  };
-  const circle = meanY(0);
-  for (const blades of [6, 9]) {
-    near(meanY(blades), circle, 0.01, `${blades} blades must not change the exposure`);
-  }
-});
-
 test("nothing promises a starburst this renderer cannot produce", () => {
-  /* A real lens's sunstars are diffraction at the blade edges. This renderer is
-     geometric -- it knows where rays land, not how they interfere -- so a blade
-     count changes the SHAPE of a defocused highlight and nothing else. The
-     prompt said otherwise in three places, which would have had the assistant
+  /* A real lens's sunstars are diffraction at the edges of the iris blades.
+     This renderer has neither: it is geometric, so it knows where rays land and
+     not how they interfere, and its aperture is a plain circle. The prompt
+     promised spikes in three places, which would have had the assistant
      confidently describing an effect that can never appear on screen. */
   const K = readFileSync("js/optics/knowledge.js", "utf8");
   const A = readFileSync("js/optics/assistant.js", "utf8");
@@ -934,44 +851,6 @@ test("nothing promises a starburst this renderer cannot produce", () => {
   /* And the limits section has to name it, since a visitor will ask. */
   assert.match(optics.LIMITS_TEXT ?? K, /starburst|sunstar/i,
     "the limits should say plainly that there are no sunstars");
-});
-
-test("wide open, the blade corners really are clipped by the barrel", () => {
-  /* The one case where a blade count DOES change the exposure, and it is not a
-     violation of the area invariant -- it is the invariant meeting a real
-     mechanical limit.
-
-     An N-gon of the same area as a circle of radius a has to reach further than
-     a at its corners: a hexagon reaches 1.0996a. At f/5 this design is wide
-     open, its iris is already 10.0 mm against a 10.04 mm bore, and the hexagon's
-     corners land at 11.0 mm -- outside the clear aperture of the elements
-     behind the stop, which duly clip them. The picture is a couple of percent
-     darker, and it should be: the corners of that iris do not fit down the
-     barrel.
-
-     Stop down one third of a stop and the polygon fits, and the difference goes
-     away. Pinned so that neither half can be "fixed" into the other. */
-  const lens = L.build(P.ACHROMAT_100, 100, 5);
-  const bore = lens.surf[lens.stopIndex].semiApMm;
-  assert.ok(L.irisCircumradius(lens.stopSemiApMm, 6, 0) > bore,
-    "wide open, a hexagonal iris must reach past the bore");
-
-  const stopped = L.build(P.ACHROMAT_100, 100, 5.6);
-  assert.ok(L.irisCircumradius(stopped.stopSemiApMm, 6, 0) < stopped.surf[stopped.stopIndex].semiApMm,
-    "one third of a stop down, it fits");
-
-  const meanY = (blades, fno) => {
-    const s = { ...baseSettings(), blades, fno, lightMode: SD.AMBIENT, resW: 36, spp: 4 };
-    const st = setup(s);
-    const f = FILM.create(st.width, st.height);
-    for (let pass = 0; pass < 16; pass++) renderRows(st, f, s, pass, 0, st.height);
-    let sum = 0;
-    for (let i = 0; i < f.n.length; i++) sum += f.xyz[i * 3 + 1] / f.n[i];
-    return sum / f.n.length;
-  };
-  const lossWideOpen = 1 - meanY(6, 5) / meanY(0, 5);
-  assert.ok(lossWideOpen > 0.01,
-    `wide open the clipped corners must cost real light, lost ${(lossWideOpen * 100).toFixed(2)}%`);
 });
 
 /* ------------------------------------------------------------- the diagram */
@@ -1042,20 +921,6 @@ test("there is one clamp path, and it holds for every field", () => {
   }
 });
 
-test("one and two blades are a hole in the range, not a limit", () => {
-  /* Enforced in set(), not by an input's step, so a value arriving from a URL
-     cannot land in it. */
-  for (const from of [0, 3, 9]) {
-    for (const ask of [1, 2]) {
-      const s = ST.defaults();
-      ST.set(s, "blades", from);
-      ST.set(s, "blades", ask);
-      assert.ok(s.blades === 0 || s.blades >= 3,
-        `from ${from}, asking ${ask} gave ${s.blades}`);
-    }
-  }
-});
-
 test("exposure and the sharpness limit never restart a render", () => {
   const a = ST.defaults(), b = ST.defaults();
   ST.set(b, "exposure", 1234);
@@ -1071,8 +936,6 @@ test("every settable field survives a hash round trip", () => {
   ST.set(s, "focalMm", 55);
   ST.set(s, "fno", 2.8);
   ST.set(s, "focusM", 1.25);
-  ST.set(s, "blades", 7);
-  ST.set(s, "curvature", 0.4);
   ST.set(s, "lightMode", SD.AMBIENT);
 
   const back = ST.defaults();
@@ -1084,9 +947,8 @@ test("every settable field survives a hash round trip", () => {
 
 test("a hand-edited link cannot produce a state the panel could not", () => {
   const s = ST.defaults();
-  ST.fromHash("#fno=0.001&blades=2&resW=99999&focusM=-4&design=made-up", s);
+  ST.fromHash("#fno=0.001&resW=99999&focusM=-4&design=made-up", s);
   assert.ok(s.fno >= 1 && s.fno <= 45);
-  assert.ok(s.blades === 0 || s.blades >= 3);
   assert.ok(s.resW <= 640);
   assert.ok(s.focusM >= 0.15);
   assert.ok(P.IDS.includes(s.design));

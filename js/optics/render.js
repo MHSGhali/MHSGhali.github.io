@@ -13,14 +13,14 @@
      on how the scheduler happened to slice it, so a bug would reproduce only
      sometimes and a regression test could not exist at all. */
 
-import * as SD from "./scenedesc.js?v=008be1e5";
-import * as CAM from "./camera.js?v=008be1e5";
-import * as LENS from "./lens.js?v=008be1e5";
-import * as FILM from "./film.js?v=008be1e5";
-import * as T from "./trace.js?v=008be1e5";
-import * as G from "./glass.js?v=008be1e5";
-import * as R from "../light/rng.js?v=008be1e5";
-import { PI } from "../light/core.js?v=008be1e5";
+import * as SD from "./scenedesc.js?v=3da9737a";
+import * as CAM from "./camera.js?v=3da9737a";
+import * as LENS from "./lens.js?v=3da9737a";
+import * as FILM from "./film.js?v=3da9737a";
+import * as T from "./trace.js?v=3da9737a";
+import * as G from "./glass.js?v=3da9737a";
+import * as R from "../light/rng.js?v=3da9737a";
+import { PI } from "../light/core.js?v=3da9737a";
 
 /* The same seed constant the light engine's grid uses. */
 const SEED = 0x2545f4914f6cdd1dn;
@@ -73,12 +73,6 @@ export function setup(s) {
   const h = resH(w);
 
   const cam = CAM.build(s.design, s.focalMm, s.fno, s.sensorWMm, w, h);
-  cam.lens.blades = s.blades >= 3 ? s.blades | 0 : 0;
-  cam.lens.bladeCurvature = s.curvature;
-  cam.lens.bladeRotRad = (s.rotDeg * PI) / 180;
-  /* The iris shape changes the clip, so the f-number must be re-derived through
-     it before the pupil is cached against it. */
-  LENS.setFnumber(cam.lens, s.fno);
   if (!LENS.focus(cam.lens, s.focusM)) {
     throw new Error(`cannot focus at ${s.focusM} m: that is inside the front focal point`);
   }
