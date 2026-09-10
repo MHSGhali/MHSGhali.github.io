@@ -600,8 +600,13 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 }
 /* A read-only row is a measurement, not a control, so it reads as text rather
    than as a box someone tried and failed to type in. */
-.prow-ro { grid-template-columns: 1fr auto; gap: 12px; }
-.prow-ro span { font-size: .78rem; color: var(--text-dim); text-align: right; }
+/* .prow is a flex row, so a grid-template-columns here would do nothing at all.
+   The value takes the rest of the row and right-aligns in it, which is what
+   puts a column of measurements on a common edge. */
+.prow-ro span {
+  flex: 1; min-width: 0;
+  font-size: .78rem; color: var(--text-dim); text-align: right;
+}
 .derived-rows { display: grid; }
 
 /* ============================================================

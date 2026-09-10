@@ -22,9 +22,9 @@
      decides the step a number input takes and how a value is formatted, since
      there is no drag-to-scrub. */
 
-import { clamp } from "../light/core.js?v=6aaa6367";
-import * as P from "./prescription.js?v=6aaa6367";
-import * as SD from "./scenedesc.js?v=6aaa6367";
+import { clamp } from "../light/core.js?v=d88b88e5";
+import * as P from "./prescription.js?v=d88b88e5";
+import * as SD from "./scenedesc.js?v=d88b88e5";
 
 export function defaults() {
   return {
@@ -199,6 +199,14 @@ export function toHash(s) {
   return parts.length ? parts.join("&") : `preset=${s.preset}`;
 }
 
+/* Returns whether the hash was UNDERSTOOD, not whether it moved anything.
+
+   Those differ, and the difference is a bug: a link back to the shipped camera
+   is `#preset=rail`, so a visitor who had stopped down to f/16 and then pasted
+   a colleague's default link got `false` -- nothing had changed relative to the
+   defaults this function was handed -- and the page kept f/16 while the address
+   bar claimed otherwise. A link is a whole state; whether it happens to differ
+   from the one on screen is not this function's business. */
 export function fromHash(hash, s) {
   const text = hash.replace(/^#/, "");
   if (!text) return false;
@@ -206,17 +214,19 @@ export function fromHash(hash, s) {
   const named = /^preset=([\w-]+)$/.exec(text);
   if (named) {
     if (!SD.PRESETS.includes(named[1])) return false;
-    return set(s, "preset", named[1]);
+    set(s, "preset", named[1]);
+    return true;
   }
 
-  let any = false;
+  let understood = false;
   for (const pair of text.split("&")) {
     const eq = pair.indexOf("=");
     if (eq < 0) continue;
     const id = pair.slice(0, eq);
     const raw = decodeURIComponent(pair.slice(eq + 1));
     if (!FIELD_BY_ID[id]) continue;
-    if (set(s, id, FIELD_BY_ID[id].enumOf ? raw : Number(raw))) any = true;
+    set(s, id, FIELD_BY_ID[id].enumOf ? raw : Number(raw));
+    understood = true;
   }
-  return any;
+  return understood;
 }

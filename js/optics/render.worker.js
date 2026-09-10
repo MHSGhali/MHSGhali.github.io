@@ -20,9 +20,9 @@
    `rgb` is transferred, not copied. `gen` rises with each request; a result
    carrying a stale gen is ignored by the page and abandoned here. */
 
-import * as FILM from "./film.js?v=6aaa6367";
-import { setup, renderRows, derivedOf } from "./render.js?v=6aaa6367";
-import { prescriptionName } from "./prescription.js?v=6aaa6367";
+import * as FILM from "./film.js?v=d88b88e5";
+import { setup, renderRows, derivedOf } from "./render.js?v=d88b88e5";
+import { prescriptionName } from "./prescription.js?v=d88b88e5";
 
 let gen = 0;
 /* Kept between messages so an exposure change can re-tonemap without tracing a
@@ -40,7 +40,13 @@ self.onmessage = async (e) => {
      reason the film is kept in physical units between messages. */
   if (msg.type === "expose") {
     if (!state || state.gen !== msg.gen) return;
-    const rgb = FILM.tonemap(state.film, msg.exposure, bytesFor(state.film));
+    /* Recorded, not just used once. The render loop below tone-maps every
+       frame it delivers, and if it kept using the exposure that arrived with
+       the original request, the corrected frame would survive only until the
+       next pass landed -- a quarter of a second -- and the control would look
+       dead for the whole minute a render takes. */
+    state.exposure = msg.exposure;
+    const rgb = FILM.tonemap(state.film, state.exposure, bytesFor(state.film));
     postMessage(
       { type: "pass", gen: msg.gen, pass: state.pass, spp: FILM.samplesPerPixel(state.film), rgb },
       [rgb.buffer]
@@ -56,7 +62,7 @@ self.onmessage = async (e) => {
   try {
     const st = setup(s);
     const film = FILM.create(st.width, st.height);
-    state = { gen: myGen, film, pass: 0 };
+    state = { gen: myGen, film, pass: 0, exposure: s.exposure };
 
     postMessage({
       type: "built", gen: myGen,
@@ -102,7 +108,7 @@ self.onmessage = async (e) => {
       const last = pass === s.passes - 1;
       if (pass === 0 || last || now - lastPost >= MIN_FRAME_MS) {
         lastPost = now;
-        const rgb = FILM.tonemap(film, s.exposure, bytesFor(film));
+        const rgb = FILM.tonemap(film, state.exposure, bytesFor(film));
         postMessage(
           { type: "pass", gen: myGen, pass: pass + 1, spp: FILM.samplesPerPixel(film), rgb },
           [rgb.buffer]

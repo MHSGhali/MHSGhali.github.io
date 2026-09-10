@@ -1,4 +1,4 @@
-import { makeRetriever, MARKDOWN } from "./retrieve.js?v=6aaa6367";
+import { makeRetriever, MARKDOWN } from "./retrieve.js?v=d88b88e5";
 
 /* ---------------------------------------------------------------
    Everything the in-browser model is told about Mark, and the rules
@@ -166,10 +166,10 @@ Mark's own desktop C programs, and both run entirely on the visitor's machine.
    and is printed from there. */
 export const TOOL_HELP = {
   links:
-    "I can open either simulator for you with a particular mechanism or scene already loaded. "
-    + "Ask for one by name, or say \"open the linkage simulator\". Once you are there I can drive "
-    + "it directly from the panel on that page, all the way down to building a mechanism joint by "
-    + "joint or setting a lamp's colour temperature.",
+    "I can open any of the three simulators for you with a particular mechanism, scene or camera "
+    + "already loaded. Ask for one by name, or say \"open the linkage simulator\". Once you are "
+    + "there I can drive it directly from the panel on that page, all the way down to building a "
+    + "mechanism joint by joint, setting a lamp's colour temperature, or stopping a lens down.",
 };
 
 export function systemPrompt(mode, context = PROFILE) {
@@ -243,6 +243,7 @@ export const SUGGESTIONS = {
     "What is the benchmarking harness for?",
     "Tell me about the patent",
     "Open the linkage simulator with a Hoeken",
+    "Open the optics simulator with the depth rail",
   ],
   linkage: [
     "Load the Hoeken straight-line and run it",

@@ -16,7 +16,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { parse } from "../js/chat/commands.js";
+import { parse, LINKAGE_PRESETS, LIGHT_PRESETS, OPTICS_PRESETS } from "../js/chat/commands.js";
 import { triage, toolPrompt, systemPrompt, selectContext } from "../js/chat/profile.js";
 import { planSystem } from "../js/chat/plan.js";
 import * as linkage from "../js/linkage/knowledge.js";
@@ -493,6 +493,63 @@ test("a question about a control is not an instruction to change it", () => {
                       "why is the sky brighter", "what is an achromat"]) {
     const cmds = parse(said, "optics").filter((c) => c.action !== "describe" && c.action !== "help");
     assert.equal(cmds.length, 0, `"${said}" should reach the model, got ${JSON.stringify(cmds)}`);
+  }
+});
+
+test("a blade CURVE is not a blade COUNT", () => {
+  /* The loose count form matched "blade ... 0" inside "set the blade curve to
+     0.5", so rounding the blades of a seven-blade iris asked for a ZERO-blade
+     one at the same time and silently threw the seven away. It is a documented
+     vocabulary line, so the planner emits it verbatim -- and the vocabulary
+     test only asserts that a line parses, not that it parses to the right
+     thing. */
+  assert.deepEqual(parse("set the blade curve to 0.5", "optics"),
+    [{ action: "curvature", value: 0.5 }]);
+  assert.deepEqual(parse("round the blades to 0.7", "optics"),
+    [{ action: "curvature", value: 0.7 }]);
+  /* A count still lands, in every wording. */
+  assert.deepEqual(parse("nine blades", "optics"), [{ action: "blades", value: 9 }]);
+  assert.deepEqual(parse("9 blades", "optics"), [{ action: "blades", value: 9 }]);
+  assert.deepEqual(parse("set the blades to 11", "optics"), [{ action: "blades", value: 11 }]);
+  assert.deepEqual(parse("round iris", "optics"), [{ action: "blades", value: 0 }]);
+});
+
+test("the Ask page can hand over a link to any of the three tools", () => {
+  /* It searched the linkage table only, which made links.js's light branch
+     unreachable: it looked up an id in LIGHT_PRESETS that could never have come
+     from a light preset. So the one page whose whole job is handing out deep
+     links could not hand out two thirds of them. */
+  const named = {
+    hoeken: "load the Hoeken",
+    workcell: "load the workcell",
+    bokeh: "show me the bokeh lights",
+    rail: "open the optics simulator with the depth rail",
+  };
+  for (const [id, said] of Object.entries(named)) {
+    const [cmd] = parse(said, "links");
+    assert.ok(cmd, `"${said}" matched nothing on the Ask page`);
+    assert.equal(cmd.action, "preset", said);
+    assert.equal(cmd.id, id, said);
+  }
+});
+
+test("no two tools claim the same preset name", () => {
+  /* Which is what makes searching all three tables at once safe. A shared id or
+     alias would send the Ask page to the wrong simulator. */
+  const all = [...LINKAGE_PRESETS, ...LIGHT_PRESETS, ...OPTICS_PRESETS];
+  const ids = new Set();
+  for (const p of all) {
+    assert.ok(!ids.has(p.id), `two tools both call something "${p.id}"`);
+    ids.add(p.id);
+  }
+  const aliases = new Map();
+  for (const p of all) {
+    for (const a of p.aliases || []) {
+      const owner = aliases.get(a);
+      assert.ok(owner === undefined || owner === p.id,
+        `"${a}" is an alias for both ${owner} and ${p.id}`);
+      aliases.set(a, p.id);
+    }
   }
 });
 

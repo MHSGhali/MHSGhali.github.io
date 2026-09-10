@@ -1070,6 +1070,29 @@ test("a hand-edited link cannot produce a state the panel could not", () => {
   assert.ok(P.IDS.includes(s.design));
 });
 
+test("an incoming link is a whole state, not a diff against this one", () => {
+  /* fromHash reports whether the hash was UNDERSTOOD. It used to report whether
+     it had CHANGED anything, which is not the same: a link back to the shipped
+     camera is "#preset=rail", so a visitor who had stopped down to f/16 and
+     then pasted a colleague's default link was told nothing had changed, and
+     the page kept f/16 while the address bar claimed otherwise. */
+  const s = ST.defaults();
+  assert.equal(ST.toHash(s), "preset=rail", "the default state shares as a bare preset");
+  assert.equal(ST.fromHash("#preset=rail", ST.defaults()), true,
+    "a link that names the state it already is was still understood");
+
+  /* And the caller can then apply it wholesale: a field the link omits goes
+     back to its default rather than keeping what this session left it at. */
+  const incoming = ST.defaults();
+  ST.fromHash("#preset=rail", incoming);
+  assert.equal(incoming.fno, ST.defaults().fno);
+
+  /* Something it cannot read is still refused. */
+  assert.equal(ST.fromHash("#preset=not-a-scene", ST.defaults()), false);
+  assert.equal(ST.fromHash("#nonsense=1", ST.defaults()), false);
+  assert.equal(ST.fromHash("", ST.defaults()), false);
+});
+
 test("a bare preset link loads that preset", () => {
   const s = ST.defaults();
   assert.ok(ST.fromHash("#preset=bokeh", s));

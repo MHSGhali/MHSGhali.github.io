@@ -27,10 +27,10 @@
    COORDINATES
      Y-up, camera at the origin looking down -z, matching scenedesc.js. */
 
-import { TWO_PI } from "../light/core.js?v=6aaa6367";
-import * as v from "../light/vec3.js?v=6aaa6367";
-import * as LENS from "./lens.js?v=6aaa6367";
-import { AMBIENT } from "./scenedesc.js?v=6aaa6367";
+import { TWO_PI } from "../light/core.js?v=d88b88e5";
+import * as v from "../light/vec3.js?v=d88b88e5";
+import * as LENS from "./lens.js?v=d88b88e5";
+import { AMBIENT } from "./scenedesc.js?v=d88b88e5";
 
 /* What a segment is FOR, which is what decides how it is drawn. */
 export const GRID = "grid";         /* the ground, and its distance rings   */
@@ -191,9 +191,13 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
        is NOT the whole of how sharp a subject looks: off axis an uncorrected
        doublet adds coma and astigmatism that no depth-of-field formula knows
        about, so a marked subject near the frame edge can still be soft in the
-       render. lens.spotMm traces that real spot, and the panel reports it -- so
-       the honest number is beside the slab rather than silently overriding
-       it. */
+       render.
+
+       The C's panel reports lens.spotMm for the SELECTED subject, which is the
+       honest answer for one. This page has no selection, so it has no such row
+       and the rendered image is the only place the discrepancy shows -- which
+       it does, plainly, and a test pins it. Do not read this mark as a promise
+       about the corners. */
     const dist = -o.centre.z;
     const sharp = !!dofRes && dist >= nr && dist <= fr;
     sphereWire(s, o.centre, o.radius, sharp ? SUBJECT : OBJECT);

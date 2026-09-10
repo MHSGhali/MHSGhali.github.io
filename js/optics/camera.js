@@ -33,12 +33,12 @@
      The cos^4 falloff is DERIVED here, not applied. Nothing else in this
      program may multiply by a vignetting factor -- see lens.js. */
 
-import { PI } from "../light/core.js?v=6aaa6367";
-import * as v from "../light/vec3.js?v=6aaa6367";
-import * as R from "../light/rng.js?v=6aaa6367";
-import * as L from "./lens.js?v=6aaa6367";
-import * as PU from "./pupil.js?v=6aaa6367";
-import { pixelHash, lambdaPick } from "./spectral.js?v=6aaa6367";
+import { PI } from "../light/core.js?v=d88b88e5";
+import * as v from "../light/vec3.js?v=d88b88e5";
+import * as R from "../light/rng.js?v=d88b88e5";
+import * as L from "./lens.js?v=d88b88e5";
+import * as PU from "./pupil.js?v=d88b88e5";
+import { pixelHash, lambdaPick } from "./spectral.js?v=d88b88e5";
 
 const MM_PER_M = 1000.0;
 
@@ -59,10 +59,16 @@ export function build(design, eflMm, fno, sensorWMm, w, h) {
     pupil: null,
   };
   lookAt(c, v.v3(0, 0, 0), v.v3(0, 0, -1), v.v3(0, 1, 0));
-  refresh(c);
+  /* NO refresh here. The pupil cache costs ~74 000 lens traces, and every
+     caller changes the iris, the aperture or the focus immediately afterwards,
+     which invalidates it -- so building it now is a build thrown away. The
+     caller refreshes once, when the lens is finally the lens it wants. */
   return c;
 }
 
+/* Where the camera stands and what it points at. Note this does NOT invalidate
+   the pupil cache: the cache is a function of the lens and the sensor, and the
+   pose is neither. */
 export function lookAt(c, eye, target, upHint) {
   c.eye = eye;
   c.fwd = v.normalize(v.sub(target, eye));
@@ -154,9 +160,14 @@ export function sample(c, x, y, sampleIndex, rng, out) {
 /* World point to a pixel in the rendered image -- the paraxial inverse of the
    film mapping in sample(), including its two y flips and its x flip.
 
-   Paraxial, and only used to place overlays: a real trace would land a hair
-   away because the lens distorts, and an annotation being a pixel off matters
-   far less than it agreeing with where sample() would have put it.
+   Paraxial on purpose: a real trace would land a hair away because the lens
+   distorts, and anything drawn over the image matters less for being a pixel
+   out than for agreeing with where sample() put the thing underneath it.
+
+   Nothing on this page draws such an overlay yet -- the C uses it to annotate
+   the image view. Here its caller is the test that checks sample()'s three sign
+   flips, which is worth the function on its own: those flips are invisible
+   until something in the scene is not symmetric.
 
    Returns null for a point at or behind the front vertex, where no pixel
    corresponds to it. */

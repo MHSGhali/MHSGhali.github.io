@@ -96,10 +96,24 @@ export const OPTICS_PRESETS = [
 /* ------------------------------------------------------------- the grammar */
 
 /* Which table a domain's presets live in. One place, so adding a third tool
-   did not mean finding every `domain === "light"` and hoping. */
+   did not mean finding every `domain === "light"` and hoping.
+
+   The Ask page ("links") drives nothing, so it searches ALL of them: naming a
+   scene there is a request for a link to the tool that owns it, and which tool
+   that is is exactly what the tables know. It used to get the linkage table
+   only, which made links.js's light branch unreachable -- it checked
+   LIGHT_PRESETS for an id that could never have come from a light preset --
+   so "load the workcell" on the Ask page fell through to the model instead of
+   handing over the link it exists to hand over.
+
+   Safe because no id and no alias is shared between the three tables; a test
+   holds that. */
+export const ALL_PRESETS = [...LINKAGE_PRESETS, ...LIGHT_PRESETS, ...OPTICS_PRESETS];
+
 export function presetsFor(domain) {
   if (domain === "light") return LIGHT_PRESETS;
   if (domain === "optics") return OPTICS_PRESETS;
+  if (domain === "links") return ALL_PRESETS;
   return LINKAGE_PRESETS;
 }
 
@@ -462,12 +476,24 @@ function parseClause(text, domain) {
     else if (!asking && /\b(aps.?c|crop sensor)\b/i.test(raw)) cmds.push({ action: "sensor", value: 23.6 });
 
     /* --- the iris --- */
+    /* The CURVE is read first, because it decides whether a number near the
+       word "blade" is a count at all. "Set the blade curve to 0.5" otherwise
+       matched the loose count form on "blade ... 0" and came back as a request
+       for a ZERO-blade iris alongside the curve -- so rounding the blades of a
+       seven-blade iris silently threw the seven away. That form is a documented
+       line in the optics vocabulary, so the planner emits it verbatim. */
+    const curve = /\bblades?\b[^.]{0,16}?\b(?:curve|curvature|round\w*)\b[^.]{0,16}?(-?\d*\.?\d+)/i.exec(raw)
+               || /\b(?:curve|curvature|round\w*)\b[^.]{0,20}?\bblades?\b[^.]{0,16}?(-?\d*\.?\d+)/i.exec(raw);
+    if (curve && !asking) cmds.push({ action: "curvature", value: Number(curve[1]) });
+
     /* Nobody says "9 blades" out loud; they say "nine blades". */
     const BLADE_WORDS = { three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
                           nine: 9, ten: 10, eleven: 11, twelve: 12 };
     const bladeWord = new RegExp(`\\b(${Object.keys(BLADE_WORDS).join("|")})[\\s-]*blade`, "i").exec(raw);
+    /* The adjacent form ("7 blades", "7-blade") is unambiguous. The loose one
+       only runs when the sentence is not about the curve. */
     const blades = /(\d+)\s*(?:-|\s)?blade/i.exec(raw)
-                || /\bblades?\b[^.]{0,16}?(\d+)/i.exec(raw);
+                || (curve ? null : /\bblades?\b[^.]{0,16}?(\d+)/i.exec(raw));
     if (blades && !asking) cmds.push({ action: "blades", value: Number(blades[1]) });
     else if (bladeWord && !asking) {
       cmds.push({ action: "blades", value: BLADE_WORDS[bladeWord[1].toLowerCase()] });
@@ -475,8 +501,6 @@ function parseClause(text, domain) {
     else if (!asking && /\b(round|circular|perfect circle) (?:iris|aperture|blades?)\b/i.test(raw)) {
       cmds.push({ action: "blades", value: 0 });
     }
-    const curve = /\bblade\b[^.]{0,16}?\b(?:curve|curvature|round\w*)\b[^.]{0,16}?(-?\d*\.?\d+)/i.exec(raw);
-    if (curve && !asking) cmds.push({ action: "curvature", value: Number(curve[1]) });
 
     /* --- exposure ---
        A view gain, so it has no unit of its own; the word has to be there. */

@@ -13,15 +13,14 @@
      on how the scheduler happened to slice it, so a bug would reproduce only
      sometimes and a regression test could not exist at all. */
 
-import * as SD from "./scenedesc.js?v=6aaa6367";
-import * as CAM from "./camera.js?v=6aaa6367";
-import * as LENS from "./lens.js?v=6aaa6367";
-import * as FILM from "./film.js?v=6aaa6367";
-import * as T from "./trace.js?v=6aaa6367";
-import * as G from "./glass.js?v=6aaa6367";
-import { prescriptionName } from "./prescription.js?v=6aaa6367";
-import * as R from "../light/rng.js?v=6aaa6367";
-import { PI } from "../light/core.js?v=6aaa6367";
+import * as SD from "./scenedesc.js?v=d88b88e5";
+import * as CAM from "./camera.js?v=d88b88e5";
+import * as LENS from "./lens.js?v=d88b88e5";
+import * as FILM from "./film.js?v=d88b88e5";
+import * as T from "./trace.js?v=d88b88e5";
+import * as G from "./glass.js?v=d88b88e5";
+import * as R from "../light/rng.js?v=d88b88e5";
+import { PI } from "../light/core.js?v=d88b88e5";
 
 /* The same seed constant the light engine's grid uses. */
 const SEED = 0x2545f4914f6cdd1dn;
@@ -91,8 +90,9 @@ export function setup(s) {
   desc.ambientCctK = s.ambientCctK;
   const built = SD.build(desc);
 
+  /* No refresh after lookAt: the pupil cache depends on the lens and the
+     sensor, and a pose is neither. */
   CAM.lookAt(cam, desc.camEye, desc.camTarget, { x: 0, y: 1, z: 0 });
-  CAM.refresh(cam);
 
   return { cam, ...built, desc, width: w, height: h };
 }

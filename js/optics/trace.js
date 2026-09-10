@@ -22,15 +22,15 @@
      sampling the sky in addition -- is what keeps the estimator unbiased when
      both are present. */
 
-import { PI, TWO_PI } from "../light/core.js?v=6aaa6367";
-import * as v from "../light/vec3.js?v=6aaa6367";
-import * as S from "../light/spectrum.js?v=6aaa6367";
-import * as B from "../light/bsdf.js?v=6aaa6367";
-import * as L from "../light/light.js?v=6aaa6367";
-import * as R from "../light/rng.js?v=6aaa6367";
-import { intersect, occluded } from "../light/scene.js?v=6aaa6367";
-import { offsetOrigin, makeHit } from "../light/geom.js?v=6aaa6367";
-import { envRadiance } from "./scenedesc.js?v=6aaa6367";
+import { PI, TWO_PI } from "../light/core.js?v=d88b88e5";
+import * as v from "../light/vec3.js?v=d88b88e5";
+import * as S from "../light/spectrum.js?v=d88b88e5";
+import * as B from "../light/bsdf.js?v=d88b88e5";
+import * as L from "../light/light.js?v=d88b88e5";
+import * as R from "../light/rng.js?v=d88b88e5";
+import { intersect, occluded } from "../light/scene.js?v=d88b88e5";
+import { offsetOrigin, makeHit } from "../light/geom.js?v=d88b88e5";
+import { envRadiance } from "./scenedesc.js?v=d88b88e5";
 
 /* Power-2 MIS heuristic. Squaring sharpens the crossover between the two
    strategies, which is what suppresses the fireflies a balance heuristic leaves
@@ -86,7 +86,14 @@ export function radiance(sc, env, ray, lambdaNm, rng, maxDepth) {
 
   /* A dome at zero radiance is no dome. Dropping it from the strategy count
      here, rather than sampling it and adding zero, keeps the lamps-only
-     estimator exactly what it was before the sky existed. */
+     estimator exactly what it was before the sky existed.
+
+     Asked ONCE, with the camera ray's direction, and then held for the whole
+     path -- which is sound only because the dome is uniform, so the answer does
+     not depend on the direction it was asked about. envRadiance takes a
+     direction anyway, as the seam a gradient sky would arrive at; if one ever
+     does, this line has to become a per-vertex test or the strategy count will
+     be wrong for every bounce after the first. */
   const haveEnv = env && env.on && envRadiance(env, ray.d, lambdaNm) > 0;
   const nstrat = sc.lights.length + (haveEnv ? 1 : 0);
 
