@@ -15,11 +15,11 @@
    on it.
    --------------------------------------------------------------- */
 
-import { systemPrompt, toolPrompt, selectContext, triage, REFUSALS, SUGGESTIONS, TOOL_HELP } from "./profile.js?v=281bca3b";
-import { parse } from "./commands.js?v=281bca3b";
-import { planSystem, planRequest, validatePlan, repairPlan, looksLikeABuild } from "./plan.js?v=281bca3b";
-import * as engine from "./engine.js?v=281bca3b";
-import { render, streamInto, attachCopy, stripPreamble, stripRefusalTail, TRY, stripTry } from "./render.js?v=281bca3b";
+import { systemPrompt, toolPrompt, selectContext, triage, REFUSALS, SUGGESTIONS, TOOL_HELP } from "./profile.js?v=6aaa6367";
+import { parse } from "./commands.js?v=6aaa6367";
+import { planSystem, planRequest, validatePlan, repairPlan, looksLikeABuild } from "./plan.js?v=6aaa6367";
+import * as engine from "./engine.js?v=6aaa6367";
+import { render, streamInto, attachCopy, stripPreamble, stripRefusalTail, TRY, stripTry } from "./render.js?v=6aaa6367";
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -171,8 +171,9 @@ export function mountChat(host, { mode = "page", controller } = {}) {
       gate.appendChild(specs);
     } else {
       gate.append(el("p", null,
-        "I can drive this simulator right now, no model needed: try “load the "
-        + (domain === "light" ? "workcell" : "Hoeken") + "”. For questions in prose, load the "
+        "I can drive this simulator right now, no model needed: try “"
+        + ({ light: "load the workcell", optics: "stop down to f/16" }[domain] || "load the Hoeken")
+        + "”. For questions in prose, load the "
         + "language model into your browser (" + SIZE_NOTE + ")."));
     }
     const start = el("button", "btn btn-primary", "Load the model");

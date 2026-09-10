@@ -79,7 +79,29 @@ export const LIGHT_PRESETS = [
     aliases: ["sun", "sunlight", "daylight", "hard shadow", "directional source", "penumbra"] },
 ];
 
+/* The optics page fixes its scene, so a "preset" here is which arrangement is
+   in front of the camera rather than something to build. Two of them, and both
+   are asked for by what they show far more often than by name. */
+export const OPTICS_PRESETS = [
+  { id: "rail", name: "depth rail",
+    aliases: ["depth rail", "rail", "targets", "five spheres", "depth targets", "focus chart"],
+    does: /\b(depth of field|depth-of-field|what.{0,4}s in focus|how much is sharp|focus test|rack focus)\b/i,
+    because: "five identical targets at known distances, so the only difference between them in the image is how far out of focus they are" },
+  { id: "bokeh", name: "bokeh lights",
+    aliases: ["bokeh", "blur disc", "blur discs", "out of focus lights", "point lights", "highlights"],
+    does: /\b(bokeh|shape of the blur|blur shape|iris shape|aperture shape|what the iris looks like)\b/i,
+    because: "small bright sources against nothing, so a defocused one takes the shape of the iris" },
+];
+
 /* ------------------------------------------------------------- the grammar */
+
+/* Which table a domain's presets live in. One place, so adding a third tool
+   did not mean finding every `domain === "light"` and hoping. */
+export function presetsFor(domain) {
+  if (domain === "light") return LIGHT_PRESETS;
+  if (domain === "optics") return OPTICS_PRESETS;
+  return LINKAGE_PRESETS;
+}
 
 /* A word that means "put this on the screen". Without one of these a preset
    name is a QUESTION about that mechanism, not a request to load it: "what is
@@ -240,7 +262,7 @@ export function splitClauses(text, presets = []) {
 const ELIDED = /^(?:(?:and\s+)?(?:one|another|then)\b|\(?-?\d)/i;
 
 export function parse(text, domain) {
-  const clauses = splitClauses(text, domain === "light" ? LIGHT_PRESETS : LINKAGE_PRESETS);
+  const clauses = splitClauses(text, presetsFor(domain));
   if (clauses.length < 2) return parseClause(text, domain);
 
   const out = [];
@@ -270,7 +292,7 @@ function parseClause(text, domain) {
   if (DESCRIBE.test(raw)) return [{ action: "describe" }];
   if (HELP.test(raw) && !LOAD.test(raw)) return [{ action: "help" }];
 
-  const presets = domain === "light" ? LIGHT_PRESETS : LINKAGE_PRESETS;
+  const presets = presetsFor(domain);
   const hit = findPreset(raw, presets);
 
   /* A preset name loads it when the sentence asks for it, or when the message
@@ -380,6 +402,123 @@ function parseClause(text, domain) {
       else if (/\bpoint ?(?:light|lamp|source)?\b/i.test(raw)) cmds.push({ action: "addLight", kind: "point" });
       if (/\b(sphere|ball)\b/i.test(raw)) cmds.push({ action: "addPrim", kind: "sphere" });
       else if (/\b(quad|plate|panel surface|wall|board)\b/i.test(raw)) cmds.push({ action: "addPrim", kind: "quad" });
+    }
+  } else if (domain === "optics") {
+    /* Nothing here adds or deletes anything: the scene is fixed and the camera
+       is what a visitor changes. So every command is a SETTING, and the whole
+       branch is "which number did they mean".
+
+       Units carry the meaning, because a bare number cannot: 50 could be a
+       focal length, a sensor width or an exposure. Every rule below therefore
+       needs either a unit or a word naming the control, and a sentence with
+       neither is a question for the model. */
+
+    /* --- the lens design --- */
+    if (!asking) {
+      if (/\b(achromat|doublet|corrected|fraunhofer|cemented)\b/i.test(raw)) {
+        cmds.push({ action: "design", value: "achromat" });
+      } else if (/\b(singlet|single element|one element|uncorrected|bk7 alone)\b/i.test(raw)) {
+        cmds.push({ action: "design", value: "singlet" });
+      } else if (/\b(ideal|perfect lens|thin lens|aberration.?free|no aberration)\b/i.test(raw)) {
+        cmds.push({ action: "design", value: "thin" });
+      }
+    }
+
+    /* --- aperture ---
+       f/2.8, f2.8, "f 2.8", or the word with a number nearby. "Open up" and
+       "stop down" are the two things a photographer says without a number at
+       all, so they get a relative form. */
+    const fno = /\bf\s*[\/\\]?\s*(\d+(?:\.\d+)?)\b/i.exec(raw)
+             || (/\b(aperture|f.?stop|f.?number|stop)\b/i.test(raw)
+                 ? /(\d+(?:\.\d+)?)/.exec(raw) : null);
+    if (fno && !asking) cmds.push({ action: "aperture", value: Number(fno[1]) });
+    else if (!asking && /\b(open (?:it )?up|wide open|open the aperture|shallower)\b/i.test(raw)) {
+      cmds.push({ action: "aperture", stops: -1 });
+    } else if (!asking && /\b(stop (?:it )?down|close (?:it )?down|stop down|deeper)\b/i.test(raw)) {
+      cmds.push({ action: "aperture", stops: +1 });
+    }
+
+    /* --- focus ---
+       Metres, and only when the sentence is about focusing. "2 m" in a
+       sentence about a sensor is not a focus distance. */
+    const focusAt = /\b(?:focus(?:ed|ing)?|focal plane|sharp)\b[^.]{0,24}?(-?\d+(?:\.\d+)?)\s*(?:m\b|metres?|meters?)/i.exec(raw)
+                 || /(-?\d+(?:\.\d+)?)\s*(?:m\b|metres?|meters?)[^.]{0,16}?\b(?:focus|away|out|distance)\b/i.exec(raw);
+    if (focusAt && !asking) cmds.push({ action: "focus", value: Number(focusAt[1]) });
+    else if (!asking && /\bfocus\b[^.]{0,20}?\b(infinity|infinite|far away|the horizon)\b/i.test(raw)) {
+      cmds.push({ action: "focus", value: Infinity });
+    }
+
+    /* --- focal length ---
+       Millimetres, but so is the sensor, so the control has to be named. */
+    const focal = /\b(?:focal(?: length)?|lens|zoom)\b[^.]{0,24}?(\d+(?:\.\d+)?)\s*(?:mm\b|millimet\w*)/i.exec(raw)
+               || /(\d+(?:\.\d+)?)\s*(?:mm\b|millimet\w*)[^.]{0,16}?\b(?:lens|focal)\b/i.exec(raw);
+    if (focal && !asking) cmds.push({ action: "focal", value: Number(focal[1]) });
+
+    /* --- the sensor --- */
+    const sensor = /\b(?:sensor|film|format|frame)\b[^.]{0,24}?(\d+(?:\.\d+)?)\s*(?:mm\b|millimet\w*)/i.exec(raw)
+                || /(\d+(?:\.\d+)?)\s*(?:mm\b|millimet\w*)[^.]{0,16}?\b(?:sensor|film|format|frame)\b/i.exec(raw);
+    if (sensor && !asking) cmds.push({ action: "sensor", value: Number(sensor[1]) });
+    else if (!asking && /\bfull ?frame\b/i.test(raw)) cmds.push({ action: "sensor", value: 36 });
+    else if (!asking && /\b(aps.?c|crop sensor)\b/i.test(raw)) cmds.push({ action: "sensor", value: 23.6 });
+
+    /* --- the iris --- */
+    /* Nobody says "9 blades" out loud; they say "nine blades". */
+    const BLADE_WORDS = { three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+                          nine: 9, ten: 10, eleven: 11, twelve: 12 };
+    const bladeWord = new RegExp(`\\b(${Object.keys(BLADE_WORDS).join("|")})[\\s-]*blade`, "i").exec(raw);
+    const blades = /(\d+)\s*(?:-|\s)?blade/i.exec(raw)
+                || /\bblades?\b[^.]{0,16}?(\d+)/i.exec(raw);
+    if (blades && !asking) cmds.push({ action: "blades", value: Number(blades[1]) });
+    else if (bladeWord && !asking) {
+      cmds.push({ action: "blades", value: BLADE_WORDS[bladeWord[1].toLowerCase()] });
+    }
+    else if (!asking && /\b(round|circular|perfect circle) (?:iris|aperture|blades?)\b/i.test(raw)) {
+      cmds.push({ action: "blades", value: 0 });
+    }
+    const curve = /\bblade\b[^.]{0,16}?\b(?:curve|curvature|round\w*)\b[^.]{0,16}?(-?\d*\.?\d+)/i.exec(raw);
+    if (curve && !asking) cmds.push({ action: "curvature", value: Number(curve[1]) });
+
+    /* --- exposure ---
+       A view gain, so it has no unit of its own; the word has to be there. */
+    const exp = /\bexposure\b[^.]{0,20}?(-?\d*\.?\d+)/i.exec(raw)
+             || /(-?\d*\.?\d+)[^.]{0,12}?\bexposure\b/i.exec(raw);
+    if (exp && !asking) cmds.push({ action: "exposure", value: Number(exp[1]) });
+    else if (!asking && /\b(brighter|brighten|too dark)\b/i.test(raw)) cmds.push({ action: "exposure", factor: 2 });
+    else if (!asking && /\b(darker|darken|too bright|blown out|clipping)\b/i.test(raw)) cmds.push({ action: "exposure", factor: 0.5 });
+
+    /* --- the render grid --- */
+    const px = /(\d{2,4})\s*(?:px\b|pixels?\b)/i.exec(raw)
+            || /\b(?:render|resolution)\b[^.]{0,16}?(\d{2,4})/i.exec(raw);
+    if (px && !asking) cmds.push({ action: "resolution", value: Number(px[1]) });
+
+    /* --- lighting: a choice, not a blend ---
+
+       The sky's own settings are read FIRST, because they decide whether the
+       word "sky" meant "switch to it" or merely named the thing being adjusted.
+       "Set the sky to 5000 lx" is not a request to switch lighting mode, and
+       treating it as one produced two answers to one question: "the sky is
+       already lighting it" followed immediately by "sky at 5000 lx". */
+    const lux = /(\d+(?:\.\d+)?)\s*(?:lx\b|lux\b)/i.exec(raw);
+    const skyK = /(\d{3,5})\s*(?:k\b|kelvin)/i.exec(raw);
+    const adjustingTheSky = Boolean(lux || skyK);
+
+    if (!asking && !adjustingTheSky
+        && /\b(sky|dome|ambient|overcast|lightbox|light box|no shadows|shadowless)\b/i.test(raw)) {
+      cmds.push({ action: "lighting", value: "ambient" });
+    } else if (!asking && /\b(lamps?|key light|the panel|placed light|shadows back)\b/i.test(raw)) {
+      cmds.push({ action: "lighting", value: "lamps" });
+    }
+    if (lux && !asking) cmds.push({ action: "ambientLux", value: Number(lux[1]) });
+    if (skyK && !asking) cmds.push({ action: "skyColour", value: Number(skyK[1]) });
+
+    /* --- the sharpness criterion --- */
+    const coc = /\b(?:sharp if|circle of confusion|coc|blur limit)\b[^.]{0,20}?(-?\d*\.?\d+)/i.exec(raw);
+    if (coc && !asking) cmds.push({ action: "coc", value: Number(coc[1]) });
+
+    if (/\b(share|copy the link|link to this|permalink)\b/i.test(raw) && !asking) cmds.push({ action: "share" });
+    if (/\b(reset|start over|back to (?:the )?default)\b/i.test(raw) && !asking) cmds.push({ action: "reset" });
+    if (/\b(what is sharp|what.?s sharp|which (?:one|target|sphere) is sharp|read ?out|the numbers|depth of field now)\b/i.test(raw)) {
+      cmds.push({ action: "list" });
     }
   } else {
     /* --- a whole linkage of a named size ---------------------------
@@ -509,15 +648,22 @@ function parseClause(text, domain) {
     if (/\b(undo)\b/i.test(raw)) cmds.push({ action: "undo" });
   }
 
-  if (FIT.test(raw) && !asking) cmds.push({ action: "fit" });
+  /* "Full frame" is a sensor format, and FIT matches "frame". Without this the
+     one phrase every photographer uses for a 36 mm sensor also reframed the
+     3D view. */
+  if (FIT.test(raw) && !asking && !/\bfull ?frame\b/i.test(raw)) cmds.push({ action: "fit" });
 
   /* Run and pause go last: a preset load stops the simulation, so asking for
      both in one sentence has to end with the run.
 
-     Linkage only. The light solver has nothing to start or stop -- it re-solves
-     whenever the scene changes -- and its vocabulary overlaps: "move it to..."
-     would otherwise read as a request to run. */
-  if (domain !== "light") {
+     Linkage only, and named rather than excluded. It used to read
+     `domain !== "light"`, which was the same thing while there were two tools
+     and silently wrong the moment there were three: "stop down to f/16" came
+     back as an aperture change AND a request to pause a simulation the optics
+     page does not have. Neither the light solver nor the optics renderer has
+     anything to start or stop -- both re-render whenever something changes --
+     and both have vocabulary that collides ("move it to...", "stop down"). */
+  if (domain === "linkage") {
     if (PAUSE.test(raw) && !asking) cmds.push({ action: "pause" });
     else if (RUN.test(raw) && !asking && !/\brun(?:s|ning)? (?:in|on|entirely)\b/i.test(raw)) {
       /* "run" is also how people ask what a preset IS ("what does the quick

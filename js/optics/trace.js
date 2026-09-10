@@ -22,15 +22,15 @@
      sampling the sky in addition -- is what keeps the estimator unbiased when
      both are present. */
 
-import { PI, TWO_PI } from "../light/core.js?v=281bca3b";
-import * as v from "../light/vec3.js?v=281bca3b";
-import * as S from "../light/spectrum.js?v=281bca3b";
-import * as B from "../light/bsdf.js?v=281bca3b";
-import * as L from "../light/light.js?v=281bca3b";
-import * as R from "../light/rng.js?v=281bca3b";
-import { intersect, occluded } from "../light/scene.js?v=281bca3b";
-import { offsetOrigin, makeHit } from "../light/geom.js?v=281bca3b";
-import { envRadiance } from "./scenedesc.js?v=281bca3b";
+import { PI, TWO_PI } from "../light/core.js?v=6aaa6367";
+import * as v from "../light/vec3.js?v=6aaa6367";
+import * as S from "../light/spectrum.js?v=6aaa6367";
+import * as B from "../light/bsdf.js?v=6aaa6367";
+import * as L from "../light/light.js?v=6aaa6367";
+import * as R from "../light/rng.js?v=6aaa6367";
+import { intersect, occluded } from "../light/scene.js?v=6aaa6367";
+import { offsetOrigin, makeHit } from "../light/geom.js?v=6aaa6367";
+import { envRadiance } from "./scenedesc.js?v=6aaa6367";
 
 /* Power-2 MIS heuristic. Squaring sharpens the crossover between the two
    strategies, which is what suppresses the fireflies a balance heuristic leaves

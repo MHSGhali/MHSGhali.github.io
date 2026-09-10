@@ -21,8 +21,9 @@ import { triage, toolPrompt, systemPrompt, selectContext } from "../js/chat/prof
 import { planSystem } from "../js/chat/plan.js";
 import * as linkage from "../js/linkage/knowledge.js";
 import * as light from "../js/light/knowledge.js";
+import * as optics from "../js/optics/knowledge.js";
 
-const TOOLS = [["linkage", linkage], ["light", light]];
+const TOOLS = [["linkage", linkage], ["light", light], ["optics", optics]];
 
 /* A vocabulary line is written with placeholders. Fill them with values a
    visitor would actually use. */
@@ -32,7 +33,10 @@ function fill(form) {
     .replace(/<a>/g, "1").replace(/<b>/g, "2").replace(/<n>/g, "2")
     .replace(/<lumens>/g, "400").replace(/<kelvin>/g, "2700")
     .replace(/<degrees>/g, "25").replace(/<albedo>/g, "0.8")
-    .replace(/<metres>/g, "0.05");
+    .replace(/<metres>/g, "0.05")
+    .replace(/<focal>/g, "85").replace(/<fno>/g, "2.8").replace(/<blades>/g, "7")
+    .replace(/<curve>/g, "0.5").replace(/<sensor>/g, "24").replace(/<pixels>/g, "480")
+    .replace(/<exposure>/g, "40").replace(/<lux>/g, "5000");
 }
 
 /* ----------------------------------------------------- prompt against code */
@@ -57,6 +61,7 @@ test("every suggestion a refusal can offer is runnable", () => {
     linkage: ["stop", "select all", "select link 1", "put a motor on it",
               "anchor joint 3", "unanchor joint 3"],
     light: ["select lamp 1"],
+    optics: ["switch to the sky"],
   };
   for (const [domain, says] of Object.entries(suggestions)) {
     for (const say of says) {
@@ -86,6 +91,19 @@ test("the capability list names every starter the tool ships", async () => {
   for (const p of scenes.PRESETS) {
     assert.ok(light.CAPABILITY_TEXT.toLowerCase().includes(distinctive(p.name)),
       `the light capabilities never mention ${p.name}`);
+  }
+
+  /* The optics page's "presets" are the two arrangements in front of the
+     camera, and the lens designs are the other thing the menu offers. */
+  const sd = await import("../js/optics/scenedesc.js");
+  for (const id of sd.PRESETS) {
+    assert.ok(optics.CAPABILITY_TEXT.toLowerCase().includes(sd.PRESET_NAMES[id].toLowerCase()),
+      `the optics capabilities never mention the ${sd.PRESET_NAMES[id]} scene`);
+  }
+  const pr = await import("../js/optics/prescription.js");
+  for (const id of pr.IDS) {
+    assert.ok(optics.CAPABILITY_TEXT.toLowerCase().includes(pr.NAMES[id].toLowerCase()),
+      `the optics capabilities never mention the ${pr.NAMES[id]} design`);
   }
 });
 
@@ -359,13 +377,19 @@ test("the role is instructions, not subject matter", () => {
   for (const w of ["lamp", "albedo", "refraction", "caustics", "lumens"]) {
     assert.ok(light.TERMS.has(w), `the gate should recognise "${w}"`);
   }
+  assert.equal(optics.TERMS.has("write"), false);
+  for (const w of ["aperture", "bokeh", "achromat", "vignetting", "pupil", "hyperfocal"]) {
+    assert.ok(optics.TERMS.has(w), `the gate should recognise "${w}"`);
+  }
 });
 
 test("the chat page is unchanged, and nothing lets an off-topic question in", () => {
   /* No knowledge module there, so the resume answers and the old gate holds. */
   assert.equal(triage("can it do gears?", {}).kind, "off-topic");
   assert.equal(triage("what does mark do at tesla", {}).subject, "mark");
-  for (const opts of [{}, { domain: "linkage", knowledge: linkage }, { domain: "light", knowledge: light }]) {
+  for (const opts of [{}, { domain: "linkage", knowledge: linkage },
+                      { domain: "light", knowledge: light },
+                      { domain: "optics", knowledge: optics }]) {
     assert.equal(triage("who wrote don quixote", opts).kind, "off-topic");
     assert.equal(triage("what is 2 + 2", opts).kind, "off-topic");
   }
@@ -381,7 +405,7 @@ test("the chat module does not know what a coupler is", () => {
   for (const name of readdirSync("js/chat")) {
     if (!name.endsWith(".js")) continue;
     const src = readFileSync(`js/chat/${name}`, "utf8");
-    const bad = src.match(/from\s+["']\.\.\/(?:linkage|light)\//g);
+    const bad = src.match(/from\s+["']\.\.\/(?:linkage|light|optics)\//g);
     assert.equal(bad, null, `js/chat/${name} imports a simulator: ${bad}`);
   }
 });
@@ -394,4 +418,105 @@ test("the planner is composed from the tool's own document", () => {
   for (const form of linkage.VOCABULARY) assert.ok(sys.includes(form), `missing "${form}"`);
   assert.ok(sys.includes("PLACE EVERY JOINT FIRST"), "the procedure comes with it");
   assert.ok(planSystem(light).includes("load the workcell"));
+
+  const optSys = planSystem(optics);
+  assert.match(optSys, /optics simulator/i,
+    "the compiler must know which tool it is compiling for");
+  for (const form of optics.VOCABULARY) assert.ok(optSys.includes(form), `missing "${form}"`);
+  assert.ok(optSys.includes("The scene is fixed"), "the procedure comes with it");
+});
+
+/* ------------------------------------------------------------------ optics */
+
+test("the optics grammar does not reach for controls the page does not have", () => {
+  /* The run/pause branch used to be guarded by `domain !== "light"`, which was
+     the same thing as "linkage" while there were two tools and quietly wrong
+     the moment there were three: "stop down to f/16" came back as an aperture
+     change AND a request to pause a simulation that does not exist. */
+  for (const said of ["stop down to f/16", "stop down", "open it up", "focus at 3 m"]) {
+    const cmds = parse(said, "optics");
+    assert.ok(cmds.length, `"${said}" matched nothing`);
+    for (const c of cmds) {
+      assert.ok(!["run", "pause", "undo", "speed", "addJoint"].includes(c.action),
+        `"${said}" produced a ${c.action}, which the optics page cannot do`);
+    }
+  }
+  /* And the linkage still runs and pauses. */
+  assert.equal(parse("run it", "linkage")[0].action, "run");
+  assert.equal(parse("stop", "linkage")[0].action, "pause");
+});
+
+test("a bare number is never mistaken for a setting", () => {
+  /* Every optics control is a number, and several share a unit, so a value
+     with nothing naming it has to fall through to the model rather than land
+     on whichever rule happens to be checked first. */
+  for (const said of ["50", "what about 50", "2.8", "tell me about 100 mm"]) {
+    const cmds = parse(said, "optics").filter((c) => c.action !== "describe" && c.action !== "help");
+    assert.equal(cmds.length, 0, `"${said}" should not have set anything, got ${JSON.stringify(cmds)}`);
+  }
+  /* But the same numbers with their control named do land. */
+  assert.equal(parse("set the focal length to 50 mm", "optics")[0].action, "focal");
+  assert.equal(parse("make the sensor 50 mm", "optics")[0].action, "sensor");
+});
+
+test("the two units that collide are told apart by the control they name", () => {
+  /* Focal length and sensor width are both millimetres. Getting these the wrong
+     way round silently reframes the picture. */
+  const focal = parse("set the focal length to 85 mm", "optics")[0];
+  assert.equal(focal.action, "focal");
+  assert.equal(focal.value, 85);
+  const sensor = parse("make the sensor 24 mm", "optics")[0];
+  assert.equal(sensor.action, "sensor");
+  assert.equal(sensor.value, 24);
+  /* "Full frame" is a sensor size, and FIT matches the word "frame". */
+  const ff = parse("full frame", "optics");
+  assert.deepEqual(ff, [{ action: "sensor", value: 36 }]);
+});
+
+test("adjusting the sky is not the same as switching to it", () => {
+  /* The word "sky" names both the lighting mode and the thing being adjusted.
+     Firing both rules gave two answers to one question: "the sky is already
+     lighting it", then "sky at 5000 lx". */
+  assert.deepEqual(parse("set the sky to 5000 lx", "optics"),
+    [{ action: "ambientLux", value: 5000 }]);
+  assert.deepEqual(parse("make the sky 5600 K", "optics"),
+    [{ action: "skyColour", value: 5600 }]);
+  /* Naming it with no value is still a request to switch. */
+  assert.deepEqual(parse("switch to the sky", "optics"),
+    [{ action: "lighting", value: "ambient" }]);
+  assert.deepEqual(parse("switch to the lamps", "optics"),
+    [{ action: "lighting", value: "lamps" }]);
+});
+
+test("a question about a control is not an instruction to change it", () => {
+  for (const said of ["what does the aperture do", "how do I focus closer",
+                      "why is the sky brighter", "what is an achromat"]) {
+    const cmds = parse(said, "optics").filter((c) => c.action !== "describe" && c.action !== "help");
+    assert.equal(cmds.length, 0, `"${said}" should reach the model, got ${JSON.stringify(cmds)}`);
+  }
+});
+
+test("the optics state block stays small however much is on screen", () => {
+  const s = optics.formatState({
+    scene: "RAIL", lighting: "AMBIENT", ambientLux: 2000, ambientCctK: 6500,
+    design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2, blades: 9, curvature: 0.5,
+    sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03, spp: 412,
+    derived: { eflMm: 100, hfovDeg: 20.41, pupilMm: 20, tstop: 5.26, colourErrPct: -0.058,
+               nearM: 1.94, farM: 2.06, hyperfocalM: 66.77, coversMm: 20.07, coveredMm: 43.25,
+               fNumber: 5 },
+    targets: Array.from({ length: 40 }, (_, i) => ({ label: `T${i}`, depthM: i, sharp: i === 2 })),
+  });
+  assert.ok(s.startsWith("<state>") && s.trimEnd().endsWith("</state>"));
+  assert.ok(s.length < 900, `the state block is ${s.length} characters`);
+  assert.match(s, /f\/5/, "the aperture has to be in there");
+});
+
+test("an unbuilt lens says so rather than inventing numbers", () => {
+  const s = optics.formatState({
+    scene: "RAIL", lighting: "LAMPS", design: "ACHROMAT", focalMm: 100, fno: 5, focusM: 2,
+    blades: 0, curvature: 0, sensorWMm: 36, resW: 320, exposure: 100, cocLimitMm: 0.03,
+    derived: null, spp: 0, targets: [],
+  });
+  assert.match(s, /has not been built yet/);
+  assert.ok(!/NaN|undefined/.test(s), `the state block leaked a placeholder: ${s}`);
 });

@@ -20,9 +20,9 @@
    `rgb` is transferred, not copied. `gen` rises with each request; a result
    carrying a stale gen is ignored by the page and abandoned here. */
 
-import * as FILM from "./film.js?v=281bca3b";
-import { setup, renderRows, derivedOf } from "./render.js?v=281bca3b";
-import { prescriptionName } from "./prescription.js?v=281bca3b";
+import * as FILM from "./film.js?v=6aaa6367";
+import { setup, renderRows, derivedOf } from "./render.js?v=6aaa6367";
+import { prescriptionName } from "./prescription.js?v=6aaa6367";
 
 let gen = 0;
 /* Kept between messages so an exposure change can re-tonemap without tracing a
@@ -60,7 +60,7 @@ self.onmessage = async (e) => {
 
     postMessage({
       type: "built", gen: myGen,
-      derived: derivedOf(st.cam, s.cocLimitMm),
+      derived: derivedOf(st.cam.lens, st.cam.sensorWMm, st.cam.sensorHMm, s.cocLimitMm),
       width: st.width, height: st.height,
       markers: st.markers,
       lamps: st.lamps.map((l) => ({

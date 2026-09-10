@@ -154,12 +154,14 @@ and sharpness criterion, plus the choice between the placed area lamp and a
 uniform overhead sky. Sampling is not a control — how many rays it takes to
 answer is the program's problem, not the visitor's.
 
+The assistant panel drives all of it without the model; see below.
+
 ## The assistant
 
 `pages/chat.html` runs a small quantized language model inside the visitor's own
 browser: the weights stream from a CDN once, compile to WebGPU shaders, and
 execute on their GPU. There is no server, no API key and no request to anything
-of mine. It answers questions about my background, and on the two simulator
+of mine. It answers questions about my background, and on the three simulator
 pages the same panel drives the tools.
 
 On the simulator pages it reaches **every control those tools have**, and a few
@@ -169,6 +171,13 @@ them", "anchor it", "select link 1", "put a motor on it", "run it"), or pick a
 lamp out of a light scene and set its flux, colour temperature, cone and
 position by name. The canvas numbers nothing, so the panel reads the joints and
 the lamps out with numbers, and those numbers are what it takes back.
+
+On the optics page the scene is fixed, so there is nothing to build and the
+whole vocabulary is the camera: "stop down to f/16", "open it up", "focus at
+5 metres", "use the singlet", "nine blades", "switch to the sky". It answers
+with the numbers the lens actually produced rather than the ones that were
+asked for — request f/2.8 on a design that is wide open at f/5 and it says so,
+with the entrance pupil that really exists.
 
 Two things it does without the model at all, because neither is a matter of
 judgement. **A starter can be asked for by what it does**: "create a mechanism
@@ -189,8 +198,8 @@ and twice 0.62 leaves a quarter again of slack at full stretch. A test runs
 every size through a full revolution against the real solver and checks the
 mobility comes out at one, which is the only check here that means anything.
 
-Each simulator carries its own **knowledge document** — `js/linkage/knowledge.js`
-and `js/light/knowledge.js` — an XML-tagged file holding what the tool can do,
+Each simulator carries its own **knowledge document** — `js/linkage/knowledge.js`,
+`js/light/knowledge.js` and `js/optics/knowledge.js` — an XML-tagged file holding what the tool can do,
 what it cannot, and the rules it enforces, with the live state of the tool
 injected as a `<state>` block on every turn. One document serves the planner,
 the help text and prose answers, so those three can no longer drift apart, and

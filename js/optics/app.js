@@ -9,11 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=281bca3b";
-import * as SD from "./scenedesc.js?v=281bca3b";
-import * as S3 from "./scene3d.js?v=281bca3b";
-import * as LENS from "./lens.js?v=281bca3b";
-import { createView } from "./view3d.js?v=281bca3b";
+import * as ST from "./settings.js?v=6aaa6367";
+import * as SD from "./scenedesc.js?v=6aaa6367";
+import * as S3 from "./scene3d.js?v=6aaa6367";
+import * as LENS from "./lens.js?v=6aaa6367";
+import { createView } from "./view3d.js?v=6aaa6367";
+import { derivedOf } from "./render.js?v=6aaa6367";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -38,6 +39,7 @@ let view = null;
 let worker = null;
 let gen = 0;
 let derived = null;
+let markers = [];
 let lensForDiagram = null;
 let renderTimer = 0;
 let passesSeen = 0;
@@ -72,7 +74,11 @@ function onWorkerMessage(msg) {
   }
 
   if (msg.type === "built") {
-    derived = msg.derived;
+    /* Deliberately NOT taking msg.derived: rebuildDiagram already computed the
+       same numbers from the same settings, synchronously, and this message
+       arrives a render behind the control that caused it. The markers are the
+       part only the worker knows. */
+    markers = msg.markers || [];
     statusMsg.textContent = "";
     statusMsg.classList.remove("warn");
     imageCanvas.width = msg.width;
@@ -153,6 +159,17 @@ function rebuildDiagram() {
   lensForDiagram = lens;
 
   const sensorH = (settings.sensorWMm * ST.resH(settings.resW)) / settings.resW;
+
+  /* The readouts come from the SAME lens the diagram is about to be drawn from,
+     right now, rather than from whatever the worker last sent back. The worker
+     agrees -- it calls the same function on the same settings -- but it does so
+     a render later, and a number that lags a control by a render is a number
+     that is wrong every time anyone reads it immediately after changing
+     something. */
+  derived = lens ? derivedOf(lens, settings.sensorWMm, sensorH, settings.cocLimitMm) : null;
+  renderDerived();
+  updateStatus();
+
   const diagram = S3.build(desc, lens, settings.sensorWMm, sensorH, settings.cocLimitMm);
   if (view && !view.failed) view.setDiagram(diagram);
 }
@@ -171,7 +188,8 @@ function commit(id, value) {
 
   if (ST.imageDiffers(before, settings)) requestRender();
   else if (before.exposure !== settings.exposure) requestExpose();
-  else renderDerived();   /* the sharpness criterion moved the numbers only */
+  /* Anything else -- the sharpness criterion -- moved only the derived
+     numbers, and rebuildDiagram has already refreshed them. */
 }
 
 /* Scrolling the page must not edit the camera.
@@ -381,7 +399,7 @@ async function start() {
   if (window.innerWidth < 700) settings.resW = 192;
 
   buildPanel();
-  renderDerived();
+  rebuildDiagram();     /* fills in the readouts before the first render lands */
   updateStatus();
 
   worker = startWorker();
@@ -413,6 +431,52 @@ async function start() {
     rebuildDiagram();
     requestRender(0);
   });
+}
+
+/* ---- the assistant ----
+
+   Everything it can do goes through commit(), which is the same path a typed
+   number takes. So a command cannot reach a state the panel could not, and the
+   panel's values stay the single source of truth for what is on screen. */
+const assistantApi = {
+  settings: () => ({ ...settings }),
+  derived: () => derived,
+  spp: () => passesSeen,
+
+  /* The rail's targets with the depth-of-field verdict the scene view drew, so
+     the assistant and the diagram cannot disagree about which one is sharp. */
+  targets() {
+    if (!lensForDiagram || !markers.length) return [];
+    const d = LENS.dof(lensForDiagram, settings.cocLimitMm);
+    return markers.map((m) => ({
+      label: m.label,
+      depthM: m.depthM,
+      sharp: !!d && m.depthM >= d.near && m.depthM <= d.far,
+    }));
+  },
+
+  /* Returns true when the value actually moved -- the assistant says "already
+     f/5" rather than claiming a change that did not happen. */
+  set(id, value) {
+    const before = settings[id];
+    commit(id, value);
+    return settings[id] !== before;
+  },
+
+  fit() { if (view && !view.failed) view.frame(); },
+  share() { $("#btn-share").click(); },
+  reset() { $("#btn-reset").click(); },
+};
+
+const assistantHost = $("#assistant");
+if (assistantHost) {
+  import("./assistant.js?v=6aaa6367")
+    .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
+    .catch((err) => {
+      console.warn("optics assistant:", err);
+      const shell = assistantHost.closest(".assistant-shell") || assistantHost;
+      shell.remove();
+    });
 }
 
 start().catch((err) => {

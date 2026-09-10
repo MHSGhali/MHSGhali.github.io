@@ -1,4 +1,4 @@
-import { makeRetriever, MARKDOWN } from "./retrieve.js?v=281bca3b";
+import { makeRetriever, MARKDOWN } from "./retrieve.js?v=6aaa6367";
 
 /* ---------------------------------------------------------------
    Everything the in-browser model is told about Mark, and the rules
@@ -173,12 +173,13 @@ export const TOOL_HELP = {
 };
 
 export function systemPrompt(mode, context = PROFILE) {
-  const here = mode === "linkage"
-    ? "\nYou are on the linkage simulator page, and the visitor can see the mechanism next to you."
-    : mode === "light"
-      ? "\nYou are on the light simulator page, and the visitor can see the scene next to you."
-      : "";
-  return `You are the assistant on Mark Gerges's personal website. You answer questions from visitors (recruiters, engineers, collaborators, and the curious) about Mark's background, experience, projects and skills, and about the two simulators on this site.
+  const HERE = {
+    linkage: "\nYou are on the linkage simulator page, and the visitor can see the mechanism next to you.",
+    light: "\nYou are on the light simulator page, and the visitor can see the scene next to you.",
+    optics: "\nYou are on the optics simulator page, and the visitor can see the camera's scene and the photograph it took next to you.",
+  };
+  const here = HERE[mode] || "";
+  return `You are the assistant on Mark Gerges's personal website. You answer questions from visitors (recruiters, engineers, collaborators, and the curious) about Mark's background, experience, projects and skills, and about the three simulators on this site.
 
 You are running entirely inside the visitor's browser, on their own GPU. Nothing they type leaves their machine.${here}
 
@@ -257,6 +258,14 @@ export const SUGGESTIONS = {
     "Select lamp 1 and make it 2700 K",
     "Turn off interreflection",
     "What does it read?",
+    "What can you do?",
+  ],
+  optics: [
+    "Stop down to f/16",
+    "Focus at 5 metres",
+    "Use the singlet",
+    "Switch to the sky",
+    "What is sharp?",
     "What can you do?",
   ],
 };

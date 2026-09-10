@@ -13,15 +13,15 @@
      on how the scheduler happened to slice it, so a bug would reproduce only
      sometimes and a regression test could not exist at all. */
 
-import * as SD from "./scenedesc.js?v=281bca3b";
-import * as CAM from "./camera.js?v=281bca3b";
-import * as LENS from "./lens.js?v=281bca3b";
-import * as FILM from "./film.js?v=281bca3b";
-import * as T from "./trace.js?v=281bca3b";
-import * as G from "./glass.js?v=281bca3b";
-import { prescriptionName } from "./prescription.js?v=281bca3b";
-import * as R from "../light/rng.js?v=281bca3b";
-import { PI } from "../light/core.js?v=281bca3b";
+import * as SD from "./scenedesc.js?v=6aaa6367";
+import * as CAM from "./camera.js?v=6aaa6367";
+import * as LENS from "./lens.js?v=6aaa6367";
+import * as FILM from "./film.js?v=6aaa6367";
+import * as T from "./trace.js?v=6aaa6367";
+import * as G from "./glass.js?v=6aaa6367";
+import { prescriptionName } from "./prescription.js?v=6aaa6367";
+import * as R from "../light/rng.js?v=6aaa6367";
+import { PI } from "../light/core.js?v=6aaa6367";
 
 /* The same seed constant the light engine's grid uses. */
 const SEED = 0x2545f4914f6cdd1dn;
@@ -33,17 +33,21 @@ export function resH(resW) {
   return h < 2 ? 2 : h;
 }
 
-/* Everything the panel reports but does not set. Computed once per build, from
-   the same lens the renderer is about to use -- so a number on screen cannot
-   disagree with the picture beside it. */
-export function derivedOf(cam, cocLimitMm) {
-  const L = cam.lens;
-  const diag = Math.sqrt(cam.sensorWMm ** 2 + cam.sensorHMm ** 2);
+/* Everything the panel reports but does not set, from the LENS rather than from
+   a built camera.
+
+   Taking the lens directly is what lets the page compute these synchronously,
+   the instant a control moves, instead of waiting for the worker to build a
+   camera and send them back. That wait was long enough to be wrong about:
+   the assistant read the previous render's numbers and told a visitor who had
+   just stopped down to f/16 that f/16 was wider than the design opens. */
+export function derivedOf(L, sensorWMm, sensorHMm, cocLimitMm) {
+  const diag = Math.sqrt(sensorWMm ** 2 + sensorHMm ** 2);
   const d = LENS.dof(L, cocLimitMm) || { near: 0, far: Infinity };
   return {
     name: L.name,
     eflMm: L.eflMm,
-    hfovDeg: CAM.hfovDeg(cam),
+    hfovDeg: (2 * Math.atan2(sensorWMm * 0.5, L.eflMm) * 180) / PI,
     pupilMm: 2 * L.epSemiApMm,
     /* The f-stop / T-stop gap: real transmitted light, not geometry. */
     tstop: L.fNumber / Math.sqrt(LENS.transmittance(L, G.LINE_D)),

@@ -1088,7 +1088,7 @@ test("the render height follows the sensor and never degenerates", () => {
 test("the derived readouts are finite and agree with the lens they came from", () => {
   const s = baseSettings();
   const st = setup(s);
-  const d = derivedOf(st.cam, s.cocLimitMm);
+  const d = derivedOf(st.cam.lens, st.cam.sensorWMm, st.cam.sensorHMm, s.cocLimitMm);
   near(d.eflMm, st.cam.lens.eflMm, 1e-12, "focal length");
   near(d.fNumber, st.cam.lens.fNumber, 1e-12, "f-number");
   near(d.hfovDeg, CAM.hfovDeg(st.cam), 1e-12, "field of view");
