@@ -14,7 +14,7 @@
       That is what makes a ternary-or-larger link (a plate, not a bar) rigid:
       every internal distance is held, not just consecutive ones. */
 
-import * as v from "./vec2.js?v=d88b88e5";
+import * as v from "./vec2.js?v=901aad0b";
 
 /* Condensed upper-triangular pair index for i<j among k items (0-indexed). */
 export function pairIndex(i, j, k) {

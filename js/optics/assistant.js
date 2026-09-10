@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=d88b88e5";
-import * as knowledge from "./knowledge.js?v=d88b88e5";
-import * as SD from "./scenedesc.js?v=d88b88e5";
-import * as P from "./prescription.js?v=d88b88e5";
+import { mountChat } from "../chat/ui.js?v=901aad0b";
+import * as knowledge from "./knowledge.js?v=901aad0b";
+import * as SD from "./scenedesc.js?v=901aad0b";
+import * as P from "./prescription.js?v=901aad0b";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -102,11 +102,26 @@ export function mountAssistant(host, api) {
             : ".");
         }
 
+        case "focal": {
+          /* A relative step is a third of the way between the classic focal
+             lengths, which is roughly how a zoom ring feels. */
+          const want = cmd.stops !== undefined
+            ? s.focalMm * Math.pow(1.5, cmd.stops)
+            : cmd.value;
+          if (!put("focalMm", want)) return `Already a ${r2(s.focalMm)} mm lens.`;
+          const d = api.derived();
+          return `Rescaled the design to ${r2(api.settings().focalMm)} mm`
+            + (d ? `, which is ${r2(d.hfovDeg)}° across the frame.` : ".")
+            + " Every length in the prescription scales together, so the f-number is unchanged.";
+        }
+
         case "focus": {
           /* Infinity is a real answer to "focus where", but the control is a
              finite number: 1000 m is the far end and is past hyperfocal for
              every design here, so it IS infinity as far as the picture goes. */
-          const want = Number.isFinite(cmd.value) ? cmd.value : 1000;
+          const want = cmd.stops !== undefined
+            ? s.focusM * Math.pow(1.6, cmd.stops)
+            : Number.isFinite(cmd.value) ? cmd.value : 1000;
           if (!put("focusM", want)) return `Already focused at ${r2(s.focusM)} m.`;
           const now = api.settings().focusM;
           if (Math.abs(now - want) > 1e-9) {
@@ -118,14 +133,6 @@ export function mountAssistant(host, api) {
           return `Focused at ${r2(now)} m.`
             + (d ? ` Sharp on the axis from ${r2(d.nearM)} to ${r2(d.farM)} m.` : "")
             + (sharp.length ? ` That puts ${sharp.join(" and ")} inside it.` : "");
-        }
-
-        case "focal": {
-          if (!put("focalMm", cmd.value)) return `Already a ${r2(s.focalMm)} mm lens.`;
-          const d = api.derived();
-          return `Rescaled the design to ${r2(api.settings().focalMm)} mm`
-            + (d ? `, which is ${r2(d.hfovDeg)}° across the frame.` : ".")
-            + " Every length in the prescription scales together, so the f-number is unchanged.";
         }
 
         case "sensor": {

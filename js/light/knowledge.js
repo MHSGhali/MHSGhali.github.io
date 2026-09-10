@@ -14,7 +14,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=d88b88e5";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=901aad0b";
 
 export const VOCABULARY = [
   "load the workcell",

@@ -85,7 +85,13 @@ export const LIGHT_PRESETS = [
 export const OPTICS_PRESETS = [
   { id: "rail", name: "depth rail",
     aliases: ["depth rail", "rail", "targets", "five spheres", "depth targets", "focus chart"],
-    does: /\b(depth of field|depth-of-field|what.{0,4}s in focus|how much is sharp|focus test|rack focus)\b/i,
+    /* "Depth of field" on its own is what people call the APERTURE. "Make the
+       depth of field shallower" and "I want more depth of field" are both
+       instructions about f-number, and matching them as a request for this
+       SCENE loaded a preset nobody asked for -- and, in the second case, was
+       the only thing that happened, so the aperture never moved at all. So the
+       phrase only names the scene when a looking-at verb comes with it. */
+    does: /\b(?:see|show|showing|shows|demonstrat\w*|illustrat\w*|look at|compare)\b[^.]{0,28}?\b(?:depth of field|depth-of-field|focus)\b|\b(?:focus test|focus chart|rack focus|how much is sharp|what.{0,4}s in focus)\b/i,
     because: "five identical targets at known distances, so the only difference between them in the image is how far out of focus they are" },
   { id: "bokeh", name: "bokeh lights",
     aliases: ["bokeh", "blur disc", "blur discs", "out of focus lights", "point lights", "highlights"],
@@ -445,10 +451,15 @@ function parseClause(text, domain) {
     const fno = /\bf\s*[\/\\]?\s*(\d+(?:\.\d+)?)\b/i.exec(raw)
              || (/\b(aperture|f.?stop|f.?number|stop)\b/i.test(raw)
                  ? /(\d+(?:\.\d+)?)/.exec(raw) : null);
+    /* "Depth of field" is the thing people ask for by name when they mean the
+       aperture, so more of it stops down and less of it opens up. */
+    const moreDof = /\b(?:more|deeper|greater|increase\w*|extend\w*)\b[^.]{0,16}?\bdepth[- ]of[- ]field\b|\bdepth[- ]of[- ]field\b[^.]{0,16}?\b(?:deeper|larger)\b/i.test(raw);
+    const lessDof = /\b(?:less|shallow\w*|narrow\w*|reduce\w*|decrease\w*)\b[^.]{0,16}?\bdepth[- ]of[- ]field\b|\bdepth[- ]of[- ]field\b[^.]{0,16}?\bshallow\w*\b/i.test(raw);
+
     if (fno && !asking) cmds.push({ action: "aperture", value: Number(fno[1]) });
-    else if (!asking && /\b(open (?:it )?up|wide open|open the aperture|shallower)\b/i.test(raw)) {
+    else if (!asking && (lessDof || /\b(open (?:it )?up|wide open|open the aperture|shallower)\b/i.test(raw))) {
       cmds.push({ action: "aperture", stops: -1 });
-    } else if (!asking && /\b(stop (?:it )?down|close (?:it )?down|stop down|deeper)\b/i.test(raw)) {
+    } else if (!asking && (moreDof || /\b(stop (?:it )?down|close (?:it )?down|stop down|deeper)\b/i.test(raw))) {
       cmds.push({ action: "aperture", stops: +1 });
     }
 
@@ -458,8 +469,14 @@ function parseClause(text, domain) {
     const focusAt = /\b(?:focus(?:ed|ing)?|focal plane|sharp)\b[^.]{0,24}?(-?\d+(?:\.\d+)?)\s*(?:m\b|metres?|meters?)/i.exec(raw)
                  || /(-?\d+(?:\.\d+)?)\s*(?:m\b|metres?|meters?)[^.]{0,16}?\b(?:focus|away|out|distance)\b/i.exec(raw);
     if (focusAt && !asking) cmds.push({ action: "focus", value: Number(focusAt[1]) });
-    else if (!asking && /\bfocus\b[^.]{0,20}?\b(infinity|infinite|far away|the horizon)\b/i.test(raw)) {
+    else if (!asking && /\bfocus\b[^.]{0,20}?\b(infinity|infinite|the horizon)\b/i.test(raw)) {
       cmds.push({ action: "focus", value: Infinity });
+    }
+    /* Racking without a number. */
+    else if (!asking && /\b(focus closer|focus nearer|nearer focus|closer focus|rack.{0,8}in)\b/i.test(raw)) {
+      cmds.push({ action: "focus", stops: -1 });
+    } else if (!asking && /\b(focus further|focus farther|further away|farther away|focus back|rack.{0,8}out)\b/i.test(raw)) {
+      cmds.push({ action: "focus", stops: +1 });
     }
 
     /* --- focal length ---
@@ -467,6 +484,15 @@ function parseClause(text, domain) {
     const focal = /\b(?:focal(?: length)?|lens|zoom)\b[^.]{0,24}?(\d+(?:\.\d+)?)\s*(?:mm\b|millimet\w*)/i.exec(raw)
                || /(\d+(?:\.\d+)?)\s*(?:mm\b|millimet\w*)[^.]{0,16}?\b(?:lens|focal)\b/i.exec(raw);
     if (focal && !asking) cmds.push({ action: "focal", value: Number(focal[1]) });
+    /* No number, because a photographer usually does not give one. "Longer" and
+       "wider" are the words for it; "zoom in" means the same thing and does NOT
+       mean reframing the 3D view, which is what FIT would otherwise make of it
+       on a page whose subject is a lens. */
+    else if (!asking && /\b(zoom in|longer lens|more reach|telephoto|tighter|narrower field)\b/i.test(raw)) {
+      cmds.push({ action: "focal", stops: +1 });
+    } else if (!asking && /\b(zoom out|wider lens|wide angle|wide-angle|shorter lens|make it wider|more of the scene)\b/i.test(raw)) {
+      cmds.push({ action: "focal", stops: -1 });
+    }
 
     /* --- the sensor --- */
     const sensor = /\b(?:sensor|film|format|frame)\b[^.]{0,24}?(\d+(?:\.\d+)?)\s*(?:mm\b|millimet\w*)/i.exec(raw)
@@ -485,6 +511,12 @@ function parseClause(text, domain) {
     const curve = /\bblades?\b[^.]{0,16}?\b(?:curve|curvature|round\w*)\b[^.]{0,16}?(-?\d*\.?\d+)/i.exec(raw)
                || /\b(?:curve|curvature|round\w*)\b[^.]{0,20}?\bblades?\b[^.]{0,16}?(-?\d*\.?\d+)/i.exec(raw);
     if (curve && !asking) cmds.push({ action: "curvature", value: Number(curve[1]) });
+    /* The two ends, which is how the control is actually described. */
+    else if (!asking && /\b(round(?:ed)? blades|round the blades|curved blades)\b/i.test(raw)) {
+      cmds.push({ action: "curvature", value: 1 });
+    } else if (!asking && /\b(straight blades|straight-edged|flat blades)\b/i.test(raw)) {
+      cmds.push({ action: "curvature", value: 0 });
+    }
 
     /* Nobody says "9 blades" out loud; they say "nine blades". */
     const BLADE_WORDS = { three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
@@ -541,7 +573,10 @@ function parseClause(text, domain) {
 
     if (/\b(share|copy the link|link to this|permalink)\b/i.test(raw) && !asking) cmds.push({ action: "share" });
     if (/\b(reset|start over|back to (?:the )?default)\b/i.test(raw) && !asking) cmds.push({ action: "reset" });
-    if (/\b(what is sharp|what.?s sharp|which (?:one|target|sphere) is sharp|read ?out|the numbers|depth of field now)\b/i.test(raw)) {
+    /* "What is sharp" reads the state out. "What is sharp if" is a question
+       about the CONTROL of that name -- the circle of confusion -- and belongs
+       to the model, so the readout must not swallow it on the prefix. */
+    if (/\b(?:what is sharp(?! ?if)|what.?s sharp(?! ?if)|which (?:one|target|sphere) is sharp|read ?out|the numbers|depth of field now)\b/i.test(raw)) {
       cmds.push({ action: "list" });
     }
   } else {
@@ -672,10 +707,13 @@ function parseClause(text, domain) {
     if (/\b(undo)\b/i.test(raw)) cmds.push({ action: "undo" });
   }
 
-  /* "Full frame" is a sensor format, and FIT matches "frame". Without this the
-     one phrase every photographer uses for a 36 mm sensor also reframed the
-     3D view. */
-  if (FIT.test(raw) && !asking && !/\bfull ?frame\b/i.test(raw)) cmds.push({ action: "fit" });
+  /* Two phrases FIT matches that mean something else entirely on a camera page:
+     "full frame" is a sensor format, and "zoom" is the focal length. Without
+     this, the one phrase every photographer uses for a 36 mm sensor also
+     reframed the 3D view, and "zoom out" reframed it instead of fitting a wider
+     lens. */
+  const fitCollides = domain === "optics" && /\b(full ?frame|zoom (?:in|out))\b/i.test(raw);
+  if (FIT.test(raw) && !asking && !fitCollides) cmds.push({ action: "fit" });
 
   /* Run and pause go last: a preset load stops the simulation, so asking for
      both in one sentence has to end with the run.

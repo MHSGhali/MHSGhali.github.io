@@ -26,8 +26,8 @@
    it -- so the background is the same engine as the tool, not a canned
    animation. The two agree to about 1e-7 of a link length over a revolution. */
 
-import * as M from "../linkage/mechanism.js?v=d88b88e5";
-import * as S from "../linkage/solver.js?v=d88b88e5";
+import * as M from "../linkage/mechanism.js?v=901aad0b";
+import * as S from "../linkage/solver.js?v=901aad0b";
 
 export const HOLY = {
   a: 38.0, b: 41.5, c: 39.3, d: 40.1, e: 55.8, f: 39.4, g: 36.7,

@@ -1,14 +1,14 @@
 /* Page controller for the linkage tool: wires the toolbar, the status line,
    the 3D view, the Blender export and the share link to the editor. */
 
-import * as M from "./mechanism.js?v=d88b88e5";
-import { createEditor } from "./editor.js?v=d88b88e5";
-import { createView3D } from "./view3d.js?v=d88b88e5";
-import { PRESETS, buildPreset } from "./presets.js?v=d88b88e5";
-import { exportBlenderScript } from "./blender.js?v=d88b88e5";
-import { exportPrintableParts } from "./print3d.js?v=d88b88e5";
-import { makeZip } from "./zip.js?v=d88b88e5";
-import { encode, decode } from "./serialize.js?v=d88b88e5";
+import * as M from "./mechanism.js?v=901aad0b";
+import { createEditor } from "./editor.js?v=901aad0b";
+import { createView3D } from "./view3d.js?v=901aad0b";
+import { PRESETS, buildPreset } from "./presets.js?v=901aad0b";
+import { exportBlenderScript } from "./blender.js?v=901aad0b";
+import { exportPrintableParts } from "./print3d.js?v=901aad0b";
+import { makeZip } from "./zip.js?v=901aad0b";
+import { encode, decode } from "./serialize.js?v=901aad0b";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -311,7 +311,7 @@ refresh();
    asks for it -- so a visitor who never opens the panel downloads nothing. */
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=d88b88e5").then(({ mountAssistant }) => {
+  import("./assistant.js?v=901aad0b").then(({ mountAssistant }) => {
     mountAssistant(assistantHost, {
       editor,
       /* The chat needs the preset back to describe what it just did, and

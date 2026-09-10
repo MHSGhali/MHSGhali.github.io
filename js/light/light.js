@@ -25,9 +25,9 @@
      not -- it accumulates one scalar per light and combines spectra once, at
      the end -- which is what keeps the 95-bin loop out of the hot path. */
 
-import { PI, TWO_PI, INV_4PI } from "./core.js?v=d88b88e5";
-import * as v from "./vec3.js?v=d88b88e5";
-import * as S from "./spectrum.js?v=d88b88e5";
+import { PI, TWO_PI, INV_4PI } from "./core.js?v=901aad0b";
+import * as v from "./vec3.js?v=901aad0b";
+import * as S from "./spectrum.js?v=901aad0b";
 
 export const POINT = "point";             /* isotropic delta source */
 export const DIRECTIONAL = "directional"; /* delta direction, infinitely far */

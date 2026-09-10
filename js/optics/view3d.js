@@ -13,8 +13,8 @@
 const THREE_URL = "three";
 const ORBIT_URL = "three/addons/controls/OrbitControls.js";
 
-import { createViewControl } from "../viewcontrol.js?v=d88b88e5";
-import * as S3 from "./scene3d.js?v=d88b88e5";
+import { createViewControl } from "../viewcontrol.js?v=901aad0b";
+import * as S3 from "./scene3d.js?v=901aad0b";
 
 /* How each kind of segment is drawn. Colour comes from a CSS custom property so
    the diagram follows the page's theme; `w` is the opacity, which is what

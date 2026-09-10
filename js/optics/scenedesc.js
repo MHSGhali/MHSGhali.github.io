@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=d88b88e5";
-import * as v from "../light/vec3.js?v=d88b88e5";
-import * as S from "../light/spectrum.js?v=d88b88e5";
-import * as B from "../light/bsdf.js?v=d88b88e5";
-import * as Lt from "../light/light.js?v=d88b88e5";
-import * as G from "../light/geom.js?v=d88b88e5";
-import * as U from "../light/units.js?v=d88b88e5";
-import { spectrumToXyz } from "../light/color.js?v=d88b88e5";
-import { createScene } from "../light/scene.js?v=d88b88e5";
+import { PI, clamp } from "../light/core.js?v=901aad0b";
+import * as v from "../light/vec3.js?v=901aad0b";
+import * as S from "../light/spectrum.js?v=901aad0b";
+import * as B from "../light/bsdf.js?v=901aad0b";
+import * as Lt from "../light/light.js?v=901aad0b";
+import * as G from "../light/geom.js?v=901aad0b";
+import * as U from "../light/units.js?v=901aad0b";
+import { spectrumToXyz } from "../light/color.js?v=901aad0b";
+import { createScene } from "../light/scene.js?v=901aad0b";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;

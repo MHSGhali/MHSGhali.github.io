@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=d88b88e5";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=901aad0b";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -26,10 +26,18 @@ export const VOCABULARY = [
   "set the focal length to <focal> mm",
   "open up to f/<fno>",
   "stop down to f/<fno>",
+  "I want more depth of field",
+  "make the depth of field shallower",
   "focus at <metres> m",
   "focus at infinity",
+  "focus closer",
+  "focus further away",
+  "zoom in",
+  "zoom out",
   "<blades> blades",
+  "round iris",
   "set the blade curve to <curve>",
+  "straight blades",
   "make the sensor <sensor> mm",
   "full frame",
   "render at <pixels> px",
@@ -55,9 +63,14 @@ const ROLE =
 You are the assistant beside this camera simulator. You can drive it and you can
 explain it. Answer from the sections below and from <state>, which is the camera
 and the scene on the screen right now.
-Every number you mention must come from <state>. If it is not there, say you
-cannot see it. Never invent a reading, a distance or a lens.
-Be brief. Two or three sentences unless a list is asked for.
+Every number you mention must come from <state>, carrying the name <state> gives
+it: a number and its label travel together. The field of view is in degrees and
+the entrance pupil is in millimetres, and neither is the other. If a number is
+not in <state>, say you cannot see it. Never invent a reading, a distance or a
+lens.
+Be brief: two or three sentences, and never two paragraphs. Answer the question
+asked and stop -- do not restate it, do not summarise yourself, and do not add a
+second explanation of the same thing.
 When the visitor's problem is one command away from being fixed, end your answer
 with that command on its own line inside <try></try>, worded the way the
 commands below are worded. Write nothing after the closing tag, and offer at
@@ -70,8 +83,16 @@ Set up a camera and see what it records.
 - Light is traced through a multi-element lens prescription, surface by surface,
   with a refractive index from the Sellmeier coefficients of the real catalogue
   glass. Aberration is not applied afterwards; it is what the trace produces.
-- Three lens designs: an ideal aberration-free lens, an uncorrected N-BK7
-  singlet, and a Fraunhofer N-BK7 and F2 cemented achromat doublet.
+- Three lens designs, all selectable, all 100 mm, and what separates them is
+  COLOUR -- where blue light and red light come to a focus relative to each
+  other:
+    IDEAL, dispersionless: blue and red focus in exactly the same place.
+    SINGLET, one uncorrected N-BK7 element: their focal lengths differ by about
+      1.5 %. It is meant to fringe; that is what it is here for.
+    ACHROMAT, a Fraunhofer N-BK7 and F2 cemented doublet: two glasses paired so
+      that difference nearly cancels, down to about 0.06 %.
+  Because they share a focal length they frame identically, so what changes
+  between them is fidelity and nothing else.
 - Focal length from 12 to 400 mm, and the design is rescaled to it exactly.
 - Aperture from f/1 to f/45, limited by the glass: a design whose front element
   is too small simply cannot open that wide, and it reports the f-number it
@@ -93,6 +114,62 @@ Set up a camera and see what it records.
   focus, film position, chromatic error, blur at 6 m, image circle, the on-axis
   sharp limits and the hyperfocal distance.
 </capabilities>`;
+
+const CONTROLS =
+`<controls>
+What each control does, and what changes on screen when it moves.
+- DESIGN: which lens is mounted. Changes the aberration, not the framing -- all
+  three are 100 mm, so what differs is how faithfully the image is formed.
+- FOCAL: rescales the whole prescription. Longer is a narrower field and a
+  bigger subject. The f-number and the aberration character do not change.
+- APERTURE: does two things at once, always both. Opening up (a smaller
+  f-number) lets in more light AND makes the depth of field shallower. This is
+  where brightness comes from here, which is why exposure is not a substitute.
+- FOCUS: the distance the film is set for. What sits there is sharp; everything
+  else blurs by how far it is from it.
+- BLADES: the shape of the iris, and so of every out-of-focus highlight. Also
+  the starburst spikes on a point source: N of them if N is even, 2N if odd. It
+  does not change the exposure.
+- BLADE CURVE: rounds the blades off. 0 is a straight-edged polygon, 1 a circle.
+  Shape only.
+- SENSOR WIDTH: the film format. Wider sees more at the same focal length, and
+  demands a bigger image circle from the lens.
+- RENDER: how many pixels wide the photograph is computed at. Quality and speed;
+  the field of view does not change with it.
+- EXPOSURE: a viewing gain applied when the measurements become pixels. Instant,
+  because it traces no ray. It is a darkroom control rather than a camera one:
+  a photographer would change brightness with the aperture.
+- SHARP IF: the circle of confusion -- the DIAMETER of the biggest blur spot
+  that still counts as sharp, in millimetres on the film. Moves the
+  depth-of-field numbers and the slab in the scene view, and nothing about the
+  photograph.
+- LIGHTING: the placed key lamp or a uniform sky. AMBIENT and SKY COLOUR set
+  that sky when it is the one in use.
+</controls>`;
+
+const READOUTS =
+`<readouts>
+What the derived numbers mean. Every one is measured from the mounted lens.
+- FOCAL: the focal length the built lens actually has.
+- H FIELD: degrees across the frame.
+- PUPIL: entrance pupil diameter -- the aperture seen from in front, through the
+  glass ahead of it. Focal length over it is the f-number.
+- T-STOP: the f-stop corrected for the light the glass really transmits. Every
+  surface here is uncoated, so each one REFLECTS a few percent away and less
+  light arrives than the geometry promises. A T-stop is therefore always a
+  slower number than the f-stop it comes from.
+- BACK FOCUS: where the film sits at infinity. FILM AT: where it sits now.
+- COLOUR ERR: chromatic aberration as a percentage of focal length -- how far
+  apart blue and red focus. Singlet about -1.5 %, achromat about -0.06 %.
+- BLUR AT 6 M: the defocus blur a subject at 6 m makes on the film, in mm.
+  Compare it against SHARP IF.
+- COVERS: the image circle the design throws, against the diagonal the sensor
+  needs. First smaller than second means the corners are outside what it covers.
+- AXIS SHARP FROM/TO: the near and far limits of sharpness on the axis.
+- AXIS HYPERFOCAL: focus there and everything from about half of it out is
+  sharp.
+- SAMPLES: rays per pixel traced so far. Still refining until it stops climbing.
+</readouts>`;
 
 const PRECONDITIONS =
 `<preconditions>
@@ -223,7 +300,7 @@ fit the view
 </example>`;
 
 export const KNOWLEDGE =
-  [HEAD, ROLE, CAPABILITIES, PRECONDITIONS, LIMITS, NUMBERS, HOW].join("\n");
+  [HEAD, ROLE, CAPABILITIES, CONTROLS, READOUTS, PRECONDITIONS, LIMITS, NUMBERS, HOW].join("\n");
 
 export const PLANNING = [PROCEDURE, EXAMPLE].join("\n\n");
 
@@ -246,10 +323,24 @@ const retriever = makeRetriever({
 
   nudges: [
     [/\b(flare|ghost\w*|glare|coat\w*|iso|shutter|noise|grain|raw|white balance|zoom|macro|tilt|shift|stabilis\w*|stabiliz\w*|autofocus|asphere|aspheric\w*|freeform|diffract\w*|airy|polaris\w*|polariz\w*|fog|undo|save|export|edit|move|add|delete|double gauss|tessar|telephoto|retrofocus|canon|nikon|sony|leica|zeiss)\b/i, "limits"],
-    [/\b(clip\w*|blown|too bright|too dark|grain\w*|noisy|provisional|refus\w*|cannot|can.?t|won.?t|wide open|corner|corners|dark corner|image circle|cover\w*|soft|why)\b/i, "preconditions"],
+    /* No bare "why": it is in a third of all questions, and forcing a section
+       bypasses the byte budget by design, so one loose word here drags a whole
+       paragraph into every prompt. */
+    [/\b(clip\w*|blown|too bright|too dark|grain\w*|noisy|provisional|refus\w*|cannot|can.?t|won.?t|wide open|corner|corners|dark corner|soft)\b/i, "preconditions"],
     [/\b(default|defaults|how (?:big|far|many|much)|distance|distances|metre|meters?|metres?|millimet\w*|circle of confusion|coc|hyperfocal|chromatic|abbe|lumens?|kelvin|lux)\b/i, "numbers"],
-    [/\b(wavelength|spectral|dispersion|sellmeier|vignett\w*|pupil|entrance pupil|exit pupil|blade|blades|iris|area|estimator|sampling|how does it|why does)\b/i, "how"],
+    /* "Why is the corner dark" is answered in <how> -- vignetting is geometric
+       and a dark corner means rays aimed at it hit the edge of real glass.
+       Without the corner words here it pulled <preconditions>, which mentions
+       the image circle but never says what makes a corner go dark, and the
+       model filled the gap from the state block and got the wrong number. */
+    [/\b(wavelength|spectral|dispersion|sellmeier|vignett\w*|pupil|entrance pupil|exit pupil|blade|blades|iris|area|estimator|sampling|how does it|why does|corner|corners|falloff|fall.?off|darker at the edge)\b/i, "how"],
     [/\b(what can|capabilit\w*|features?|able to|support|supports|do here|possible|designs?|achromat|singlet)\b/i, "capabilities"],
+    /* "What does X do" is the commonest question a control invites, and until
+       <controls> existed the answer came back as whatever section happened to
+       mention X -- for the aperture, the paragraph explaining why it will not
+       open past f/5, which is a different question. */
+    [/\b(?:what|which|how)\b[^.]{0,24}\b(?:does|do|is|are)\b[^.]{0,24}\b(?:aperture|f.?number|f.?stop|focal|focus|blade|blades|curve|sensor|render|resolution|exposure|sharp if|lighting|design|control|slider|setting)\b/i, "controls"],
+    [/\b(t.?stop|entrance pupil|exit pupil|back focus|film at|colour err|color err|image circle|covers|hyperfocal|blur at|h field|field of view|derived|read ?out|read ?outs|samples)\b/i, "readouts"],
   ],
 
   budget: 2500,
@@ -279,12 +370,18 @@ export function formatState(s) {
 
   if (s.derived) {
     const d = s.derived;
-    out.push(`measured: ${n2(d.eflMm)} mm actual, ${n2(d.hfovDeg)} deg across`
-      + `, pupil ${n2(d.pupilMm)} mm, T/${n2(d.tstop)}`
+    /* Units spelled out on every one of these. "20.41 deg across" sat two lines
+       above "covers 20.07 mm", and the model answered a question about the
+       image circle with the field of view -- two plausible numbers a decimal
+       apart, one of which was not a length at all. */
+    out.push(`measured: focal length ${n2(d.eflMm)} mm`
+      + `, field of view ${n2(d.hfovDeg)} degrees`
+      + `, entrance pupil ${n2(d.pupilMm)} mm, T/${n2(d.tstop)}`
       + `, colour error ${n2(d.colourErrPct)} %`);
     out.push(`sharp on axis: ${n2(d.nearM)} m to ${n2(d.farM)} m`
       + `; hyperfocal ${n2(d.hyperfocalM)} m`
-      + `; covers ${n2(d.coversMm)} mm of the ${n2(d.coveredMm)} mm the sensor needs`);
+      + `; image circle ${n2(d.coversMm)} mm against the ${n2(d.coveredMm)} mm diagonal `
+      + `the sensor needs`);
   } else {
     out.push("measured: the lens has not been built yet");
   }
