@@ -92,11 +92,27 @@ camera recorded.
 Light is traced through a real multi-element lens prescription, surface by
 surface, with a refractive index taken from the Sellmeier coefficients of the
 actual catalogue glass. Spherical aberration, coma, astigmatism, field
-curvature, chromatic aberration, vignetting, distortion and the shape of the
-and distortion are not effects that get applied — they are what happens when you trace
-real glass. A ray that misses a clear aperture is dead, and that is the *only*
+curvature, chromatic aberration, vignetting and distortion are not effects that
+get applied — they are what happens when you trace real glass. A ray that misses a clear aperture is dead, and that is the *only*
 source of vignetting: there is no darkening factor on the corners anywhere in
 the code.
+
+### The rail, and where its perspective went
+
+The one scene is a rail of five coloured targets at 1, 1.5, 2, 3 and 5 m, and
+**target size** decides how big they really are. *Same in metres* gives all five
+a 30 mm radius, so the near one images about five times the diameter of the far
+one — ordinary 1/distance perspective, and the default. *Same on film* scales
+each radius with its distance so every target lands the same size on the sensor,
+which makes focus the only difference left between them.
+
+*Same on film* was the original and the only mode, and it was a mistake to ship
+alone: a frame whose objects all image the same size looks orthographic, which
+is what a **telecentric** lens produces, and the page was read as being one. It
+is not. The camera is an ordinary perspective camera and *same in metres* is the
+proof. Related: parallel rays entering a lens in a cross-section diagram mean the
+object is at infinity, which is simply how such diagrams are drawn — not a sign
+of telecentricity, and a telephoto lens drawn the same way looks the same.
 
 ### What it shares, and what is new
 

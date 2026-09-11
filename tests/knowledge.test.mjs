@@ -506,6 +506,30 @@ test("adjusting the sky is not the same as switching to it", () => {
     [{ action: "lighting", value: "lamps" }]);
 });
 
+test("the words for a flat-looking frame reach the target sizing", () => {
+  /* "Perspective" is what a visitor calls the thing that is missing, and
+     "telecentric" is what they call the lens they think is causing it. Both are
+     the SCENE's target sizing, and nothing else on the page changes it. */
+  for (const said of ["show me perspective", "make it telecentric",
+                      "set the targets to actual size",
+                      "make the targets the same size in metres"]) {
+    assert.deepEqual(parse(said, "optics"), [{ action: "sizing", value: "metric" }], said);
+  }
+  for (const said of ["match the targets on film", "make them the same size on film",
+                      "matched targets", "same in the frame"]) {
+    assert.deepEqual(parse(said, "optics"), [{ action: "sizing", value: "filmed" }], said);
+  }
+  /* "Frame" is FIT's word too, and firing both would match the targets and move
+     the camera at once -- two answers to one question. The sensor format and
+     the focal length keep their own claims on it. */
+  assert.deepEqual(parse("full frame", "optics"), [{ action: "sensor", value: 36 }]);
+  assert.deepEqual(parse("frame the scene", "optics"), [{ action: "fit" }]);
+  /* And asking about it is a question, not an instruction. */
+  for (const said of ["is this lens telecentric", "why is there no perspective"]) {
+    assert.deepEqual(parse(said, "optics").filter((c) => c.action === "sizing"), [], said);
+  }
+});
+
 test("a question about a control is not an instruction to change it", () => {
   for (const said of ["what does the aperture do", "how do I focus closer",
                       "why is the sky brighter", "what is an achromat"]) {

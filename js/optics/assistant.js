@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=7a60899b";
-import * as knowledge from "./knowledge.js?v=7a60899b";
-import * as SD from "./scenedesc.js?v=7a60899b";
-import * as P from "./prescription.js?v=7a60899b";
+import { mountChat } from "../chat/ui.js?v=e01fefc3";
+import * as knowledge from "./knowledge.js?v=e01fefc3";
+import * as SD from "./scenedesc.js?v=e01fefc3";
+import * as P from "./prescription.js?v=e01fefc3";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -38,6 +38,7 @@ export function mountAssistant(host, api) {
       const s = api.settings();
       return {
         scene: SD.PRESET_NAMES[s.preset],
+        sizing: SD.SIZING_NAMES[s.sizing],
         lighting: SD.MODE_NAMES[s.lightMode],
         lampLm: s.lampLm,
         lampCctK: s.lampCctK,
@@ -62,8 +63,9 @@ export function mountAssistant(host, api) {
       switch (cmd.action) {
         case "preset": {
           if (!put("preset", cmd.id)) return `Already showing the ${cmd.name}.`;
-          return "Loaded the depth rail: five identical targets at 1, 1.5, 2, 3 and 5 m. They all "
-            + "subtend the same angle, so the only difference between them is focus.";
+          return "Loaded the depth rail: five coloured targets at 1, 1.5, 2, 3 and 5 m. TARGET SIZE "
+            + "decides whether they are the same size in metres, which shows perspective, or the "
+            + "same size on film, which leaves focus as the only difference between them.";
         }
 
         case "design": {
@@ -155,6 +157,22 @@ export function mountAssistant(host, api) {
           if (!put("resW", cmd.value)) return `Already rendering ${s.resW} px wide.`;
           return `Rendering ${api.settings().resW} px wide. Bigger is slower per pass, and the `
             + "picture refines progressively either way.";
+
+        case "sizing": {
+          if (!put("sizing", cmd.value)) {
+            return cmd.value === SD.METRIC
+              ? "The targets are already the same size in metres."
+              : "The targets are already matched on film.";
+          }
+          return cmd.value === SD.METRIC
+            ? "Every target is a 30 mm sphere now, so the picture shows perspective: the near one "
+              + "images about five times the diameter of the far one, which is 1/distance and "
+              + "nothing else. The camera did not change — the scene did."
+            : "Each target's radius now scales with its distance, so all five land the same size on "
+              + "the sensor and the only difference left between them is how far out of focus they "
+              + "are. It makes the frame look flat, which is a property of the scene and not of the "
+              + "lens.";
+        }
 
         case "lighting": {
           if (!put("lightMode", cmd.value)) {

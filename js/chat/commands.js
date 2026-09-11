@@ -92,7 +92,7 @@ export const OPTICS_PRESETS = [
        the only thing that happened, so the aperture never moved at all. So the
        phrase only names the scene when a looking-at verb comes with it. */
     does: /\b(?:see|show|showing|shows|demonstrat\w*|illustrat\w*|look at|compare)\b[^.]{0,28}?\b(?:depth of field|depth-of-field|focus)\b|\b(?:focus test|focus chart|rack focus|how much is sharp|what.{0,4}s in focus)\b/i,
-    because: "five identical targets at known distances, so the only difference between them in the image is how far out of focus they are" },
+    because: "five targets at known distances, and under SAME ON FILM they all land the same size, so the only difference between them in the image is how far out of focus they are" },
 ];
 
 /* ------------------------------------------------------------- the grammar */
@@ -510,6 +510,26 @@ function parseClause(text, domain) {
             || /\b(?:render|resolution)\b[^.]{0,16}?(\d{2,4})/i.exec(raw);
     if (px && !asking) cmds.push({ action: "resolution", value: Number(px[1]) });
 
+    /* --- how big the targets really are ---
+
+       "Perspective" is the word people reach for when the picture looks flat,
+       and "telecentric" is the word they reach for when they think the lens is
+       why. Both land here, because the sizing is a property of the SCENE and is
+       the only thing on this page that decides whether the frame shows
+       perspective at all.
+
+       "Flat" is deliberately NOT in this rule: under the sky it is what a
+       visitor calls the LIGHTING, and a word that means two controls means
+       neither. */
+    if (!asking) {
+      if (/\b(perspective|telecentric|orthographic|same size in (?:met|meter)\w*|equal size|real size|true size|actual size)\b/i.test(raw)) {
+        cmds.push({ action: "sizing", value: "metric" });
+      } else if (/\b(?:match\w*|same|equal)\b[^.]{0,24}?\bon film\b/i.test(raw)
+              || /\b(matched targets?|same size in (?:the )?frame|same in (?:the )?frame)\b/i.test(raw)) {
+        cmds.push({ action: "sizing", value: "filmed" });
+      }
+    }
+
     /* --- lighting: a choice, not a blend ---
 
        The sky's own settings are read FIRST, because they decide whether the
@@ -690,12 +710,14 @@ function parseClause(text, domain) {
     if (/\b(undo)\b/i.test(raw)) cmds.push({ action: "undo" });
   }
 
-  /* Two phrases FIT matches that mean something else entirely on a camera page:
-     "full frame" is a sensor format, and "zoom" is the focal length. Without
-     this, the one phrase every photographer uses for a 36 mm sensor also
-     reframed the 3D view, and "zoom out" reframed it instead of fitting a wider
-     lens. */
-  const fitCollides = domain === "optics" && /\b(full ?frame|zoom (?:in|out))\b/i.test(raw);
+  /* Three phrases FIT matches that mean something else entirely on a camera
+     page: "full frame" is a sensor format, "zoom" is the focal length, and
+     "the same size in the frame" is the target sizing. Without this, the one
+     phrase every photographer uses for a 36 mm sensor also reframed the 3D
+     view, "zoom out" reframed it instead of fitting a wider lens, and asking
+     for matched targets both matched them and moved the camera. */
+  const fitCollides = domain === "optics"
+    && /\b(full ?frame|zoom (?:in|out)|(?:same|equal)[^.]{0,12}?in (?:the )?frame)\b/i.test(raw);
   if (FIT.test(raw) && !asking && !fitCollides) cmds.push({ action: "fit" });
 
   /* Run and pause go last: a preset load stops the simulation, so asking for

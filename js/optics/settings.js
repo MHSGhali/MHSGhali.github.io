@@ -22,9 +22,9 @@
      decides the step a number input takes and how a value is formatted, since
      there is no drag-to-scrub. */
 
-import { clamp } from "../light/core.js?v=7a60899b";
-import * as P from "./prescription.js?v=7a60899b";
-import * as SD from "./scenedesc.js?v=7a60899b";
+import { clamp } from "../light/core.js?v=e01fefc3";
+import * as P from "./prescription.js?v=e01fefc3";
+import * as SD from "./scenedesc.js?v=e01fefc3";
 
 export function defaults() {
   return {
@@ -36,6 +36,11 @@ export function defaults() {
 
     /* scene */
     preset: SD.RAIL,
+    /* METRIC by default. FILMED is the better controlled experiment, but it
+       makes an ordinary perspective camera look orthographic -- see the note in
+       scenedesc.js -- and a photograph with no perspective in it is the wrong
+       first impression for a lens simulator to give. */
+    sizing: SD.METRIC,
     lightMode: SD.LAMPS,
     lampLm: 20800.0,
     lampCctK: 5500.0,
@@ -78,6 +83,8 @@ export const FIELDS = [
   { id: "focusM", section: "LENS", label: "focus", unit: "m", lo: 0.15, hi: 1000, log: true },
   { id: "preset", section: "SCENE", label: "scene", enumOf: () => SD.PRESETS,
     names: SD.PRESET_NAMES, when: () => SD.PRESETS.length > 1 },
+  { id: "sizing", section: "SCENE", label: "target size", enumOf: () => SD.SIZINGS,
+    names: SD.SIZING_NAMES },
   { id: "lightMode", section: "SCENE", label: "lighting", enumOf: () => SD.LIGHT_MODES, names: SD.MODE_NAMES },
   /* Each mode shows its own source's controls and only its own. Showing the
      lamp's brightness beside a sky that is doing the work would be two answers
@@ -130,6 +137,33 @@ export function set(s, id, value) {
   if (next === s[id]) return false;
   s[id] = next;
   return true;
+}
+
+/* Everything the renderer needs, as one plain object, built FROM THE FIELD
+   TABLE rather than by hand.
+
+   It used to be hand-listed at the postMessage call, and that is a second place
+   a setting has to be registered -- which is exactly the thing this module
+   exists to prevent. Adding `sizing` to the panel and forgetting that list gave
+   a page whose control read SAME ON FILM over a photograph rendered SAME IN
+   METRES: the select moved, the scene diagram moved, and the one thing anybody
+   was looking at did not. Nothing threw, because an absent field simply took
+   its default inside the worker.
+
+   `spp`, `depth` and `passes` are not fields -- see defaults() -- so they are
+   named here, and they are the ONLY things named here. */
+export function renderRequest(s, passes = 512) {
+  const out = {};
+  for (const f of FIELDS) out[f.id] = s[f.id];
+  out.spp = s.spp;
+  out.depth = s.depth;
+  /* Enough passes that the picture keeps improving for as long as anyone
+     watches it, and a newer request pre-empts whatever is left. 512 of them is
+     a couple of thousand samples a pixel, which on this scene is past the point
+     where the grain is visible; nobody waits for the end of it, they just stop
+     seeing it change. */
+  out.passes = passes;
+  return out;
 }
 
 /* True if anything that affects the RENDERED IMAGE differs.

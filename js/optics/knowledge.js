@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=7a60899b";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=e01fefc3";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -101,7 +101,9 @@ Set up a camera and see what it records.
   glass, so the camera does not walk while racking.
 - Sensor width from 4 to 80 mm at 3:2, a render grid from 64 to 640 px, and an
   exposure that is a viewing gain applied after the fact.
-- One scene, the depth rail: five identical targets at 1, 1.5, 2, 3 and 5 m.
+- One scene, the depth rail: five coloured targets at 1, 1.5, 2, 3 and 5 m, in
+  either of two sizings -- all the same size ON FILM, or all the same size IN
+  METRES, which is the one that shows perspective.
 - Two lighting modes: the placed rectangular key lamp, or a uniform overhead
   sky. A choice, not a blend. The sky lights the scene but is not photographed,
   so the background is black in both modes and switching between them changes
@@ -125,6 +127,13 @@ What each control does, and what changes on screen when it moves.
   where brightness comes from here, which is why exposure is not a substitute.
 - FOCUS: the distance the film is set for. What sits there is sharp; everything
   else blurs by how far it is from it.
+- TARGET SIZE: how big the five rail targets really are. SAME IN METRES gives
+  them all a 30 mm radius, so the near one images about five times the diameter
+  of the far one -- ordinary 1/distance perspective, and the default. SAME ON
+  FILM scales each target's radius with its distance so all five land the same
+  size on the sensor, which isolates focus as the only difference between them
+  but makes the picture look flat, like an orthographic or telecentric
+  projection. It is a property of the SCENE, not of the lens.
 - SENSOR WIDTH: the film format. Wider sees more at the same focal length, and
   demands a bigger image circle from the lens.
 - RENDER: how many pixels wide the photograph is computed at. Quality and speed;
@@ -207,6 +216,18 @@ const PRECONDITIONS =
   So at the default settings nothing formally qualifies as sharp, and one third
   of a stop down it does. That is the lens being aberration limited at f/5, not
   a fault.
+- THIS IS AN ORDINARY PERSPECTIVE CAMERA, and under SAME ON FILM it does not
+  look like one. A fixed 30 mm sphere images 59.3 px across at 1 m and 10.9 px
+  at 5 m at the default settings: exactly 1/distance. Under SAME ON FILM every
+  target images the same size because the SCENE scales their radii with their
+  distance, not because the lens is telecentric. It is not telecentric, and
+  there is no telecentric mode. Offer SAME IN METRES to anyone who says the
+  image has no perspective in it.
+- Parallel rays entering a lens in a cross-section diagram mean the OBJECT IS AT
+  INFINITY, which is the standard way such a diagram is drawn. They are not a
+  sign of telecentricity, and a telephoto lens drawn with the same object at
+  infinity has exactly the same parallel input rays. What varies with the lens
+  in that picture is where the rays cross the axis and by how much they miss.
 - The 100 mm designs cover a 20 mm image circle, which is smaller than a 36 mm
   sensor. The corners are outside what the lens covers, and the page says so.
 </preconditions>`;
@@ -388,7 +409,8 @@ export function formatState(s) {
   const lit = sky
     ? (s.ambientLux != null && s.ambientCctK != null ? `, sky ${s.ambientLux} lx at ${s.ambientCctK} K` : "")
     : (s.lampLm != null && s.lampCctK != null ? `, lamp ${s.lampLm} lm at ${s.lampCctK} K` : "");
-  out.push(`scene: ${s.scene}; lighting: ${s.lighting}${lit}`);
+  out.push(`scene: ${s.scene}${s.sizing ? `, targets ${s.sizing}` : ""}`
+    + `; lighting: ${s.lighting}${lit}`);
   out.push(`lens: ${s.design}, ${n2(s.focalMm)} mm at f/${n2(s.fno)}`
     + `, focused at ${n2(s.focusM)} m`
     );

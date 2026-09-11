@@ -653,8 +653,115 @@ test("the lamp's brightness and colour are controls, and independent", () => {
   const lamps = ST.defaults();
   const sky = { ...ST.defaults(), lightMode: SD.AMBIENT };
   const ids = (s) => ST.visibleFields(s).filter((f) => f.section === "SCENE").map((f) => f.id);
-  assert.deepEqual(ids(lamps), ["lightMode", "lampLm", "lampCctK"]);
-  assert.deepEqual(ids(sky), ["lightMode", "ambientLux", "ambientCctK"]);
+  /* `sizing` is in both lists on purpose: it describes the SCENE, not the
+     source lighting it, so it has no business appearing and disappearing with
+     the lighting mode. */
+  assert.deepEqual(ids(lamps), ["sizing", "lightMode", "lampLm", "lampCctK"]);
+  assert.deepEqual(ids(sky), ["sizing", "lightMode", "ambientLux", "ambientCctK"]);
+});
+
+test("every setting the panel can change reaches the renderer", () => {
+  /* THE BUG THIS EXISTS FOR
+       The worker's payload was written out by hand at the postMessage call, so
+       a new field could be added to the panel, to the field table, to the URL
+       hash and to the scene diagram and still never reach the render. It was:
+       TARGET SIZE moved the select and moved the diagram, and the photograph
+       underneath went on being rendered at the default, because an absent field
+       silently took its default inside setup(). Nothing threw.
+
+     So the payload is derived from FIELDS, and this is the assertion that says
+     so -- it fails the moment anything starts hand-listing again. */
+  const s = ST.defaults();
+  /* Move every field off its default, so a payload that copied the defaults
+     instead of the state would fail too. */
+  for (const f of ST.FIELDS) {
+    if (f.enumOf) {
+      const other = f.enumOf().find((o) => o !== s[f.id]);
+      if (other !== undefined) ST.set(s, f.id, other);
+    } else {
+      ST.set(s, f.id, s[f.id] === f.hi ? f.lo : f.hi);
+    }
+  }
+
+  const req = ST.renderRequest(s);
+  for (const f of ST.FIELDS) {
+    assert.ok(req[f.id] !== undefined, `${f.id} never reaches the renderer`);
+    assert.equal(req[f.id], s[f.id], `${f.id} reaches the renderer stale`);
+  }
+  /* And the three the field table deliberately does not carry. */
+  for (const id of ["spp", "depth", "passes"]) {
+    assert.ok(Number.isFinite(req[id]), `${id} must be in the request`);
+  }
+
+  /* A request must survive the structured clone postMessage puts it through. */
+  assert.deepEqual(structuredClone(req), req);
+
+  /* And setup() must accept it: the payload IS the settings object the render
+     core reads, not a subset of one. */
+  assert.doesNotThrow(() => setup({ ...ST.defaults(), ...ST.renderRequest(ST.defaults()) }));
+});
+
+test("the camera has perspective, and only the scene's sizing hides it", () => {
+  /* THE CLAIM THIS PINS
+       A rail whose targets all image the same size looks like an orthographic
+       projection, which is what a TELECENTRIC lens produces -- and the page was
+       read that way. It is not telecentric. Under METRIC, where every target is
+       the same 30 mm sphere in the world, the image sizes must fall off as
+       1/distance and nothing else. Under FILMED they must not fall off at all,
+       because the SCENE is scaling the radii to cancel exactly that.
+
+     Measured through camera.project(), which is the paraxial inverse of the
+     mapping sample() actually uses, so this is the size the renderer draws. */
+  const build = (sizing) => {
+    const st = setup({ ...ST.defaults(), sizing, resW: 320 });
+    return st.desc.objects.map((o) => {
+      const c = o.centre;
+      const a = CAM.project(st.cam, c);
+      const b = CAM.project(st.cam, { x: c.x + o.radius, y: c.y, z: c.z });
+      return { depth: -c.z, radius: o.radius, px: 2 * Math.abs(b.x - a.x) };
+    });
+  };
+
+  const metric = build(SD.METRIC);
+  for (const t of metric) {
+    assert.equal(t.radius, 0.030, "METRIC gives every target the same real size");
+  }
+  /* NEWTON'S MAGNIFICATION, m = f/x, with x the object's distance from the
+     front focal point. So image size times (distance - focal length) is a
+     constant across the rail, and the reference is the near target -- making
+     this a statement about the SHAPE of the falloff rather than about a
+     magnification constant, which could be wrong by any factor and still pass.
+
+     It is emphatically NOT constant times distance: that is the crude 1/d
+     approximation, and at 100 mm on a 1 m subject it is already 7 % out. */
+  const fMm = ST.defaults().focalMm;
+  const law = (t) => t.px * (t.depth * 1000 - fMm);   /* the rail is in metres */
+  for (const t of metric) {
+    near(law(t), law(metric[0]), 1e-3 * law(metric[0]),
+      `a fixed sphere at ${t.depth} m must image at f/(distance - f)`);
+  }
+  /* And the falloff has to be LARGE, or the picture still looks flat: the 1 m
+     target is more than five times the diameter of the 5 m one. */
+  assert.ok(metric[0].px / metric[4].px > 4.8,
+    `near/far size ratio was ${(metric[0].px / metric[4].px).toFixed(2)}, expected about 5.4`);
+
+  const filmed = build(SD.FILMED);
+  for (const t of filmed) {
+    near(t.px, filmed[0].px, 0.1 * filmed[0].px,
+      "FILMED must land every target the same size on the sensor");
+    near(t.radius, 0.030 * t.depth, 1e-12, "FILMED scales the radius with the distance");
+  }
+
+  /* Both sizings agree at 1 m, so switching modes is a change of depth cue and
+     not a change of subject. */
+  near(metric[0].px, filmed[0].px, 1e-9, "the near target is the same in both");
+
+  /* The two are separate settings and neither implies the other. */
+  const s = ST.defaults();
+  assert.equal(s.sizing, SD.METRIC, "the shipped camera shows perspective");
+  assert.ok(ST.set(s, "sizing", SD.FILMED));
+  assert.ok(!ST.set(s, "sizing", "telecentric"), "there is no telecentric sizing");
+  assert.equal(s.sizing, SD.FILMED);
 });
 
 test("the dome is authored in lux and stored as radiance", () => {

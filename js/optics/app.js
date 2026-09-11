@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=7a60899b";
-import * as SD from "./scenedesc.js?v=7a60899b";
-import * as S3 from "./scene3d.js?v=7a60899b";
-import * as LENS from "./lens.js?v=7a60899b";
-import { createView } from "./view3d.js?v=7a60899b";
-import { derivedOf } from "./render.js?v=7a60899b";
+import * as ST from "./settings.js?v=e01fefc3";
+import * as SD from "./scenedesc.js?v=e01fefc3";
+import * as S3 from "./scene3d.js?v=e01fefc3";
+import * as LENS from "./lens.js?v=e01fefc3";
+import { createView } from "./view3d.js?v=e01fefc3";
+import { derivedOf } from "./render.js?v=e01fefc3";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -105,25 +105,8 @@ function requestRender(delay = 90) {
   clearTimeout(renderTimer);
   renderTimer = setTimeout(() => {
     gen++;
-    worker.postMessage({
-      type: "render", gen,
-      settings: {
-        design: settings.design, focalMm: settings.focalMm, fno: settings.fno,
-        focusM: settings.focusM,
-        preset: settings.preset, lightMode: settings.lightMode,
-        lampLm: settings.lampLm, lampCctK: settings.lampCctK,
-        ambientLux: settings.ambientLux, ambientCctK: settings.ambientCctK,
-        sensorWMm: settings.sensorWMm, resW: settings.resW,
-        exposure: settings.exposure, cocLimitMm: settings.cocLimitMm,
-        spp: settings.spp, depth: settings.depth,
-        /* Enough passes that the picture keeps improving for as long as anyone
-           watches it, and a newer request pre-empts whatever is left. 512 of
-           them is a couple of thousand samples a pixel, which on this scene is
-           past the point where the grain is visible; nobody waits for the end
-           of it, they just stop seeing it change. */
-        passes: 512,
-      },
-    });
+    /* Assembled from the field table, never by hand -- see renderRequest(). */
+    worker.postMessage({ type: "render", gen, settings: ST.renderRequest(settings) });
   }, delay);
 }
 
@@ -139,7 +122,7 @@ function requestExpose() {
    it must not wait for a render: dragging focus should move the focus plane
    while the picture is still resolving. */
 function rebuildDiagram() {
-  const desc = SD.preset(settings.preset);
+  const desc = SD.preset(settings.preset, settings.sizing);
   desc.lightMode = settings.lightMode;
   desc.lampLm = settings.lampLm;
   desc.lampCctK = settings.lampCctK;
@@ -475,7 +458,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=7a60899b")
+  import("./assistant.js?v=e01fefc3")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);

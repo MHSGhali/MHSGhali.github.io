@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=7a60899b";
-import * as v from "../light/vec3.js?v=7a60899b";
-import * as S from "../light/spectrum.js?v=7a60899b";
-import * as B from "../light/bsdf.js?v=7a60899b";
-import * as Lt from "../light/light.js?v=7a60899b";
-import * as G from "../light/geom.js?v=7a60899b";
-import * as U from "../light/units.js?v=7a60899b";
-import { spectrumToXyz } from "../light/color.js?v=7a60899b";
-import { createScene } from "../light/scene.js?v=7a60899b";
+import { PI, clamp } from "../light/core.js?v=e01fefc3";
+import * as v from "../light/vec3.js?v=e01fefc3";
+import * as S from "../light/spectrum.js?v=e01fefc3";
+import * as B from "../light/bsdf.js?v=e01fefc3";
+import * as Lt from "../light/light.js?v=e01fefc3";
+import * as G from "../light/geom.js?v=e01fefc3";
+import * as U from "../light/units.js?v=e01fefc3";
+import { spectrumToXyz } from "../light/color.js?v=e01fefc3";
+import { createScene } from "../light/scene.js?v=e01fefc3";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;
@@ -73,6 +73,29 @@ export const LAMPS = "lamps";
 export const AMBIENT = "ambient";
 export const LIGHT_MODES = [LAMPS, AMBIENT];
 export const MODE_NAMES = { [LAMPS]: "LAMPS", [AMBIENT]: "AMBIENT" };
+
+/* HOW BIG THE TARGETS ARE -- and it decides whether the picture has
+   PERSPECTIVE in it.
+
+   FILMED: each target's radius scales with its distance, so all five subtend
+   the same angle and land the same size on the sensor. That is a controlled
+   experiment -- the ONLY difference left between them is how far out of focus
+   they are -- and it is what the rail was built for.
+
+   It also hides the one thing every photograph shows. A scene whose objects all
+   image the same size looks like an orthographic projection, and that is exactly
+   how a TELECENTRIC lens behaves, so the rail under FILMED is easy to mistake
+   for one. It is not: the camera here is an ordinary perspective camera, and
+   under METRIC -- every target the same 30 mm radius in the world -- it proves
+   it. The 1 m target then images about five times the diameter of the 5 m one,
+   which is 1/distance and nothing else.
+
+   Angular POSITIONS still scale with distance in both modes, so the five stay
+   spread across the frame instead of stacking up behind the nearest. */
+export const FILMED = "filmed";
+export const METRIC = "metric";
+export const SIZINGS = [FILMED, METRIC];
+export const SIZING_NAMES = { [FILMED]: "SAME ON FILM", [METRIC]: "SAME IN METRES" };
 
 export const RAIL = "rail";
 /* One scene, so the panel hides the selector -- see settings.js. The list and
@@ -161,18 +184,19 @@ export function spectrumFromRgbReflectance(rgb) {
 /* Targets on a rail at exactly known distances, staggered across the frame so
    they do not occlude one another. This is the depth-of-field article: focus at
    2.0 m and the 2.0 m target must be the sharp one. */
-function presetRail(d) {
+function presetRail(d, sizing) {
   const DEPTHS = [1.0, 1.5, 2.0, 3.0, 5.0];
   const NAMES = ["1M", "1.5M", "2M", "3M", "5M"];
-  /* Each target's offset and radius scale WITH its distance, so every one
-     subtends the same angle and lands the same size on the sensor. That is the
-     point of the rail: the only difference between them in the image is how far
-     out of focus they are.
+  /* Their angular POSITIONS scale with distance in both sizings, so the five
+     stay spread across the frame rather than stacking up in depth behind the
+     nearest. The fractions stay inside 0.18, the tangent of the half-angle a
+     100 mm lens covers on full frame.
 
-     Their angular POSITIONS have to differ, though, and that is a separate
-     thing -- at a fixed offset they stack in depth and only the nearest is
-     visible. The fractions stay inside 0.18, the tangent of the half-angle a
-     100 mm lens covers on full frame. */
+     Their RADII are what `sizing` chooses between -- see the note on FILMED and
+     METRIC above. 0.030 m is the near target's size in both, so the two modes
+     agree at 1 m and diverge with distance; it is also small enough that no
+     pair overlaps under METRIC, where the near ones grow relative to their
+     neighbours. */
   const FRAC = [-0.140, -0.070, 0.0, 0.070, 0.140];
 
   /* One hue each, so a target can be named in a sentence and so the five stay
@@ -203,7 +227,7 @@ function presetRail(d) {
     d.objects.push({
       kind: "sphere",
       centre: v.v3(FRAC[i] * dist, 0, -dist),
-      radius: 0.030 * dist,
+      radius: sizing === METRIC ? 0.030 : 0.030 * dist,
       rgb: COLOURS[i][1],
       colour: COLOURS[i][0],
       name: NAMES[i],
@@ -237,7 +261,7 @@ function presetRail(d) {
 /* Seed a description from one of the presets. `id` is unused while there is
    only one, and kept so adding a second changes this function and nothing that
    calls it. */
-export function preset(id) {
+export function preset(id, sizing = METRIC) {
   const d = {
     objects: [],
     lights: [],
@@ -258,7 +282,8 @@ export function preset(id) {
     ambientLux: 2000.0,
     ambientCctK: 6500.0,
   };
-  presetRail(d);
+  d.sizing = SIZINGS.includes(sizing) ? sizing : METRIC;
+  presetRail(d, d.sizing);
   return d;
 }
 
