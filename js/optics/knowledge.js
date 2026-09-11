@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=14550619";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=f56d3836";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -110,8 +110,10 @@ Set up a camera and see what it records.
   sky. A choice, not a blend. The sky lights the scene but is not photographed,
   so the background is black in both modes and switching between them changes
   the lighting and nothing else.
-- The scene view draws the camera, the cone it sees, the focus plane and the
-  near and far limits of acceptable sharpness, all at their true distances.
+- The scene view draws the camera, the cone it sees, the focus plane, and the
+  depth of field as a box around it labelled NEAR and FAR, all at their true
+  distances. The box is left OPEN at an end that has no limit -- past the
+  hyperfocal distance there is no far face, because there is no far limit.
 - Derived readouts: focal length, field of view, entrance pupil, T-stop, back
   focus, film position, chromatic error, blur at 6 m, image circle, the on-axis
   sharp limits and the hyperfocal distance.
@@ -209,10 +211,12 @@ const PRECONDITIONS =
   glass at that target's real field position, and it is the one the rendered
   image agrees with. Quote the SPOT when asked what looks sharp.
   They no longer disagree about WHICH target, but the slab can still promise a
-  sharpness the glass cannot deliver: at 100 mm and f/8 focused at 2 m the slab
-  says 1.91 m to 2.10 m meets a 0.030 mm criterion, while the traced spot at the
-  2 m target -- zero defocus, dead in the middle of it -- is 0.046 mm. The lens
-  is aberration limited there; the slab counts defocus only.
+  sharpness the glass cannot deliver: at 100 mm and f/8 focused at 2 m the box
+  runs 1.91 m to 2.10 m at a 0.030 mm criterion, while the traced spot at the
+  2 m target -- zero defocus, dead in the middle of that box -- is 0.046 mm. The
+  lens is aberration limited there; the slab counts defocus only. So a target
+  inside the box is not automatically sharp, and the SPOT beside it is what says
+  whether it is.
   The scene view marks the sharpest target SHARPEST whether or not it met the
   criterion, and labels the focus plane FILM SET FOR rather than FOCUS, because
   that plane is where the film is placed and is not a claim about what the lens

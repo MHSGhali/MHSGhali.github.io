@@ -27,10 +27,10 @@
    COORDINATES
      Y-up, camera at the origin looking down -z, matching scenedesc.js. */
 
-import { TWO_PI } from "../light/core.js?v=14550619";
-import * as v from "../light/vec3.js?v=14550619";
-import * as LENS from "./lens.js?v=14550619";
-import { AMBIENT } from "./scenedesc.js?v=14550619";
+import { TWO_PI } from "../light/core.js?v=f56d3836";
+import * as v from "../light/vec3.js?v=f56d3836";
+import * as LENS from "./lens.js?v=f56d3836";
+import { AMBIENT } from "./scenedesc.js?v=f56d3836";
 
 /* What a segment is FOR, which is what decides how it is drawn. */
 export const GRID = "grid";         /* the ground, and its distance rings   */
@@ -172,7 +172,9 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
     /* "FILM SET FOR", not "FOCUS": this plane is where the film is placed, and
        a bare "FOCUS 1.00M" reads as a claim that the thing at 1 m is the sharp
        one. Off axis it frequently is not. */
-    label(s, v.v3(f * tanH * 1.08, f * tanV * 0.9, -f), FOCUS, `FILM SET FOR ${f.toFixed(2)}M`);
+    /* Top RIGHT. The depth-of-field box puts its two labels on the left-hand
+       corners, so the three cannot collide however shallow the range gets. */
+    label(s, v.v3(f * tanH * 1.10, f * tanV * 1.28, -f), FOCUS, `FILM SET FOR ${f.toFixed(2)}M`);
   }
 
   let nr = 0, fr = 0;
@@ -181,81 +183,74 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
     s.nearM = nr; s.farM = fr;
     s.hyperfocalM = LENS.hyperfocalM(lens, cocLimitMm);
 
-    /* DRAWN ON THE AXIS, because that is the only place the number is true.
+    /* THE BOX, restored from viewer/scene3d.c -- the near and far cross-sections
+       of the frustum, joined at the corners.
 
-       These used to be full-frame rectangles with four edges joining them into
-       a box, which says "everything in this volume is sharp". It is a paraxial,
-       ON-AXIS, defocus-only figure, and the targets are off the axis -- they
-       have to be, or they would occlude one another.
+       It was replaced with ticks on the axis for a while, because a box says
+       "everything in this volume is sharp" and the number behind it is paraxial,
+       ON AXIS and from defocus alone. That objection was really an objection to
+       the SCENE: the targets were strung across the frame, so most of them sat
+       far off axis where an uncorrected doublet's coma decides the answer and
+       the box was pointing at the wrong ball. They now sit on a ring at one
+       small field radius, well inside the box's walls, and the box points at the
+       right one. The per-target SPOT is still the authority on what the camera
+       resolves -- that is what the highlight and the label follow -- and this is
+       the textbook figure drawn to scale beside it.
 
-       At 12 mm and f/10 focused at 1 m the box landed around the 1 m target,
-       whose on-axis defocus is exactly zero and whose real spot is 0.0249 mm,
-       the WORST of the five -- while the 2 m target resolved at 0.0055 mm and
-       sat outside the box. Both numbers were right. The rectangle was the lie.
-
-       Putting the targets on a ring at one field radius fixed the ORDERING, so
-       the focused target is now the sharpest. It did not make the slab a volume:
-       the number is still the on-axis one, and the drawing still says so.
-
-       A tick on the axis and a line between them claims exactly what the
-       calculation claims: this stretch OF THE AXIS is within the limit. */
-    const tick = (dist) => {
-      const r = dist * tanV * 0.10;
-      seg(s, v.v3(-r, 0, -dist), v.v3(r, 0, -dist), DOF);
-      seg(s, v.v3(0, -r, -dist), v.v3(0, r, -dist), DOF);
-      return r;
+       AN OPEN END MEANS IT KEEPS GOING. The face is drawn only where the limit
+       is; past the hyperfocal distance there is no far face, because there is no
+       far limit. A closed box that stopped at the edge of the picture would be
+       claiming an end the calculation never gave. */
+    const face = (dist) => planeAt(s, dist, dist * tanH, dist * tanV, DOF);
+    const corners = (dist) => [
+      v.v3(-dist * tanH, -dist * tanV, -dist), v.v3(dist * tanH, -dist * tanV, -dist),
+      v.v3(dist * tanH, dist * tanV, -dist), v.v3(-dist * tanH, dist * tanV, -dist),
+    ];
+    const walls = (fromD, toD) => {
+      const a = corners(fromD), b = corners(toD);
+      for (let i = 0; i < 4; i++) seg(s, a[i], b[i], DOF);
     };
-    /* An open arrowhead for an end that is past the edge of the picture. The
-       line has to keep going, or an unbounded depth of field reads as one that
-       stops at the arrow -- which is the opposite of what it means. */
+    /* An open arrowhead on the axis, for the case where NONE of the range is in
+       the picture and there is no box to draw at all. */
     const arrow = (dist) => {
       const r = dist * tanV * 0.10;
-      const back = -dist + r * 0.9;
       for (const [ax, ay] of [[-0.6, 0], [0.6, 0], [0, -0.6], [0, 0.6]]) {
-        seg(s, v.v3(ax * r, ay * r, back), v.v3(0, 0, -dist), DOF);
+        seg(s, v.v3(ax * r, ay * r, -dist + r * 0.9), v.v3(0, 0, -dist), DOF);
       }
       return r;
     };
 
-    /* THE RANGE IS THE POINT, and the two ends are only its labels -- so the
-       line gets drawn in every case where any of it is in the picture, and an
-       end that is not gets an arrow saying where it went. Four cases, because
-       either end can fall outside:
-
-         both inside      tick, line, tick
-         far outside      tick, line, arrow -- the common one, and infinite
-                          past the hyperfocal distance
-         near at the lens  line from the camera, tick -- wide and stopped down
-         both outside     arrow alone, with the range in words */
     const m = (x) => `${x.toFixed(x < 100 ? 2 : 0)}M`;
     const nearAtLens = nr <= 0.02;
     const nearIn = !nearAtLens && nr <= reach;
     const farIn = Number.isFinite(fr) && fr <= reach;
     const anyIn = nearAtLens || nearIn;
 
-    /* Labels staggered above and below: shallow depth of field puts these two
-       within a few centimetres of each other, and on one line they overprint
-       exactly when the numbers matter most. */
     if (nearIn) {
-      const r = tick(nr);
-      label(s, v.v3(0, -r - nr * tanV * 0.12, -nr), DOF, `AXIS NEAR ${m(nr)}`);
+      face(nr);
+      /* Labels on the box's own corners rather than on the axis. On the axis
+         they landed in the middle of the targets, and at a shallow depth of
+         field NEAR, FAR, the focus plane and two target labels all overprinted
+         within a centimetre of each other. Opposite corners, so the two cannot
+         collide with each other however close the limits get. */
+      label(s, v.v3(-nr * tanH * 1.10, -nr * tanV * 1.28, -nr), DOF, `NEAR ${m(nr)}`);
     }
     if (anyIn && farIn) {
-      const r = tick(fr);
-      label(s, v.v3(0, r + fr * tanV * 0.12, -fr), DOF, `AXIS FAR ${m(fr)}`);
+      face(fr);
+      label(s, v.v3(-fr * tanH * 1.10, fr * tanV * 1.28, -fr), DOF, `FAR ${m(fr)}`);
     }
     if (anyIn && !farIn) {
-      const r = arrow(reach);
-      label(s, v.v3(0, r + reach * tanV * 0.12, -reach), DOF,
-        `AXIS FAR ${Number.isFinite(fr) ? m(fr) : "INFINITY"}`);
+      /* No far face: the range runs past the edge of the picture, or past the
+         hyperfocal distance, where it does not end at all. */
+      label(s, v.v3(-reach * tanH * 1.10, reach * tanV * 1.28, -reach), DOF,
+        `FAR ${Number.isFinite(fr) ? m(fr) : "INFINITY"}`);
     }
-    if (anyIn) {
-      seg(s, v.v3(0, 0, -(nearAtLens ? 0 : nr)), v.v3(0, 0, -(farIn ? fr : reach)), DOF);
-    } else if (nr > reach) {
+    if (anyIn) walls(nearAtLens ? 0.02 : nr, farIn ? fr : reach);
+    else if (nr > reach) {
       /* The whole range is past the end of the axis -- focus far enough out and
          it is. Nothing on screen is within it, so nothing on screen may be drawn
-         as though it were; the arrow points out of the picture and the label
-         carries both numbers. */
+         as though it were: an arrow out of the picture, and both numbers in
+         words. */
       const r = arrow(reach);
       label(s, v.v3(0, r + reach * tanV * 0.12, -reach), DOF,
         `AXIS SHARP ${m(nr)} TO ${Number.isFinite(fr) ? m(fr) : "INFINITY"}`);
@@ -324,8 +319,25 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
     const size = Number.isFinite(spot)
       ? `${o.name} ${spot < 0.1 ? spot.toFixed(3) : spot.toFixed(2)}MM${best ? " SHARPEST" : ""}`
       : o.name;
-    label(s, v.v3(o.centre.x, o.centre.y + o.radius + 0.14, o.centre.z),
-          sharp ? SUBJECT : best ? BEST : OBJECT, size);
+    /* PUSHED OUT ALONG THE RING, not stacked above the target.
+
+       Every label used to sit directly over its own sphere, which was fine
+       while the targets were strung across the frame and read left to right.
+       On a ring they are five points around one small circle, so five labels
+       hung above them landed in a heap in the middle of the picture -- with the
+       focus plane's label and the depth-of-field limits in the same heap.
+
+       Each one now moves radially outward from the axis, in its own target's
+       direction, by an amount that grows with distance so the fan opens up
+       rather than converging toward the vanishing point. The five clock
+       positions then carry the five labels apart from each other, and all of
+       them away from the axis where the focus plane lives. */
+    const out = Math.hypot(o.centre.x, o.centre.y);
+    const push = o.radius + 0.10 + 0.085 * dist;
+    const at = out > 1e-6
+      ? v.v3(o.centre.x * (1 + push / out), o.centre.y * (1 + push / out), o.centre.z)
+      : v.v3(o.centre.x, o.centre.y + push, o.centre.z);
+    label(s, at, sharp ? SUBJECT : best ? BEST : OBJECT, size);
   }
 
   /* ---- the lamps ---- */

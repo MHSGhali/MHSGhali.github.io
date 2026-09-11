@@ -33,11 +33,11 @@
          per surface:  u' = (n u - y (n' - n)/R) / n'      then  y += u' t
          EFL = -y_first / u'_last      BFD = -y_last / u'_last */
 
-import { PI } from "../light/core.js?v=14550619";
-import * as v from "../light/vec3.js?v=14550619";
-import { fresnelDielectric } from "../light/bsdf.js?v=14550619";
-import * as G from "./glass.js?v=14550619";
-import * as P from "./prescription.js?v=14550619";
+import { PI } from "../light/core.js?v=f56d3836";
+import * as v from "../light/vec3.js?v=f56d3836";
+import { fresnelDielectric } from "../light/bsdf.js?v=f56d3836";
+import * as G from "./glass.js?v=f56d3836";
+import * as P from "./prescription.js?v=f56d3836";
 
 /* Index of the medium AFTER surface i. */
 export function nAfter(L, i, lambdaNm) {

@@ -11,9 +11,9 @@
    and nothing catches it. Keeping the photometric value unreachable outside
    this layer prevents that error class structurally. */
 
-import { KM_LM_PER_W } from "./core.js?v=14550619";
-import { integrate, integrateWeighted, normalizeTo, copy } from "./spectrum.js?v=14550619";
-import { cmfYbar } from "./color.js?v=14550619";
+import { KM_LM_PER_W } from "./core.js?v=f56d3836";
+import { integrate, integrateWeighted, normalizeTo, copy } from "./spectrum.js?v=f56d3836";
+import { cmfYbar } from "./color.js?v=f56d3836";
 
 export const RADIOMETRIC = "radiometric";
 export const PHOTOMETRIC = "photometric";

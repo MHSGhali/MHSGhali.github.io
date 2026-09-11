@@ -33,12 +33,12 @@
      The cos^4 falloff is DERIVED here, not applied. Nothing else in this
      program may multiply by a vignetting factor -- see lens.js. */
 
-import { PI } from "../light/core.js?v=14550619";
-import * as v from "../light/vec3.js?v=14550619";
-import * as R from "../light/rng.js?v=14550619";
-import * as L from "./lens.js?v=14550619";
-import * as PU from "./pupil.js?v=14550619";
-import { pixelHash, lambdaPick } from "./spectral.js?v=14550619";
+import { PI } from "../light/core.js?v=f56d3836";
+import * as v from "../light/vec3.js?v=f56d3836";
+import * as R from "../light/rng.js?v=f56d3836";
+import * as L from "./lens.js?v=f56d3836";
+import * as PU from "./pupil.js?v=f56d3836";
+import { pixelHash, lambdaPick } from "./spectral.js?v=f56d3836";
 
 const MM_PER_M = 1000.0;
 

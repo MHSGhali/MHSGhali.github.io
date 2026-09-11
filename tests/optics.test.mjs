@@ -1211,9 +1211,14 @@ test("the diagram marks what the camera resolves, not what the slab predicts", (
   assert.match(focusLabel.text, /^FILM SET FOR /,
     `"${focusLabel.text}" reads as a promise the lens does not always keep`);
 
-  /* The slab is still drawn, and its labels say which question it answers. */
+  /* The slab is still drawn, as a box around the range, and it is drawn in its
+     own kind so nothing can confuse it with the focus plane or with a target. */
   const dofLabels = s.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text);
-  for (const t of dofLabels) assert.match(t, /^AXIS /, `"${t}" must say it is an on-axis figure`);
+  assert.deepEqual(dofLabels, ["NEAR 1.91M", "FAR 2.10M"]);
+  assert.equal(s.segs.filter((g) => g.kind === S3.DOF).length, 12, "a closed box");
+  /* The box contains the 2 m target it disagrees with, which is the whole
+     point of drawing both: the number says sharp and the spot says not. */
+  assert.ok(2.0 >= slab.near && 2.0 <= slab.far);
 });
 
 test("the depth of field is drawn as a range, however far out its ends are", () => {
@@ -1230,31 +1235,35 @@ test("the depth of field is drawn as a range, however far out its ends are", () 
     assert.ok(L.focus(lens, focusM), `cannot focus ${focal} mm at ${focusM} m`);
     const built = S3.build(desc, lens, 36, 24, coc);
     return {
+      built,
       range: L.dof(lens, coc),
       labels: built.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text),
       segs: built.segs.filter((g) => g.kind === S3.DOF),
     };
   };
 
-  /* Both ends inside: a tick each, and a line joining them. */
+  /* Both ends inside: a face at each, and four walls joining them. A CLOSED
+     box -- twelve segments, and that count is the assertion, because an open
+     one would mean something else entirely. */
   const both = dofOf(100, 5, 5, 0.200);
-  assert.deepEqual(both.labels, ["AXIS NEAR 3.36M", "AXIS FAR 9.81M"]);
+  assert.deepEqual(both.labels, ["NEAR 3.36M", "FAR 9.81M"]);
+  assert.equal(both.segs.length, 12, "a bounded range is a closed box");
 
-  /* The far end past the hyperfocal distance is infinite, and must still be
-     drawn -- as an arrow leaving the picture, never as a missing end. */
+  /* Past the hyperfocal distance the far limit is infinite. There is no far
+     face, because there is no far limit -- the box stays open and says so. A
+     closed box ending at the edge of the picture would be claiming an end the
+     calculation never gave. */
   const open = dofOf(25, 45, 2, 0.030);
   assert.ok(!Number.isFinite(open.range.far), "this one must be unbounded");
-  assert.deepEqual(open.labels, ["AXIS NEAR 0.38M", "AXIS FAR INFINITY"]);
-  assert.ok(open.segs.length > both.segs.length,
-    "the open end is an arrowhead, so it costs more segments than a tick");
+  assert.deepEqual(open.labels, ["NEAR 0.38M", "FAR INFINITY"]);
+  assert.equal(open.segs.length, 8, "one face and four walls: open at the far end");
 
-  /* Wide and stopped down enough and the near limit reaches the lens itself.
-     A tick there would sit inside the camera body, so the line simply starts
-     at the camera -- but the range is still drawn. */
+  /* Wide and stopped down enough and the near limit reaches the lens itself,
+     so neither end has a face -- but the range is still drawn. */
   const atLens = dofOf(12, 45, 0.5, 0.200);
   assert.ok(atLens.range.near <= 0.02, "the near limit must be at the lens");
-  assert.deepEqual(atLens.labels, ["AXIS FAR INFINITY"]);
-  assert.ok(atLens.segs.length > 0, "and the range is still drawn");
+  assert.deepEqual(atLens.labels, ["FAR INFINITY"]);
+  assert.equal(atLens.segs.length, 4, "walls only: open at both ends");
 
   /* Focused far enough out and the whole range is past the end of the axis.
      Nothing on screen is inside it, so nothing on screen may be drawn as
@@ -1267,10 +1276,16 @@ test("the depth of field is drawn as a range, however far out its ends are", () 
       "nothing inside the picture may be marked sharp when none of it is");
   }
 
-  /* Every label says it is an on-axis figure, in all four cases. */
-  for (const c of [both, open, atLens, beyond]) {
-    for (const t of c.labels) assert.match(t, /^AXIS /, `"${t}" must say it is on-axis`);
-  }
+  /* And the labels sit on the box's corners, not on the axis, where they used
+     to overprint the targets and the focus plane at a shallow depth of field. */
+  const tight = dofOf(100, 5, 2, 0.030);
+  assert.deepEqual(tight.labels, ["NEAR 1.94M", "FAR 2.06M"]);
+  const [near, far] = tight.built.labels.filter((l) => l.kind === S3.DOF);
+  assert.ok(near.at.x < 0 && near.at.y < 0, "NEAR goes to a bottom corner");
+  assert.ok(far.at.x < 0 && far.at.y > 0, "FAR goes to a top corner");
+  const focusLabel = tight.built.labels.find((l) => l.kind === S3.FOCUS);
+  assert.ok(focusLabel.at.x > 0 && focusLabel.at.y > 0,
+    "and the focus plane's label goes to the other side, so the three cannot collide");
 });
 
 test("stopped down, the focused target is marked and the numbers agree", () => {
