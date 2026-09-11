@@ -27,10 +27,10 @@
    COORDINATES
      Y-up, camera at the origin looking down -z, matching scenedesc.js. */
 
-import { TWO_PI } from "../light/core.js?v=1ebeecf9";
-import * as v from "../light/vec3.js?v=1ebeecf9";
-import * as LENS from "./lens.js?v=1ebeecf9";
-import { AMBIENT } from "./scenedesc.js?v=1ebeecf9";
+import { TWO_PI } from "../light/core.js?v=14550619";
+import * as v from "../light/vec3.js?v=14550619";
+import * as LENS from "./lens.js?v=14550619";
+import { AMBIENT } from "./scenedesc.js?v=14550619";
 
 /* What a segment is FOR, which is what decides how it is drawn. */
 export const GRID = "grid";         /* the ground, and its distance rings   */
@@ -84,12 +84,32 @@ function planeAt(s, d, halfW, halfH, k) {
 export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
   const s = { segs: [], labels: [], nearM: 0, farM: 0, hyperfocalM: 0 };
 
+  /* Solved before anything is drawn, because the depth of field is one of the
+     things that decides HOW FAR OUT to draw. */
+  const dofRes = lens ? LENS.dof(lens, cocLimitMm) : null;
+
   /* How far out to draw. Governed by the furthest thing that matters, so the
      view frames itself instead of needing a zoom every time the scene or the
-     focus changes. */
+     focus changes.
+
+     The depth of field counts as one of those things. It used to not, and the
+     far limit simply vanished whenever it fell past the objects: at 100 mm and
+     f/5 focused at 5 m the range is 3.36 m to 9.77 m, and with the axis stopping
+     at 8 m the diagram drew AXIS NEAR and nothing else -- which reads as a range
+     that stops there rather than one that runs off the end of the picture.
+
+     Past LIMIT the far end is not drawn to scale, because making room for it
+     would squeeze the camera and the targets into a few pixels to accommodate a
+     single line. It gets an arrow and its real value instead. */
+  const LIMIT = 14.0;
   let reach = 8.0;
   for (const o of d.objects) if (-o.centre.z > reach) reach = -o.centre.z;
-  if (reach > 14.0) reach = 14.0;
+  if (dofRes) {
+    for (const end of [dofRes.near, dofRes.far]) {
+      if (Number.isFinite(end) && end > reach) reach = end * 1.06;
+    }
+  }
+  if (reach > LIMIT) reach = LIMIT;
 
   /* ---- the ground, ruled every metre ----
      Kept narrow. A wide floor is mostly empty and pulls the eye away from the
@@ -155,7 +175,6 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
     label(s, v.v3(f * tanH * 1.08, f * tanV * 0.9, -f), FOCUS, `FILM SET FOR ${f.toFixed(2)}M`);
   }
 
-  const dofRes = LENS.dof(lens, cocLimitMm);
   let nr = 0, fr = 0;
   if (dofRes) {
     nr = dofRes.near; fr = dofRes.far;
@@ -166,16 +185,17 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
 
        These used to be full-frame rectangles with four edges joining them into
        a box, which says "everything in this volume is sharp". It is a paraxial,
-       ON-AXIS, defocus-only figure, and this scene's targets are deliberately
-       staggered ACROSS the frame so they do not occlude each other -- so all
-       but one of them is off axis, where an uncorrected doublet's coma decides
-       the answer instead.
+       ON-AXIS, defocus-only figure, and the targets are off the axis -- they
+       have to be, or they would occlude one another.
 
        At 12 mm and f/10 focused at 1 m the box landed around the 1 m target,
        whose on-axis defocus is exactly zero and whose real spot is 0.0249 mm,
-       the WORST of the five -- while the 2 m target, the only one actually on
-       the axis, resolves at 0.0055 mm and sat outside the box. Both numbers
-       were right. The rectangle was the lie.
+       the WORST of the five -- while the 2 m target resolved at 0.0055 mm and
+       sat outside the box. Both numbers were right. The rectangle was the lie.
+
+       Putting the targets on a ring at one field radius fixed the ORDERING, so
+       the focused target is now the sharpest. It did not make the slab a volume:
+       the number is still the on-axis one, and the drawing still says so.
 
        A tick on the axis and a line between them claims exactly what the
        calculation claims: this stretch OF THE AXIS is within the limit. */
@@ -185,20 +205,61 @@ export function build(d, lens, sensorWMm, sensorHMm, cocLimitMm) {
       seg(s, v.v3(0, -r, -dist), v.v3(0, r, -dist), DOF);
       return r;
     };
-    const haveNear = nr > 0.02 && nr <= reach;
-    const haveFar = Number.isFinite(fr) && fr <= reach;
+    /* An open arrowhead for an end that is past the edge of the picture. The
+       line has to keep going, or an unbounded depth of field reads as one that
+       stops at the arrow -- which is the opposite of what it means. */
+    const arrow = (dist) => {
+      const r = dist * tanV * 0.10;
+      const back = -dist + r * 0.9;
+      for (const [ax, ay] of [[-0.6, 0], [0.6, 0], [0, -0.6], [0, 0.6]]) {
+        seg(s, v.v3(ax * r, ay * r, back), v.v3(0, 0, -dist), DOF);
+      }
+      return r;
+    };
+
+    /* THE RANGE IS THE POINT, and the two ends are only its labels -- so the
+       line gets drawn in every case where any of it is in the picture, and an
+       end that is not gets an arrow saying where it went. Four cases, because
+       either end can fall outside:
+
+         both inside      tick, line, tick
+         far outside      tick, line, arrow -- the common one, and infinite
+                          past the hyperfocal distance
+         near at the lens  line from the camera, tick -- wide and stopped down
+         both outside     arrow alone, with the range in words */
+    const m = (x) => `${x.toFixed(x < 100 ? 2 : 0)}M`;
+    const nearAtLens = nr <= 0.02;
+    const nearIn = !nearAtLens && nr <= reach;
+    const farIn = Number.isFinite(fr) && fr <= reach;
+    const anyIn = nearAtLens || nearIn;
+
     /* Labels staggered above and below: shallow depth of field puts these two
        within a few centimetres of each other, and on one line they overprint
        exactly when the numbers matter most. */
-    if (haveNear) {
+    if (nearIn) {
       const r = tick(nr);
-      label(s, v.v3(0, -r - nr * tanV * 0.12, -nr), DOF, `AXIS NEAR ${nr.toFixed(2)}M`);
+      label(s, v.v3(0, -r - nr * tanV * 0.12, -nr), DOF, `AXIS NEAR ${m(nr)}`);
     }
-    if (haveFar) {
+    if (anyIn && farIn) {
       const r = tick(fr);
-      label(s, v.v3(0, r + fr * tanV * 0.12, -fr), DOF, `AXIS FAR ${fr.toFixed(2)}M`);
+      label(s, v.v3(0, r + fr * tanV * 0.12, -fr), DOF, `AXIS FAR ${m(fr)}`);
     }
-    if (haveNear && haveFar) seg(s, v.v3(0, 0, -nr), v.v3(0, 0, -fr), DOF);
+    if (anyIn && !farIn) {
+      const r = arrow(reach);
+      label(s, v.v3(0, r + reach * tanV * 0.12, -reach), DOF,
+        `AXIS FAR ${Number.isFinite(fr) ? m(fr) : "INFINITY"}`);
+    }
+    if (anyIn) {
+      seg(s, v.v3(0, 0, -(nearAtLens ? 0 : nr)), v.v3(0, 0, -(farIn ? fr : reach)), DOF);
+    } else if (nr > reach) {
+      /* The whole range is past the end of the axis -- focus far enough out and
+         it is. Nothing on screen is within it, so nothing on screen may be drawn
+         as though it were; the arrow points out of the picture and the label
+         carries both numbers. */
+      const r = arrow(reach);
+      label(s, v.v3(0, r + reach * tanV * 0.12, -reach), DOF,
+        `AXIS SHARP ${m(nr)} TO ${Number.isFinite(fr) ? m(fr) : "INFINITY"}`);
+    }
   }
 
   /* ---- the subjects, at the distances the description says ----

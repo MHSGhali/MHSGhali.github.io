@@ -1216,6 +1216,63 @@ test("the diagram marks what the camera resolves, not what the slab predicts", (
   for (const t of dofLabels) assert.match(t, /^AXIS /, `"${t}" must say it is an on-axis figure`);
 });
 
+test("the depth of field is drawn as a range, however far out its ends are", () => {
+  /* IT USED TO DISAPPEAR. The axis was drawn to a fixed 8 m, and an end past
+     that was silently dropped -- so at 100 mm and f/5 focused at 5 m, where the
+     range is 3.36 m to 9.81 m, the diagram showed AXIS NEAR and nothing else.
+     A range with one end drawn reads as a range that stops there.
+
+     Four cases, because either end can fall outside the picture, and every one
+     of them has to say what it is. */
+  const desc = SD.preset(SD.RAIL);
+  const dofOf = (focal, fno, focusM, coc) => {
+    const lens = L.build(P.ACHROMAT_100, focal, fno);
+    assert.ok(L.focus(lens, focusM), `cannot focus ${focal} mm at ${focusM} m`);
+    const built = S3.build(desc, lens, 36, 24, coc);
+    return {
+      range: L.dof(lens, coc),
+      labels: built.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text),
+      segs: built.segs.filter((g) => g.kind === S3.DOF),
+    };
+  };
+
+  /* Both ends inside: a tick each, and a line joining them. */
+  const both = dofOf(100, 5, 5, 0.200);
+  assert.deepEqual(both.labels, ["AXIS NEAR 3.36M", "AXIS FAR 9.81M"]);
+
+  /* The far end past the hyperfocal distance is infinite, and must still be
+     drawn -- as an arrow leaving the picture, never as a missing end. */
+  const open = dofOf(25, 45, 2, 0.030);
+  assert.ok(!Number.isFinite(open.range.far), "this one must be unbounded");
+  assert.deepEqual(open.labels, ["AXIS NEAR 0.38M", "AXIS FAR INFINITY"]);
+  assert.ok(open.segs.length > both.segs.length,
+    "the open end is an arrowhead, so it costs more segments than a tick");
+
+  /* Wide and stopped down enough and the near limit reaches the lens itself.
+     A tick there would sit inside the camera body, so the line simply starts
+     at the camera -- but the range is still drawn. */
+  const atLens = dofOf(12, 45, 0.5, 0.200);
+  assert.ok(atLens.range.near <= 0.02, "the near limit must be at the lens");
+  assert.deepEqual(atLens.labels, ["AXIS FAR INFINITY"]);
+  assert.ok(atLens.segs.length > 0, "and the range is still drawn");
+
+  /* Focused far enough out and the whole range is past the end of the axis.
+     Nothing on screen is inside it, so nothing on screen may be drawn as
+     though it were: an arrow out of the picture, and both numbers in words. */
+  const beyond = dofOf(100, 5, 50, 0.030);
+  assert.ok(beyond.range.near > 14, "the near limit must be past the axis");
+  assert.deepEqual(beyond.labels, ["AXIS SHARP 28.60M TO 199M"]);
+  for (const g of beyond.segs) {
+    assert.ok(-g.a.z > 13 && -g.b.z > 13,
+      "nothing inside the picture may be marked sharp when none of it is");
+  }
+
+  /* Every label says it is an on-axis figure, in all four cases. */
+  for (const c of [both, open, atLens, beyond]) {
+    for (const t of c.labels) assert.match(t, /^AXIS /, `"${t}" must say it is on-axis`);
+  }
+});
+
 test("stopped down, the focused target is marked and the numbers agree", () => {
   /* The other half: when the lens can actually meet the criterion, the mark
      appears, and it appears on the target the film is set for. */

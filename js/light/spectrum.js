@@ -24,8 +24,8 @@
      would require replacing this with hero-wavelength sampling. Do not add one
      casually. */
 
-import { PLANCK_H, LIGHT_C, BOLTZMANN_K, STEFAN_BOLTZMANN, PI, interpTable } from "./core.js?v=1ebeecf9";
-import { CIE_DAYLIGHT_LAMBDA, CIE_S0, CIE_S1, CIE_S2, CIE_DAYLIGHT_COUNT } from "./cie-data.js?v=1ebeecf9";
+import { PLANCK_H, LIGHT_C, BOLTZMANN_K, STEFAN_BOLTZMANN, PI, interpTable } from "./core.js?v=14550619";
+import { CIE_DAYLIGHT_LAMBDA, CIE_S0, CIE_S1, CIE_S2, CIE_DAYLIGHT_COUNT } from "./cie-data.js?v=14550619";
 
 export const LAMBDA_MIN_NM = 360;
 export const LAMBDA_MAX_NM = 830;
