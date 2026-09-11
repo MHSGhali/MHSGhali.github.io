@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=e01fefc3";
-import * as knowledge from "./knowledge.js?v=e01fefc3";
-import * as SD from "./scenedesc.js?v=e01fefc3";
-import * as P from "./prescription.js?v=e01fefc3";
+import { mountChat } from "../chat/ui.js?v=1ebeecf9";
+import * as knowledge from "./knowledge.js?v=1ebeecf9";
+import * as SD from "./scenedesc.js?v=1ebeecf9";
+import * as P from "./prescription.js?v=1ebeecf9";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -63,9 +63,10 @@ export function mountAssistant(host, api) {
       switch (cmd.action) {
         case "preset": {
           if (!put("preset", cmd.id)) return `Already showing the ${cmd.name}.`;
-          return "Loaded the depth rail: five coloured targets at 1, 1.5, 2, 3 and 5 m. TARGET SIZE "
-            + "decides whether they are the same size in metres, which shows perspective, or the "
-            + "same size on film, which leaves focus as the only difference between them.";
+          return "Loaded the depth rail: five coloured targets at 1, 1.5, 2, 3 and 5 m, set out as "
+            + "a ring about the optical axis so all five are the same distance off it — which is "
+            + "what makes the focused one the sharpest. TARGET SIZE decides whether they are the "
+            + "same size in metres, which shows perspective, or the same size on film.";
         }
 
         case "design": {

@@ -6,9 +6,9 @@
    with a mouse, a trackpad, or a finger, and every keyboard shortcut from the
    desktop app is also a toolbar button because a phone has no keyboard. */
 
-import * as M from "./mechanism.js?v=e01fefc3";
-import * as S from "./solver.js?v=e01fefc3";
-import * as v from "./vec2.js?v=e01fefc3";
+import * as M from "./mechanism.js?v=1ebeecf9";
+import * as S from "./solver.js?v=1ebeecf9";
+import * as v from "./vec2.js?v=1ebeecf9";
 
 const CONNECTOR_HIT_RADIUS = 12;   /* screen px */
 const LINK_EDGE_HIT_DIST = 7;

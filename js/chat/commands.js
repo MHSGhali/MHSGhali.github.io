@@ -92,7 +92,7 @@ export const OPTICS_PRESETS = [
        the only thing that happened, so the aperture never moved at all. So the
        phrase only names the scene when a looking-at verb comes with it. */
     does: /\b(?:see|show|showing|shows|demonstrat\w*|illustrat\w*|look at|compare)\b[^.]{0,28}?\b(?:depth of field|depth-of-field|focus)\b|\b(?:focus test|focus chart|rack focus|how much is sharp|what.{0,4}s in focus)\b/i,
-    because: "five targets at known distances, and under SAME ON FILM they all land the same size, so the only difference between them in the image is how far out of focus they are" },
+    because: "five targets at known distances, set out as a ring about the optical axis so they share their field aberration exactly, which leaves how far out of focus they are as the only difference between them" },
 ];
 
 /* ------------------------------------------------------------- the grammar */

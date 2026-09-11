@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=e01fefc3";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=1ebeecf9";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -101,9 +101,11 @@ Set up a camera and see what it records.
   glass, so the camera does not walk while racking.
 - Sensor width from 4 to 80 mm at 3:2, a render grid from 64 to 640 px, and an
   exposure that is a viewing gain applied after the fact.
-- One scene, the depth rail: five coloured targets at 1, 1.5, 2, 3 and 5 m, in
-  either of two sizings -- all the same size ON FILM, or all the same size IN
-  METRES, which is the one that shows perspective.
+- One scene, the depth rail: five coloured targets at 1, 1.5, 2, 3 and 5 m,
+  arranged as a ring about the optical axis so all five sit the same distance
+  off it. Two sizings
+  -- all the same size ON FILM, or all the same size IN METRES, which is the one
+  that shows perspective.
 - Two lighting modes: the placed rectangular key lamp, or a uniform overhead
   sky. A choice, not a blend. The sky lights the scene but is not photographed,
   so the background is black in both modes and switching between them changes
@@ -196,29 +198,33 @@ const PRECONDITIONS =
 - The image refines progressively. It is grainy for the first second and keeps
   improving for as long as it is left alone, so a reading taken immediately
   after a change is provisional.
-- There are TWO sharpness figures and they routinely disagree. The
-  depth-of-field slab (AXIS SHARP FROM/TO) is paraxial, ON AXIS, and from
+- FOCUSING AT A TARGET MAKES THAT TARGET THE SHARPEST. All five sit at the same
+  angular radius from the optical axis -- a ring, at five clock positions -- so
+  they share their field aberration exactly and it cancels out of any comparison
+  between them. Set the focus to 3 m and the 3 m target is the sharpest thing in
+  frame; set it to 5 m and the 5 m one is. That is the whole point of the scene.
+- There are still TWO sharpness figures, and they answer different questions.
+  The depth-of-field slab (AXIS SHARP FROM/TO) is paraxial, ON AXIS, and from
   defocus alone. The per-target SPOT is the real ray traced through the real
   glass at that target's real field position, and it is the one the rendered
-  image agrees with.
+  image agrees with. Quote the SPOT when asked what looks sharp.
+  They no longer disagree about WHICH target, but the slab can still promise a
+  sharpness the glass cannot deliver: at 100 mm and f/8 focused at 2 m the slab
+  says 1.91 m to 2.10 m meets a 0.030 mm criterion, while the traced spot at the
+  2 m target -- zero defocus, dead in the middle of it -- is 0.046 mm. The lens
+  is aberration limited there; the slab counts defocus only.
   The scene view marks the sharpest target SHARPEST whether or not it met the
   criterion, and labels the focus plane FILM SET FOR rather than FOCUS, because
   that plane is where the film is placed and is not a claim about what the lens
   resolves there.
-  Off axis an uncorrected doublet's coma and astigmatism dwarf defocus, so the
-  disagreement can be total: at 25 mm focused at 1 m, the 1 m target has exactly
-  zero defocus and the slab calls it perfect, while its traced spot is the worst
-  of the five and the on-axis 2 m target -- which the slab excludes -- is the
-  sharpest thing in frame. Quote the SPOT when asked what looks sharp. The slab
-  is the textbook number, not the photograph.
 - The shipped achromat leaves about 0.032 mm of spherical aberration on axis
   wide open, which is just over the 0.030 mm the sharpness criterion asks for.
   So at the default settings nothing formally qualifies as sharp, and one third
   of a stop down it does. That is the lens being aberration limited at f/5, not
   a fault.
 - THIS IS AN ORDINARY PERSPECTIVE CAMERA, and under SAME ON FILM it does not
-  look like one. A fixed 30 mm sphere images 59.3 px across at 1 m and 10.9 px
-  at 5 m at the default settings: exactly 1/distance. Under SAME ON FILM every
+  look like one. A fixed 24 mm sphere images 47.4 px across at 1 m and 8.7 px
+  at 5 m at the default settings: f/(distance - f) and nothing else. Under SAME ON FILM every
   target images the same size because the SCENE scales their radii with their
   distance, not because the lens is telecentric. It is not telecentric, and
   there is no telecentric mode. Offer SAME IN METRES to anyone who says the

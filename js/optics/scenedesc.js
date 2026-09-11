@@ -26,15 +26,15 @@
      not care, but anything that assumes an up axis (the 3D view) must use this
      one. */
 
-import { PI, clamp } from "../light/core.js?v=e01fefc3";
-import * as v from "../light/vec3.js?v=e01fefc3";
-import * as S from "../light/spectrum.js?v=e01fefc3";
-import * as B from "../light/bsdf.js?v=e01fefc3";
-import * as Lt from "../light/light.js?v=e01fefc3";
-import * as G from "../light/geom.js?v=e01fefc3";
-import * as U from "../light/units.js?v=e01fefc3";
-import { spectrumToXyz } from "../light/color.js?v=e01fefc3";
-import { createScene } from "../light/scene.js?v=e01fefc3";
+import { PI, clamp } from "../light/core.js?v=1ebeecf9";
+import * as v from "../light/vec3.js?v=1ebeecf9";
+import * as S from "../light/spectrum.js?v=1ebeecf9";
+import * as B from "../light/bsdf.js?v=1ebeecf9";
+import * as Lt from "../light/light.js?v=1ebeecf9";
+import * as G from "../light/geom.js?v=1ebeecf9";
+import * as U from "../light/units.js?v=1ebeecf9";
+import { spectrumToXyz } from "../light/color.js?v=1ebeecf9";
+import { createScene } from "../light/scene.js?v=1ebeecf9";
 
 /* ---- limits ---- */
 export const POS_LIMIT_M = 50.0;
@@ -187,24 +187,57 @@ export function spectrumFromRgbReflectance(rgb) {
 function presetRail(d, sizing) {
   const DEPTHS = [1.0, 1.5, 2.0, 3.0, 5.0];
   const NAMES = ["1M", "1.5M", "2M", "3M", "5M"];
-  /* Their angular POSITIONS scale with distance in both sizings, so the five
-     stay spread across the frame rather than stacking up in depth behind the
-     nearest. The fractions stay inside 0.18, the tangent of the half-angle a
-     100 mm lens covers on full frame.
+  /* A RING, NOT A ROW -- and the reason is the whole point of the scene.
 
-     Their RADII are what `sizing` chooses between -- see the note on FILMED and
-     METRIC above. 0.030 m is the near target's size in both, so the two modes
-     agree at 1 m and diverge with distance; it is also small enough that no
-     pair overlaps under METRIC, where the near ones grow relative to their
-     neighbours. */
-  const FRAC = [-0.140, -0.070, 0.0, 0.070, 0.140];
+     Depth of field is an ON-AXIS, defocus-only idea. Every other aberration a
+     lens has grows with how far OFF the axis the subject sits: coma roughly
+     with the field angle, astigmatism and field curvature with its square. So
+     the moment targets are spread across the frame to stop them occluding one
+     another, they stop being a controlled experiment in focus and become an
+     experiment in focus AND field position at once.
+
+     The first version of this scene was a row: angular offsets from -0.140 to
+     +0.140, evenly spaced. That put the outer two at 59 % of a full-frame
+     sensor's half-diagonal, where the shipped achromat is hopeless -- and it
+     broke the demonstration outright. Focused at 5 m, at 100 mm and f/5, the
+     5 m target measured 0.44 mm while the 3 m target measured 0.11 mm. Both
+     numbers were correct. Setting the focus to 5 m simply did not make the 5 m
+     target the sharpest thing in the frame, because 0.44 mm of coma at the
+     edge of the field beat 0.27 mm of defocus nearer the middle. Move that same
+     target ON to the axis and it measures 0.023 mm, exactly as focusing at 5 m
+     should give.
+
+     So all five now sit at the SAME angular radius from the axis, at five clock
+     positions 72 degrees apart. Equal field radius means identical field
+     aberration, which cancels out of every comparison between them and leaves
+     defocus as the only difference -- which is what this scene has always
+     claimed to show. Across 300 combinations of design, focal length, aperture
+     and focus distance, the focused target is now within 15 % of the sharpest
+     in 261 of them, against 210 for the row, and the worst disagreement falls
+     from 10.8x to 3.2x.
+
+     FIELD_RAD is a compromise between two bounds. Larger is worse optically.
+     Smaller crowds the targets: the gap between neighbours on a regular
+     pentagon is 2*R*sin(36 deg) = 1.176*R, and under FILMED every target has
+     the same angular radius RAD, so 1.176*R must clear 2*RAD with room to
+     spare. 0.050 against 0.024 leaves 0.011 rad of sky between them.
+
+     Angular positions, so they scale with distance and the ring holds its shape
+     at every depth. It also keeps the whole scene in frame up to about 240 mm,
+     where the old row left the sensor at 128 mm. */
+  const FIELD_RAD = 0.050;
+  const RAD = 0.024;
+  /* Walked clockwise from the upper left, so consecutive depths are neighbours
+     on the ring rather than jumping across it. */
+  const CLOCK = [162, 90, 18, -54, -126].map((deg) => (deg * PI) / 180);
 
   /* One hue each, so a target can be named in a sentence and so the five stay
      apart under a flat sky, where neutral greys are nearly indistinguishable.
 
      EQUAL LUMINANCE, deliberately. All five reflect 0.48 of the light falling
-     on them and differ only in hue. The rail exists to show that the sole
-     difference between these targets is how far out of focus they are; a
+     on them and differ only in hue. This scene exists to show that the sole
+     difference between these targets is how far out of focus they are -- the
+     ring above is the other half of that promise; a
      brighter or darker one would be a second difference, and the eye reads
      brightness as sharpness readily enough to confuse the demonstration this
      scene is for.
@@ -226,8 +259,14 @@ function presetRail(d, sizing) {
     const dist = DEPTHS[i];
     d.objects.push({
       kind: "sphere",
-      centre: v.v3(FRAC[i] * dist, 0, -dist),
-      radius: sizing === METRIC ? 0.030 : 0.030 * dist,
+      /* Both offsets scale with the distance, so the target stays at the same
+         angular radius and the same clock position whatever depth it sits at. */
+      centre: v.v3(FIELD_RAD * Math.cos(CLOCK[i]) * dist,
+                   FIELD_RAD * Math.sin(CLOCK[i]) * dist,
+                   -dist),
+      /* RAD metres flat, or RAD radians -- see the note on FILMED and METRIC.
+         The two agree at 1 m and diverge with distance. */
+      radius: sizing === METRIC ? RAD : RAD * dist,
       rgb: COLOURS[i][1],
       colour: COLOURS[i][0],
       name: NAMES[i],

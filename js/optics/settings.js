@@ -22,9 +22,9 @@
      decides the step a number input takes and how a value is formatted, since
      there is no drag-to-scrub. */
 
-import { clamp } from "../light/core.js?v=e01fefc3";
-import * as P from "./prescription.js?v=e01fefc3";
-import * as SD from "./scenedesc.js?v=e01fefc3";
+import { clamp } from "../light/core.js?v=1ebeecf9";
+import * as P from "./prescription.js?v=1ebeecf9";
+import * as SD from "./scenedesc.js?v=1ebeecf9";
 
 export function defaults() {
   return {

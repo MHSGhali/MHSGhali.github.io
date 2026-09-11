@@ -97,14 +97,34 @@ get applied — they are what happens when you trace real glass. A ray that miss
 source of vignetting: there is no darkening factor on the corners anywhere in
 the code.
 
-### The rail, and where its perspective went
+### The rail: a ring, and where its perspective went
 
-The one scene is a rail of five coloured targets at 1, 1.5, 2, 3 and 5 m, and
-**target size** decides how big they really are. *Same in metres* gives all five
-a 30 mm radius, so the near one images about five times the diameter of the far
-one — ordinary 1/distance perspective, and the default. *Same on film* scales
-each radius with its distance so every target lands the same size on the sensor,
-which makes focus the only difference left between them.
+The one scene is five coloured targets at 1, 1.5, 2, 3 and 5 m, set out as a
+**ring** about the optical axis — five clock positions at the same angular
+radius — rather than as a row across the frame.
+
+That is not decoration. Depth of field is an on-axis, defocus-only idea, while
+every other aberration grows with how far off the axis the subject sits: coma
+roughly with the field angle, astigmatism and field curvature with its square.
+The first version of this scene spread the targets along a row so they would not
+occlude, which put the outer two at 59 % of a full-frame half-diagonal — and
+there the achromat's coma simply beat the defocus. Focused at 5 m, at 100 mm and
+f/5, the 5 m target measured 0.44 mm and the 3 m target 0.11 mm. Both numbers
+were right, and setting the focus to 5 m did not make the 5 m target sharp. Move
+that same target on to the axis and it measures 0.023 mm.
+
+At equal field radius the field aberration is identical for all five and cancels
+out of every comparison between them, so **focusing at a target is what makes
+that target the sharpest** — which is the only thing this scene was ever for.
+Across 300 combinations of design, focal length, aperture and focus distance the
+focused target is now within 15 % of the sharpest in 261 of them, against 210 for
+the row, and the worst disagreement falls from 10.8× to 3.2×.
+
+**Target size** decides how big the targets really are. *Same in metres* gives
+all five a 24 mm radius, so the near one images about five times the diameter of
+the far one — ordinary f/(distance − f) perspective, and the default. *Same on
+film* scales each radius with its distance so every target lands the same size on
+the sensor, which is the better controlled comparison of blur at equal size.
 
 *Same on film* was the original and the only mode, and it was a mistake to ship
 alone: a frame whose objects all image the same size looks orthographic, which

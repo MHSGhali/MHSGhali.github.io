@@ -724,7 +724,7 @@ test("the camera has perspective, and only the scene's sizing hides it", () => {
 
   const metric = build(SD.METRIC);
   for (const t of metric) {
-    assert.equal(t.radius, 0.030, "METRIC gives every target the same real size");
+    assert.equal(t.radius, 0.024, "METRIC gives every target the same real size");
   }
   /* NEWTON'S MAGNIFICATION, m = f/x, with x the object's distance from the
      front focal point. So image size times (distance - focal length) is a
@@ -749,7 +749,7 @@ test("the camera has perspective, and only the scene's sizing hides it", () => {
   for (const t of filmed) {
     near(t.px, filmed[0].px, 0.1 * filmed[0].px,
       "FILMED must land every target the same size on the sensor");
-    near(t.radius, 0.030 * t.depth, 1e-12, "FILMED scales the radius with the distance");
+    near(t.radius, 0.024 * t.depth, 1e-12, "FILMED scales the radius with the distance");
   }
 
   /* Both sizings agree at 1 m, so switching modes is a change of depth cue and
@@ -1111,30 +1111,84 @@ test("the diagram's distances come from the lens, not from a formula of its own"
   assert.equal(s.hyperfocalM, L.hyperfocalM(lens, 0.03));
 });
 
+test("focusing at a target is what makes that target the sharpest", () => {
+  /* THE PROMISE THIS SCENE MAKES, and for a long time did not keep.
+
+     Depth of field is an on-axis, defocus-only idea; every other aberration
+     grows with how far off the axis the subject sits. The targets used to be
+     spread along a row from -0.140 to +0.140 radians so they would not occlude,
+     which put the outer two at 59 % of a full-frame half-diagonal -- and there
+     the achromat's coma beat the defocus outright. Focused at 5 m the 5 m
+     target measured 0.44 mm and the 3 m target 0.11 mm. Nothing was wrong with
+     either number. Setting the focus to 5 m simply did not make the 5 m target
+     the sharpest thing in frame.
+
+     They now sit at the same angular radius from the axis, so the field
+     aberration is identical for all five and cancels out of the comparison. */
+  const ring = SD.preset(SD.RAIL);
+  const field = ring.objects.map((o) => Math.hypot(o.centre.x, o.centre.y) / -o.centre.z);
+  for (const f of field) near(f, field[0], 1e-12, "every target must be at the same field radius");
+  assert.ok(field[0] > 0, "and off the axis, or they would occlude one another");
+
+  for (const [focal, fno] of [[25, 1], [50, 5], [100, 5], [100, 16], [200, 8]]) {
+    const lens = L.build(P.ACHROMAT_100, focal, fno);
+    for (let k = 0; k < ring.objects.length; k++) {
+      const want = ring.objects[k];
+      if (!L.focus(lens, -want.centre.z)) continue;
+      const spots = ring.objects.map((o) =>
+        L.spotMm(lens, -o.centre.z, Math.hypot(o.centre.x, o.centre.y), 15));
+      const min = Math.min(...spots);
+      const best = spots.indexOf(min);
+      /* Sharpest, or close enough that the photograph cannot show it.
+
+         Two residuals survive the ring, and both are small. At short focal
+         lengths the whole scene is inside the depth of field and the ordering
+         is settled by the aberration floor rather than by focus: at 25 mm f/5
+         focused at 1.5 m the 1 m target measures 0.0177 mm against the 1.5 m
+         target's 0.0216 mm. And FIELD CURVATURE bows the best-focus surface
+         toward the lens -- by the same amount for all five, since they share a
+         field radius -- so the ring's sharpest distance sits slightly nearer
+         than the on-axis setting, which at 50 mm f/5 focused at 5 m puts the
+         3 m target 0.0135 mm ahead of the 5 m one.
+
+         The bar is therefore 0.02 mm, which is what the IMAGE can resolve: one
+         pixel is 0.1125 mm at the default 36 mm across 320, and 0.056 mm at the
+         widest 640. Nothing below that is a disagreement anyone can see. */
+      assert.ok(best === k || spots[k] - min < 0.02,
+        `${focal} mm f/${lens.fNumber.toFixed(1)} focused at ${-want.centre.z} m made `
+        + `${ring.objects[best].name} visibly sharper than ${want.name}: `
+        + `[${spots.map((x) => x.toFixed(4)).join(" ")}]`);
+    }
+  }
+});
+
 test("the diagram marks what the camera resolves, not what the slab predicts", () => {
-  /* These two disagree, and the render sides with the trace. At 25 mm focused
-     at 1 m the 1 m target sits 8 degrees off axis: its DEFOCUS is exactly zero,
-     so the paraxial slab calls it perfectly sharp -- while the traced spot puts
-     it at the worst of the five, and the on-axis 2 m target, which the slab
-     excludes entirely, comes out best. The picture shows the 2 m one sharpest,
-     so the diagram has to as well. */
-  const lens = L.build(P.ACHROMAT_100, 25, 1);
-  L.focus(lens, 1.0);
-  const coc = 0.052;
+  /* The two are still different quantities and still disagree -- just not about
+     WHICH target any more. The slab is paraxial and counts defocus alone, so it
+     promises a sharpness the glass may be unable to deliver anywhere at all.
+
+     At 100 mm and f/8 focused at 2 m, with a 0.030 mm criterion, the slab says
+     1.91 m to 2.10 m is sharp. The traced spot at the 2 m target -- zero
+     defocus, dead in the middle of that slab -- is 0.0459 mm. The lens is
+     aberration limited at f/8 and nothing in the frame meets the criterion. The
+     slab is not wrong; it is answering a different question. */
+  const lens = L.build(P.ACHROMAT_100, 100, 8);
+  L.focus(lens, 2.0);
+  const coc = 0.030;
 
   const slab = L.dof(lens, coc);
-  assert.ok(1.0 >= slab.near && 1.0 <= slab.far, "the slab contains the 1 m target");
-  assert.ok(!(2.0 >= slab.near && 2.0 <= slab.far), "and excludes the 2 m one");
+  assert.ok(2.0 >= slab.near && 2.0 <= slab.far, "the slab contains the 2 m target");
 
-  const spotAt = (dist, frac) => L.spotMm(lens, dist, Math.abs(frac) * dist, 15);
-  const oneM = spotAt(1.0, -0.140);
-  const twoM = spotAt(2.0, 0);
-  assert.ok(twoM < oneM,
-    `the trace must put the on-axis 2 m target ahead of the 1 m one: ${twoM} vs ${oneM}`);
+  const desc = SD.preset(SD.RAIL);
+  const twoM = desc.objects.find((o) => o.name === "2M");
+  const spot = L.spotMm(lens, 2.0, Math.hypot(twoM.centre.x, twoM.centre.y), 15);
+  assert.ok(spot > coc,
+    `the trace must exceed the criterion the slab promises: ${spot} vs ${coc}`);
 
-  /* And the diagram prints the spot beside every target, so the comparison is
+  const s = S3.build(desc, lens, 36, 24, coc);
+
+  /* The diagram prints the spot beside every target, so the comparison is
      legible even when none of them meets the criterion. */
-  const s = S3.build(SD.preset(SD.RAIL), lens, 10, 10 * 2 / 3, coc);
   const targets = s.labels.filter((l) =>
     l.kind === S3.SUBJECT || l.kind === S3.OBJECT || l.kind === S3.BEST);
   assert.equal(targets.length, 5);
@@ -1142,27 +1196,20 @@ test("the diagram marks what the camera resolves, not what the slab predicts", (
     assert.match(t.text, /\d+MM( SHARPEST)?$/, `"${t.text}" should carry its spot`);
   }
 
-  /* At this limit the 2 m target does qualify, and it is the one marked. */
-  const marked = s.labels.filter((l) => l.kind === S3.SUBJECT);
-  assert.equal(marked.length, 1, `expected the 2 m target, got ${JSON.stringify(marked.map(m => m.text))}`);
-  assert.match(marked[0].text, /^2M /);
-
-  /* Tighten the criterion past what the lens can do and NOTHING qualifies. That
-     is the case with no highlight at all, where the only strong visual left is
-     the focus plane -- sitting on the 1 m target, which is the blurriest of the
-     five. So the sharpest thing in frame is marked regardless, and says so. */
-  const strict = S3.build(SD.preset(SD.RAIL), lens, 10, 10 * 2 / 3, 0.002);
-  assert.equal(strict.labels.filter((l) => l.kind === S3.SUBJECT).length, 0,
-    "nothing should meet a 0.002 mm criterion");
-  const bestLabels = strict.labels.filter((l) => l.kind === S3.BEST);
+  /* Nothing qualifies, so nothing is marked sharp -- and that is exactly the
+     case that used to leave the diagram with no highlight at all. The sharpest
+     thing in frame is marked regardless, and says so. */
+  assert.equal(s.labels.filter((l) => l.kind === S3.SUBJECT).length, 0,
+    "nothing meets the criterion at f/8");
+  const bestLabels = s.labels.filter((l) => l.kind === S3.BEST);
   assert.equal(bestLabels.length, 1, "exactly one target is the best");
-  assert.match(bestLabels[0].text, /^2M /, "the 2 m target is the sharpest thing in frame");
+  assert.match(bestLabels[0].text, /^2M /, "and it is the one the film is set for");
   assert.match(bestLabels[0].text, /SHARPEST$/, "and it has to say so in words");
 
   /* And the focus plane must not read as a claim about what is sharp. */
-  const focusLabel = strict.labels.find((l) => l.kind === S3.FOCUS);
+  const focusLabel = s.labels.find((l) => l.kind === S3.FOCUS);
   assert.match(focusLabel.text, /^FILM SET FOR /,
-    `"${focusLabel.text}" reads as a promise the lens does not keep off axis`);
+    `"${focusLabel.text}" reads as a promise the lens does not always keep`);
 
   /* The slab is still drawn, and its labels say which question it answers. */
   const dofLabels = s.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text);
@@ -1171,13 +1218,13 @@ test("the diagram marks what the camera resolves, not what the slab predicts", (
 
 test("stopped down, the focused target is marked and the numbers agree", () => {
   /* The other half: when the lens can actually meet the criterion, the mark
-     appears, and it appears on the target the trace says is best. */
-  const lens = L.build(P.ACHROMAT_100, 100, 8);
+     appears, and it appears on the target the film is set for. */
+  const lens = L.build(P.ACHROMAT_100, 100, 11);
   L.focus(lens, 2.0);
   const s = S3.build(SD.preset(SD.RAIL), lens, 36, 24, 0.030);
   const marked = s.labels.filter((l) => l.kind === S3.SUBJECT).map((l) => l.text);
   assert.equal(marked.length, 1, `expected one sharp target, got ${JSON.stringify(marked)}`);
-  assert.match(marked[0], /^2M /, "the 2 m target is the one in focus and on the axis");
+  assert.match(marked[0], /^2M /, "the 2 m target is the one the film is set for");
   /* When something does meet the criterion it is marked sharp, and since it is
      also the best it still says so -- one target, not two markings. */
   assert.match(marked[0], /SHARPEST$/);
