@@ -9,12 +9,12 @@
      line segments and it must not wait for a render to know where the focus
      plane went. */
 
-import * as ST from "./settings.js?v=f56d3836";
-import * as SD from "./scenedesc.js?v=f56d3836";
-import * as S3 from "./scene3d.js?v=f56d3836";
-import * as LENS from "./lens.js?v=f56d3836";
-import { createView } from "./view3d.js?v=f56d3836";
-import { derivedOf } from "./render.js?v=f56d3836";
+import * as ST from "./settings.js?v=d943ac76";
+import * as SD from "./scenedesc.js?v=d943ac76";
+import * as S3 from "./scene3d.js?v=d943ac76";
+import * as LENS from "./lens.js?v=d943ac76";
+import { createView } from "./view3d.js?v=d943ac76";
+import { derivedOf } from "./render.js?v=d943ac76";
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -273,6 +273,9 @@ function renderDerived() {
     ["axis sharp from", `${M(d.nearM)} m`],
     ["axis sharp to", `${M(d.farM)} m`],
     ["axis hyperfocal", `${M(d.hyperfocalM)} m`],
+    /* Last, because it qualifies the same criterion the three rows above it
+       use -- it is that criterion said in the other unit. */
+    ["resolving", `${M(d.resolvingLpMm, 0)} lp/mm`],
   ];
   for (const [k, v] of rows) {
     const row = el("div", "prow prow-ro");
@@ -458,7 +461,7 @@ const assistantApi = {
 
 const assistantHost = $("#assistant");
 if (assistantHost) {
-  import("./assistant.js?v=f56d3836")
+  import("./assistant.js?v=d943ac76")
     .then(({ mountAssistant }) => mountAssistant(assistantHost, assistantApi))
     .catch((err) => {
       console.warn("optics assistant:", err);

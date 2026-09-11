@@ -1427,4 +1427,17 @@ test("the derived readouts are finite and agree with the lens they came from", (
   assert.ok(d.tstop > d.fNumber, "a T-stop is always slower than the f-stop it comes from");
   assert.ok(Number.isFinite(d.nearM) && d.nearM > 0);
   assert.ok(Number.isFinite(d.hyperfocalM));
+
+  /* RESOLVING is the sharpness criterion said in the other unit -- 1/c line
+     pairs per millimetre -- so it must track the control exactly and rise as the
+     criterion tightens. It is a geometric cutoff, not an MTF: nothing in this
+     program computes contrast against spatial frequency. */
+  near(d.resolvingLpMm, 1 / s.cocLimitMm, 1e-12, "lp/mm is the reciprocal");
+  const at = (coc) =>
+    derivedOf(st.cam.lens, st.cam.sensorWMm, st.cam.sensorHMm, coc).resolvingLpMm;
+  near(at(0.030), 100 / 3, 1e-12, "the default criterion is about 33 lp/mm");
+  near(at(0.002), 500, 1e-12, "the tightest is 500 lp/mm");
+  near(at(0.200), 5, 1e-12, "the loosest is 5 lp/mm");
+  assert.ok(at(0.002) > at(0.030) && at(0.030) > at(0.200),
+    "a tighter criterion must read as MORE line pairs, not fewer");
 });

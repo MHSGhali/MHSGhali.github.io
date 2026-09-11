@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=f56d3836";
-import * as knowledge from "./knowledge.js?v=f56d3836";
-import * as SD from "./scenedesc.js?v=f56d3836";
-import * as P from "./prescription.js?v=f56d3836";
+import { mountChat } from "../chat/ui.js?v=d943ac76";
+import * as knowledge from "./knowledge.js?v=d943ac76";
+import * as SD from "./scenedesc.js?v=d943ac76";
+import * as P from "./prescription.js?v=d943ac76";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -245,9 +245,12 @@ export function mountAssistant(host, api) {
         }
 
         case "coc":
-          if (!put("cocLimitMm", cmd.value)) return `The sharpness limit is already ${s.cocLimitMm} mm.`;
-          return `Calling ${api.settings().cocLimitMm} mm sharp. That moves the depth-of-field `
-            + "numbers and the slab in the scene view; it does not re-render anything.";
+          if (!put("cocLimitMm", cmd.value)) {
+            return `The circle of confusion is already ${s.cocLimitMm} mm.`;
+          }
+          return `Circle of confusion ${api.settings().cocLimitMm} mm — about `
+            + `${Math.round(1 / api.settings().cocLimitMm)} lp/mm. That moves the depth-of-field `
+            + "numbers and the box in the scene view; it does not re-render anything.";
 
         case "fit":
           api.fit();

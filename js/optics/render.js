@@ -13,14 +13,14 @@
      on how the scheduler happened to slice it, so a bug would reproduce only
      sometimes and a regression test could not exist at all. */
 
-import * as SD from "./scenedesc.js?v=f56d3836";
-import * as CAM from "./camera.js?v=f56d3836";
-import * as LENS from "./lens.js?v=f56d3836";
-import * as FILM from "./film.js?v=f56d3836";
-import * as T from "./trace.js?v=f56d3836";
-import * as G from "./glass.js?v=f56d3836";
-import * as R from "../light/rng.js?v=f56d3836";
-import { PI } from "../light/core.js?v=f56d3836";
+import * as SD from "./scenedesc.js?v=d943ac76";
+import * as CAM from "./camera.js?v=d943ac76";
+import * as LENS from "./lens.js?v=d943ac76";
+import * as FILM from "./film.js?v=d943ac76";
+import * as T from "./trace.js?v=d943ac76";
+import * as G from "./glass.js?v=d943ac76";
+import * as R from "../light/rng.js?v=d943ac76";
+import { PI } from "../light/core.js?v=d943ac76";
 
 /* The same seed constant the light engine's grid uses. */
 const SEED = 0x2545f4914f6cdd1dn;
@@ -62,6 +62,19 @@ export function derivedOf(L, sensorWMm, sensorHMm, cocLimitMm) {
     nearM: d.near,
     farM: d.far,
     hyperfocalM: LENS.hyperfocalM(L, cocLimitMm),
+    /* The spatial frequency the sharpness criterion implies. A blur circle of
+       diameter c wipes out detail finer than about 1/c line pairs per
+       millimetre, which is the geometric-optics bridge between this page's
+       millimetres and the cycles/mm lens resolution is usually quoted in.
+
+       A RULE OF THUMB, AND NOT A MODULATION TRANSFER FUNCTION. Nothing here
+       computes contrast against spatial frequency: a real MTF curve rolls off
+       gradually and this is a hard cutoff standing in for it. The page has no
+       MTF and must not be read as having one.
+
+       cocLimitMm is clamped to [0.002, 0.2] by settings.set(), so this is
+       always finite and positive. */
+    resolvingLpMm: 1 / cocLimitMm,
     focusM: L.focusDistanceM,
   };
 }

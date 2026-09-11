@@ -22,9 +22,9 @@
      decides the step a number input takes and how a value is formatted, since
      there is no drag-to-scrub. */
 
-import { clamp } from "../light/core.js?v=f56d3836";
-import * as P from "./prescription.js?v=f56d3836";
-import * as SD from "./scenedesc.js?v=f56d3836";
+import { clamp } from "../light/core.js?v=d943ac76";
+import * as P from "./prescription.js?v=d943ac76";
+import * as SD from "./scenedesc.js?v=d943ac76";
 
 export function defaults() {
   return {
@@ -107,7 +107,11 @@ export const FIELDS = [
      progressive accumulation recovers the quality at a smaller grid anyway. */
   { id: "resW", section: "SENSOR", label: "render", unit: "px", lo: 64, hi: 640, log: true, int: true },
   { id: "exposure", section: "SENSOR", label: "exposure", unit: "x", lo: 1e-4, hi: 1e6, log: true },
-  { id: "cocLimitMm", section: "SENSOR", label: "sharp if", unit: "mm", lo: 0.002, hi: 0.2, log: true },
+  /* The id stays `cocLimitMm` though the label reads differently: it is the URL
+     hash key, and renaming it would break every link already shared for a change
+     nobody can see. */
+  { id: "cocLimitMm", section: "SENSOR", label: "circle of confusion", unit: "mm",
+    lo: 0.002, hi: 0.2, log: true },
 
 ]; /* Sampling is deliberately absent -- see defaults(). */
 

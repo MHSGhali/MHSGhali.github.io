@@ -27,10 +27,10 @@
    COORDINATES
      Y-up, camera at the origin looking down -z, matching scenedesc.js. */
 
-import { TWO_PI } from "../light/core.js?v=f56d3836";
-import * as v from "../light/vec3.js?v=f56d3836";
-import * as LENS from "./lens.js?v=f56d3836";
-import { AMBIENT } from "./scenedesc.js?v=f56d3836";
+import { TWO_PI } from "../light/core.js?v=d943ac76";
+import * as v from "../light/vec3.js?v=d943ac76";
+import * as LENS from "./lens.js?v=d943ac76";
+import { AMBIENT } from "./scenedesc.js?v=d943ac76";
 
 /* What a segment is FOR, which is what decides how it is drawn. */
 export const GRID = "grid";         /* the ground, and its distance rings   */

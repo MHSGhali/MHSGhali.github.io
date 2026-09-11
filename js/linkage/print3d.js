@@ -22,8 +22,8 @@
 
    Units are millimetres, matching 1 world unit = 1 mm. */
 
-import * as M from "./mechanism.js?v=f56d3836";
-import * as G from "./mesh3d.js?v=f56d3836";
+import * as M from "./mechanism.js?v=d943ac76";
+import * as G from "./mesh3d.js?v=d943ac76";
 
 /* How round a hole or a boss is drawn. A pin hole is only a few millimetres
    across, so this is already finer than a printer can resolve. */

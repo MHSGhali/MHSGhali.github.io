@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=f56d3836";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=d943ac76";
 
 export const VOCABULARY = [
   "load the depth rail",
@@ -116,7 +116,8 @@ Set up a camera and see what it records.
   hyperfocal distance there is no far face, because there is no far limit.
 - Derived readouts: focal length, field of view, entrance pupil, T-stop, back
   focus, film position, chromatic error, blur at 6 m, image circle, the on-axis
-  sharp limits and the hyperfocal distance.
+  sharp limits, the hyperfocal distance, and the line pairs per millimetre the
+  sharpness criterion works out to.
 </capabilities>`;
 
 const CONTROLS =
@@ -145,10 +146,22 @@ What each control does, and what changes on screen when it moves.
 - EXPOSURE: a viewing gain applied when the measurements become pixels. Instant,
   because it traces no ray. It is a darkroom control rather than a camera one:
   a photographer would change brightness with the aperture.
-- SHARP IF: the circle of confusion -- the DIAMETER of the biggest blur spot
-  that still counts as sharp, in millimetres on the film. Moves the
-  depth-of-field numbers and the slab in the scene view, and nothing about the
-  photograph.
+- CIRCLE OF CONFUSION: the DIAMETER of the biggest blur spot that still counts
+  as sharp, in millimetres on the film. Sharpness is not a property a lens has
+  -- a point images as a small disc, and "in focus" means nothing until you say
+  how big a disc you will accept. This is that number, and it is what the
+  depth-of-field box, the AXIS SHARP limits, the hyperfocal distance and the
+  SHARP marking on each target are all measured against. It moves those and
+  nothing about the photograph: no ray is re-traced, so a half-converged render
+  keeps converging.
+  It was labelled SHARP IF until recently; both names mean this control.
+  IT IS NOT MTF. A modulation transfer function is contrast measured against
+  spatial frequency, and nothing in this program computes one. What connects the
+  two is a rule of thumb: a blur circle of diameter c destroys detail finer than
+  roughly 1/c line pairs per millimetre, so 0.030 mm is about 33 lp/mm and the
+  range 0.002 to 0.2 mm spans 500 down to 5 lp/mm. The RESOLVING readout is that
+  reciprocal. Say plainly that it is a geometric cutoff standing in for a curve
+  that would really roll off gradually, and never claim the page draws MTF.
 - LIGHTING: the placed key lamp or a uniform sky, and each mode shows its own
   source's two controls. LAMP and LAMP COLOUR set the panel's flux in lumens
   and its colour temperature; AMBIENT and SKY COLOUR do the same for the dome
@@ -170,7 +183,7 @@ What the derived numbers mean. Every one is measured from the mounted lens.
 - COLOUR ERR: chromatic aberration as a percentage of focal length -- how far
   apart blue and red focus. Singlet about -1.5 %, achromat about -0.06 %.
 - BLUR AT 6 M: the defocus blur a subject at 6 m makes on the film, in mm.
-  Compare it against SHARP IF.
+  Compare it against CIRCLE OF CONFUSION.
 - COVERS: the image circle the design throws, against the diagonal the sensor
   needs. First smaller than second means the corners are outside what it covers.
 - AXIS SHARP FROM/TO: the near and far limits of sharpness on the axis, from
@@ -179,6 +192,10 @@ What the derived numbers mean. Every one is measured from the mounted lens.
   the honest figure.
 - AXIS HYPERFOCAL: focus there and everything from about half of it out is
   sharp.
+- RESOLVING: the CIRCLE OF CONFUSION said as a spatial frequency, 1/c line pairs
+  per millimetre -- 0.030 mm is about 33 lp/mm. A geometric rule of thumb for
+  comparing against the cycles/mm a lens is usually quoted at, NOT a modulation
+  transfer function; see CIRCLE OF CONFUSION in <controls>.
 - SAMPLES: rays per pixel traced so far. Still refining until it stops climbing.
 </readouts>`;
 
@@ -267,6 +284,11 @@ Things this tool genuinely cannot do. Say so plainly when one is asked for.
 - No real photographic prescriptions: no double Gauss, Tessar, telephoto or
   retrofocus, and no lens by brand or model name. Three designs only, and two of
   them exist to be compared with each other.
+- No MTF. There is no modulation transfer function, no contrast-against-spatial-
+  frequency curve and no MTF50 figure, for this lens or any other. The CIRCLE OF
+  CONFUSION control and the RESOLVING readout are a geometric blur diameter and
+  its reciprocal, which is a rule of thumb standing in for a curve, not the
+  curve. Say so rather than describing a plot the page cannot draw.
 - No diffraction of any kind, so there is no diffraction limit, no Airy disc, no
   softening on stopping right down, and no starburst or sunstar on a bright
   point. Blur here is geometric only: it is where rays land, never how they
@@ -287,9 +309,12 @@ const NUMBERS =
   320 px wide and an exposure of 100.
 - The depth rail's targets sit at 1, 1.5, 2, 3 and 5 m, and are coloured red,
   amber, green, cyan and violet in that order -- so the green one is at 2 m, and
-  a target can be named by its colour. Each one's size and offset scale with its
-  distance, so all five subtend the same angle, and all five reflect the same
-  0.48 of the light falling on them. Hue is the ONLY thing that differs between
+  a target can be named by its colour. They are arranged as a RING about the
+  optical axis, five clock positions at one angular radius, so all five carry
+  the same field aberration and it cancels out of any comparison between them.
+  Their SIZES are what TARGET SIZE chooses: 24 mm radius each under SAME IN
+  METRES, or a radius scaling with distance under SAME ON FILM. All five reflect
+  the same 0.48 of the light falling on them. Hue is the ONLY thing that differs between
   them apart from focus: they are equally bright on purpose, because the eye
   reads brightness as sharpness and a darker target would look defocused for the
   wrong reason.
@@ -298,7 +323,8 @@ const NUMBERS =
   1200 to 20000 K. The sky defaults to 2000 lx at 6500 K, a bright overcast
   day.
 - Sharpness is judged against a 0.030 mm circle of confusion, the number every
-  depth-of-field table has used for a century on a 36 mm frame.
+  depth-of-field table has used for a century on a 36 mm frame -- roughly the
+  sensor diagonal over 1500, and about 33 line pairs per millimetre.
 - At the default settings the sharp band on the axis runs from about 1.94 to
   2.06 m, and the hyperfocal distance is about 67 m.
 - The singlet's chromatic error is about -1.54 % of its focal length; the
@@ -377,7 +403,12 @@ const retriever = makeRetriever({
        bypasses the byte budget by design, so one loose word here drags a whole
        paragraph into every prompt. */
     [/\b(clip\w*|blown|too bright|too dark|grain\w*|noisy|provisional|refus\w*|cannot|can.?t|won.?t|wide open|corner|corners|dark corner|soft)\b/i, "preconditions"],
-    [/\b(default|defaults|how (?:big|far|many|much)|distance|distances|metre|meters?|metres?|millimet\w*|circle of confusion|coc|hyperfocal|chromatic|abbe|lumens?|kelvin|lux)\b/i, "numbers"],
+    /* "circle of confusion" and "coc" used to force <numbers> as well as
+       <controls>, which put the worst prompt on this page at 1562 tokens for a
+       one-line question. <controls> now carries the whole answer -- the
+       definition, the 0.030 mm default and the lp/mm equivalence -- so the
+       second section was paying for a repetition. */
+    [/\b(default|defaults|how (?:big|far|many|much)|distance|distances|metre|meters?|metres?|millimet\w*|hyperfocal|chromatic|abbe|lumens?|kelvin|lux)\b/i, "numbers"],
     /* "Why is the corner dark" is answered in <how> -- vignetting is geometric
        and a dark corner means rays aimed at it hit the edge of real glass.
        Without the corner words here it pulled <preconditions>, which mentions
@@ -389,8 +420,19 @@ const retriever = makeRetriever({
        <controls> existed the answer came back as whatever section happened to
        mention X -- for the aperture, the paragraph explaining why it will not
        open past f/5, which is a different question. */
-    [/\b(?:what|which|how)\b[^.]{0,24}\b(?:does|do|is|are)\b[^.]{0,24}\b(?:aperture|f.?number|f.?stop|focal|focus|sensor|render|resolution|exposure|sharp if|lighting|design|control|slider|setting)\b/i, "controls"],
+    [/\b(?:what|which|how)\b[^.]{0,24}\b(?:does|do|is|are)\b[^.]{0,24}\b(?:aperture|f.?number|f.?stop|focal|focus|sensor|render|resolution|exposure|sharp if|circle of confusion|coc|lighting|design|control|slider|setting)\b/i, "controls"],
     [/\b(t.?stop|entrance pupil|exit pupil|back focus|film at|colour err|color err|image circle|covers|hyperfocal|blur at|h field|field of view|derived|read ?out|read ?outs|samples)\b/i, "readouts"],
+    /* THE QUESTION THAT BUILT THIS ROW. "Is this MTF?" retrieved neither the
+       section defining the criterion nor the one defining the readout, so the
+       model would have answered a question about this program from general
+       optics -- and the likeliest general answer, that a sharpness number is an
+       MTF figure, is exactly the thing that is not true here.
+
+       Sent to <controls> rather than to <readouts> because the CIRCLE OF
+       CONFUSION entry carries the whole answer: what the number is, the 1/c
+       relationship, the numbers it works out to, and the plain statement that
+       nothing here computes a transfer function. One section, not two. */
+    [/\b(mtf|modulation transfer|line ?pairs?|lp.?mm|cycles.?(?:per.?)?mm|spatial frequency|resolving power)\b/i, "controls"],
   ],
 
   budget: 2500,
