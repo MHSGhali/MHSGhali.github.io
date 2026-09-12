@@ -13,14 +13,14 @@
      on how the scheduler happened to slice it, so a bug would reproduce only
      sometimes and a regression test could not exist at all. */
 
-import * as SD from "./scenedesc.js?v=d943ac76";
-import * as CAM from "./camera.js?v=d943ac76";
-import * as LENS from "./lens.js?v=d943ac76";
-import * as FILM from "./film.js?v=d943ac76";
-import * as T from "./trace.js?v=d943ac76";
-import * as G from "./glass.js?v=d943ac76";
-import * as R from "../light/rng.js?v=d943ac76";
-import { PI } from "../light/core.js?v=d943ac76";
+import * as SD from "./scenedesc.js?v=82f4d047";
+import * as CAM from "./camera.js?v=82f4d047";
+import * as LENS from "./lens.js?v=82f4d047";
+import * as FILM from "./film.js?v=82f4d047";
+import * as T from "./trace.js?v=82f4d047";
+import * as G from "./glass.js?v=82f4d047";
+import * as R from "../light/rng.js?v=82f4d047";
+import { PI } from "../light/core.js?v=82f4d047";
 
 /* The same seed constant the light engine's grid uses. */
 const SEED = 0x2545f4914f6cdd1dn;

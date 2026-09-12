@@ -6,10 +6,10 @@
    typed number cannot reach different places -- which is the same reason
    settings.js has exactly one clamp. */
 
-import { mountChat } from "../chat/ui.js?v=d943ac76";
-import * as knowledge from "./knowledge.js?v=d943ac76";
-import * as SD from "./scenedesc.js?v=d943ac76";
-import * as P from "./prescription.js?v=d943ac76";
+import { mountChat } from "../chat/ui.js?v=82f4d047";
+import * as knowledge from "./knowledge.js?v=82f4d047";
+import * as SD from "./scenedesc.js?v=82f4d047";
+import * as P from "./prescription.js?v=82f4d047";
 
 const r2 = (v) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : "∞");
 
@@ -64,7 +64,7 @@ export function mountAssistant(host, api) {
         case "preset": {
           if (!put("preset", cmd.id)) return `Already showing the ${cmd.name}.`;
           return "Loaded the depth rail: five coloured targets at 1, 1.5, 2, 3 and 5 m, set out as "
-            + "a ring about the optical axis so all five are the same distance off it — which is "
+            + "a ring about the optical axis so all five are the same distance off it, which is "
             + "what makes the focused one the sharpest. TARGET SIZE decides whether they are the "
             + "same size in metres, which shows perspective, or the same size on film.";
         }
@@ -74,7 +74,7 @@ export function mountAssistant(host, api) {
           const d = api.derived();
           const err = d ? ` Its chromatic error is ${r2(d.colourErrPct)} % of the focal length.` : "";
           if (cmd.value === P.SINGLET_100) {
-            return `Mounted the uncorrected N-BK7 singlet.${err} It is supposed to fringe — that is `
+            return `Mounted the uncorrected N-BK7 singlet.${err} It is supposed to fringe; that is `
               + "what it is here for.";
           }
           if (cmd.value === P.ACHROMAT_100) {
@@ -126,7 +126,7 @@ export function mountAssistant(host, api) {
           if (!put("focusM", want)) return `Already focused at ${r2(s.focusM)} m.`;
           const now = api.settings().focusM;
           if (Math.abs(now - want) > 1e-9) {
-            return `That is outside what this lens can focus on, so it went to ${r2(now)} m — `
+            return `That is outside what this lens can focus on, so it went to ${r2(now)} m. `
               + "the nearest it can do.";
           }
           const d = api.derived();
@@ -168,7 +168,7 @@ export function mountAssistant(host, api) {
           return cmd.value === SD.METRIC
             ? "Every target is a 30 mm sphere now, so the picture shows perspective: the near one "
               + "images about five times the diameter of the far one, which is 1/distance and "
-              + "nothing else. The camera did not change — the scene did."
+              + "nothing else. The camera did not change; the scene did."
             : "Each target's radius now scales with its distance, so all five land the same size on "
               + "the sensor and the only difference left between them is how far out of focus they "
               + "are. It makes the frame look flat, which is a property of the scene and not of the "
@@ -181,7 +181,7 @@ export function mountAssistant(host, api) {
           }
           return cmd.value === SD.AMBIENT
             ? "Lit by a uniform sky now. Nothing casts a shadow and nothing has a terminator, which "
-              + "is the honest place to judge focus — shadow contrast reads as sharpness. It is "
+              + "is the honest place to judge focus: shadow contrast reads as sharpness. It is "
               + "about two stops brighter than the lamp, so bring the exposure down."
             : "Back to the placed key lamp, up and to the right. The shadows and the terminator "
               + "come back with it.";
@@ -195,7 +195,7 @@ export function mountAssistant(host, api) {
             };
           }
           if (!put("lampLm", cmd.value)) return `The lamp is already ${r2(s.lampLm)} lm.`;
-          return `Lamp at ${r2(api.settings().lampLm)} lm — the number printed on a real bulb. `
+          return `Lamp at ${r2(api.settings().lampLm)} lm, the number printed on a real bulb. `
             + "It becomes watts once, when the scene is built, so changing the colour later "
             + "leaves the lumens where they are.";
         }
@@ -229,7 +229,7 @@ export function mountAssistant(host, api) {
             };
           }
           if (!put("ambientLux", cmd.value)) return `The sky is already ${r2(s.ambientLux)} lx.`;
-          return `Sky at ${r2(api.settings().ambientLux)} lx — the illuminance on a surface facing `
+          return `Sky at ${r2(api.settings().ambientLux)} lx, the illuminance on a surface facing `
             + "it, which is what a light meter aimed upward reads.";
         }
 
@@ -248,7 +248,7 @@ export function mountAssistant(host, api) {
           if (!put("cocLimitMm", cmd.value)) {
             return `The circle of confusion is already ${s.cocLimitMm} mm.`;
           }
-          return `Circle of confusion ${api.settings().cocLimitMm} mm — about `
+          return `Circle of confusion ${api.settings().cocLimitMm} mm, about `
             + `${Math.round(1 / api.settings().cocLimitMm)} lp/mm. That moves the depth-of-field `
             + "numbers and the box in the scene view; it does not re-render anything.";
 
@@ -293,7 +293,7 @@ export function mountAssistant(host, api) {
       const caveat = best
         ? ` The sharpest thing in frame is ${best.label}${best.colour ? `, the ${best.colour} one` : ""}, `
           + `at ${r2(best.spotMm)} mm on the film`
-          + (best.sharp ? "." : " — which is over the sharpness limit, so nothing formally qualifies.")
+          + (best.sharp ? "." : ", which is over the sharpness limit, so nothing formally qualifies.")
         : "";
 
       return `The ${sceneName()}, lit by ${SD.MODE_NAMES[s.lightMode].toLowerCase()}, through the `

@@ -25,7 +25,7 @@
    No DOM in here.
    --------------------------------------------------------------- */
 
-import * as M from "./mechanism.js?v=d943ac76";
+import * as M from "./mechanism.js?v=82f4d047";
 
 /* The same three helpers presets.js is written with, for the same reason: a
    mechanism has to be stated as lengths, because a link's rest lengths are

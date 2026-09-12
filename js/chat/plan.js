@@ -16,7 +16,7 @@
    No DOM in here, so tests/chat.test.mjs can check the validation.
    --------------------------------------------------------------- */
 
-import { parse, splitClauses, presetsFor } from "./commands.js?v=d943ac76";
+import { parse, splitClauses, presetsFor } from "./commands.js?v=82f4d047";
 
 /* The instructions, as a SYSTEM message.
 
