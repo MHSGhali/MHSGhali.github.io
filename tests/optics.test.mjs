@@ -1162,6 +1162,130 @@ test("focusing at a target is what makes that target the sharpest", () => {
   }
 });
 
+/* The blur a target's EDGE really has in the rendered pixels, in pixels.
+
+   The radial profile about the target is averaged over every angle, which
+   cancels the Monte Carlo noise and makes the curve fine enough to interpolate;
+   the 10 %-to-90 % fall of that curve is the blur. Three details are load
+   bearing, and each of them was a wrong answer first:
+
+     - Only the OUTWARD-facing sector is sampled. The targets are a ring, and
+       under SAME ON FILM they are wider than the gaps between them, so a full
+       annulus reaches the neighbour and takes its light as the background.
+     - The crossings are found scanning INWARD from the background. The 90 %
+       level sits about a tenth below the plateau and the plateau's own bin
+       noise is the same size, so scanning outward stops at the first bin that
+       dips -- which returned a 41 px edge for a profile that is flat to r=42
+       and zero by r=47.
+     - The background is a MEDIAN of the outer bins. A mean chases one bright
+       bin and drags the 10 % crossing out with it. */
+function edgeBlurPx(Y, W, H, cx, cy, dia, ux, uy) {
+  const step = 0.5, rMax = dia * 0.75 + 14, bins = Math.ceil(rMax / step);
+  if (cx - rMax < 0 || cx + rMax > W - 1 || cy - rMax < 0 || cy + rMax > H - 1) return null;
+  const sum = new Float64Array(bins), cnt = new Float64Array(bins);
+  for (let y = Math.floor(cy - rMax); y <= cy + rMax; y++) {
+    for (let x = Math.floor(cx - rMax); x <= cx + rMax; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
+      if (r >= rMax) continue;
+      if (r > 1 && (dx * ux + dy * uy) / r < 0.5) continue;   /* 60 deg outward */
+      const b = Math.floor(r / step); sum[b] += Y[y * W + x]; cnt[b]++;
+    }
+  }
+  const prof = [];
+  for (let b = 0; b < bins; b++) prof.push(cnt[b] >= 2 ? sum[b] / cnt[b] : NaN);
+  const mid = (a) => a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2;
+  const inner = prof.slice(Math.round(dia * 0.10 / step), Math.round(dia * 0.35 / step))
+    .filter(Number.isFinite).sort((a, b) => a - b);
+  const outer = prof.slice(Math.max(0, bins - Math.round(9 / step)))
+    .filter(Number.isFinite).sort((a, b) => a - b);
+  if (inner.length < 2 || outer.length < 2) return null;
+  const hi = mid(inner), lo = mid(outer);
+  if (!(hi > lo * 3)) return null;
+  const cross = (frac) => {
+    const t = lo + frac * (hi - lo);
+    for (let b = bins - 1; b >= 1; b--) {
+      const a = prof[b - 1], c = prof[b];
+      if (!Number.isFinite(a) || !Number.isFinite(c)) continue;
+      if (c < t && a >= t) return (b - 1 + (a - t) / (a - c)) * step;
+    }
+    return null;
+  };
+  const r90 = cross(0.9), r10 = cross(0.1);
+  return (r90 !== null && r10 !== null && r10 > r90) ? r10 - r90 : null;
+}
+
+test("the blur the diagram predicts is the blur the render actually has", () => {
+  /* THE CLAIM THE WHOLE PAGE RESTS ON. The scene view prints a spot beside every
+     target, from LENS.spotMm -- a ray traced through the real glass at that
+     target's real field position. The image view is made by render.js. If the
+     diagram and the photograph agree, then the edge in the pixels has to be as
+     soft as the spot says, target by target, and the target labelled SHARPEST
+     has to be the crispest thing in the frame.
+
+     Measured on a lighting-neutral, equal-size render. spotMm knows the lens,
+     the distance and the field angle and nothing whatever about the lamp, so
+     a lamp-lit frame would import 1/r^2 falloff and a terminator -- neither of
+     which is focus. SAME ON FILM removes size as a second variable, and the
+     ring already holds every target at one field radius. */
+  for (const focusM of [1, 2, 5]) {
+    const s = { ...ST.defaults(), resW: 240, sizing: SD.FILMED,
+                lightMode: SD.AMBIENT, focusM };
+    const lens = L.build(s.design, s.focalMm, s.fno);
+    assert.ok(L.focus(lens, focusM));
+
+    /* what the DIAGRAM says, read off the labels it actually draws */
+    const sensorH = s.sensorWMm * ST.resH(s.resW) / s.resW;
+    const desc = SD.preset(s.preset, s.sizing);
+    desc.lightMode = SD.AMBIENT;
+    const said = {};
+    let best = null;
+    for (const lab of S3.build(desc, lens, s.sensorWMm, sensorH, s.cocLimitMm).labels) {
+      const m = /^(\S+)\s+([\d.]+)MM( SHARPEST)?$/.exec(lab.text);
+      if (m && [S3.SUBJECT, S3.OBJECT, S3.BEST].includes(lab.kind)) {
+        said[m[1]] = +m[2];
+        if (m[3]) best = m[1];
+      }
+    }
+    assert.ok(best, "the diagram must name a sharpest target");
+
+    /* what the IMAGE has */
+    const st = setup(s);
+    const film = FILM.create(st.width, st.height);
+    for (let p = 0; p < 16; p++) renderRows(st, film, s, p, 0, st.height);
+    const Y = new Float64Array(st.width * st.height);
+    for (let i = 0; i < Y.length; i++) Y[i] = film.n[i] > 0 ? film.xyz[i * 3 + 1] / film.n[i] : 0;
+
+    const pxPerMm = s.resW / s.sensorWMm;
+    const got = [];
+    for (const o of st.desc.objects) {
+      const a = CAM.project(st.cam, o.centre);
+      const b = CAM.project(st.cam, { x: o.centre.x + o.radius, y: o.centre.y, z: o.centre.z });
+      if (!a || !b) continue;
+      const dia = 2 * Math.abs(b.x - a.x);
+      const nx = a.x - st.width / 2, ny = a.y - st.height / 2, nn = Math.hypot(nx, ny) || 1;
+      const w = edgeBlurPx(Y, st.width, st.height, a.x, a.y, dia, nx / nn, ny / nn);
+      if (w === null) continue;
+      got.push({ name: o.name, want: said[o.name] * pxPerMm, got: w });
+    }
+    assert.ok(got.length >= 4, `only ${got.length} targets measurable at ${focusM} m`);
+
+    for (const r of got) {
+      /* A perfectly sharp edge still spans a couple of pixels once it has been
+         sampled onto a grid, so the floor is absolute and the rest relative. */
+      const tol = Math.max(2.5, 0.45 * r.want);
+      near(r.got, r.want, tol,
+        `focused at ${focusM} m, ${r.name}: the diagram predicts ${r.want.toFixed(1)} px of blur`);
+    }
+
+    const sharpest = got.reduce((m, r) => r.got < m.got ? r : m);
+    const claimed = got.find((r) => r.name === best);
+    assert.ok(sharpest.name === best || claimed.got - sharpest.got <= 2,
+      `focused at ${focusM} m the diagram says ${best} is sharpest (${claimed.got.toFixed(1)} px) `
+      + `but the render is crispest at ${sharpest.name} (${sharpest.got.toFixed(1)} px)`);
+  }
+});
+
 test("the diagram marks what the camera resolves, not what the slab predicts", () => {
   /* The two are still different quantities and still disagree -- just not about
      WHICH target any more. The slab is paraxial and counts defocus alone, so it
