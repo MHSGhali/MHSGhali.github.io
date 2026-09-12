@@ -78,7 +78,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
       <p class="eyebrow">Linkage Design</p>
       <h1>Build a mechanism.</h1>
     </div>
-    <p>Place joints, tie them into rigid bodies, ground some, drive one with a motor, and run it. The 3D view follows along, and the Blender export gives you the animated skeleton to build printable geometry around. Everything runs in your browser &mdash; nothing is uploaded.</p>
+    <p>Place joints, tie them into rigid bodies, ground some, drive one with a motor, and run it. The 3D view follows along, and the Blender export gives you the animated skeleton to build printable geometry around. Everything runs in your browser; nothing is uploaded.</p>
   </div>
 
   <div class="toolbar" role="toolbar" aria-label="Mechanism tools">
@@ -150,13 +150,13 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
     <div class="grid grid-2">
       <div>
         <h3>Building</h3>
-        <p class="panel-hint" style="margin:0 0 12px">Every one of these is also a button in the toolbar, and each greys out until it has something to act on &mdash; <strong>L</strong> needs two joints selected, <strong>S</strong> exactly three, <strong>M</strong> a selected link with one grounded joint. Editing is disabled entirely while the mechanism is running: press <strong>R</strong> to stop first.</p>
+        <p class="panel-hint" style="margin:0 0 12px">Every one of these is also a button in the toolbar, and each greys out until it has something to act on: <strong>L</strong> needs two joints selected, <strong>S</strong> exactly three, <strong>M</strong> a selected link with one grounded joint. Editing is disabled entirely while the mechanism is running: press <strong>R</strong> to stop first.</p>
         <dl class="keys">
           <div><dt>Click</dt><dd>place a joint on empty space, or select one</dd></div>
-          <div><dt>Shift-click</dt><dd>add to the selection instead of replacing it &mdash; on an existing joint, or on empty space to place one and keep the rest selected</dd></div>
+          <div><dt>Shift-click</dt><dd>add to the selection instead of replacing it: on an existing joint, or on empty space to place one and keep the rest selected</dd></div>
           <div><dt>Drag</dt><dd>from empty space to box-select; from a joint to move the selection</dd></div>
           <div><dt>Click a bar</dt><dd>select that link</dd></div>
-          <div><dt>L</dt><dd>join the selected joints into one rigid body &mdash; two makes a bar, three or more makes a plate</dd></div>
+          <div><dt>L</dt><dd>join the selected joints into one rigid body: two makes a bar, three or more makes a plate</dd></div>
           <div><dt>S</dt><dd>hold a joint on a rail: select three, and the <em>first</em> becomes a pin held on the line through the other two. Ground the two rail joints with <strong>A</strong> and it is a slideway; leave them on a moving link and it is a pin running in that link's slot</dd></div>
           <div><dt>A</dt><dd>ground the selection, so it never moves</dd></div>
           <div><dt>M</dt><dd>drive the selected link with a motor. It needs exactly one grounded joint, which becomes the pivot</dd></div>
@@ -179,16 +179,16 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
           <div><dt>On a phone</dt><dd>a swipe up or down scrolls the page; two fingers pinch and pan the view. Use the Design/3D switch above to give one view the screen</dd></div>
         </dl>
         <h3 style="margin-top:24px">When it binds</h3>
-        <p>Fixed-length links here are genuinely rigid. If the motor reaches a position the mechanism cannot physically assume &mdash; a non-Grashof linkage hitting its limit, say &mdash; the run stops there rather than stretching a bar, and tells you. To get through it, change the geometry or make a link variable with <strong>V</strong>.</p>
+        <p>Fixed-length links here are genuinely rigid. If the motor reaches a position the mechanism cannot physically assume (a non-Grashof linkage hitting its limit, say), the run stops there rather than stretching a bar, and tells you. To get through it, change the geometry or make a link variable with <strong>V</strong>.</p>
         <h3 style="margin-top:24px">Exporting</h3>
         <p>Two exports, and they are different things. The <strong>Blender script</strong> writes an <em>animation</em>: one cylinder per link edge and one empty per joint, keyframed through a full cycle. Open it in Blender's Scripting tab and press Space. It is the mechanism's skeleton, for you to build real geometry around.</p>
-        <p>The <strong>STL parts</strong> write <em>objects</em>: a zip holding one solid per part &mdash; link plates with a boss at every pin, slider rails with a slot cut through them, headed pins, push-on caps, spacer washers, and a baseplate that holds the anchors &mdash; plus a <code>MANIFEST.txt</code> saying what each one is and how the pile stacks up. Parts that share a pin are put on separate <em>layers</em> and any gap left on a pin is packed out with a spacer, so nothing rubs and nothing floats. Every solid is checked watertight before it is written; one that fails is left out and said so in the manifest rather than handed to a slicer that would quietly print something else. One world unit is one millimetre throughout.</p>
-        <p>The zip also carries <code>assembly.stl</code> and <code>assembly_exploded.stl</code>. Neither is a part to print &mdash; they are several solids touching, not one shell &mdash; but opening them is the quickest way to see which piece goes where.</p>
+        <p>The <strong>STL parts</strong> write <em>objects</em>: a zip holding one solid per part (link plates with a boss at every pin, slider rails with a slot cut through them, headed pins, push-on caps, spacer washers, and a baseplate that holds the anchors), plus a <code>MANIFEST.txt</code> saying what each one is and how the pile stacks up. Parts that share a pin are put on separate <em>layers</em> and any gap left on a pin is packed out with a spacer, so nothing rubs and nothing floats. Every solid is checked watertight before it is written; one that fails is left out and said so in the manifest rather than handed to a slicer that would quietly print something else. One world unit is one millimetre throughout.</p>
+        <p>The zip also carries <code>assembly.stl</code> and <code>assembly_exploded.stl</code>. Neither is a part to print (they are several solids touching, not one shell), but opening them is the quickest way to see which piece goes where.</p>
       </div>
     </div>
   </details>
 
-  <p style="margin-top:32px;font-size:.9rem">The solver is a Levenberg&ndash;Marquardt damped Gauss&ndash;Newton iteration over pairwise rest-distance constraints, warm-started from the previous frame &mdash; which is what keeps the motion on one branch without a special case for four-bar ambiguity, and what lets it handle open chains, multi-loop mechanisms and plates rather than just four-bars. It is a JavaScript port of <a href="https://github.com/MHSGhali/Linkage-Design" target="_blank" rel="noopener">Linkage-Design</a>, my desktop tool in C, and reproduces its results to the last decimal place.</p>
+  <p style="margin-top:32px;font-size:.9rem">The solver is a Levenberg&ndash;Marquardt damped Gauss&ndash;Newton iteration over pairwise rest-distance constraints, warm-started from the previous frame, which is what keeps the motion on one branch without a special case for four-bar ambiguity, and what lets it handle open chains, multi-loop mechanisms and plates rather than just four-bars. It is a JavaScript port of <a href="https://github.com/MHSGhali/Linkage-Design" target="_blank" rel="noopener">Linkage-Design</a>, my desktop tool in C, and reproduces its results to the last decimal place.</p>
 </section>
 </main>
 

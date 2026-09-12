@@ -78,7 +78,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
       <p class="eyebrow">Optics Simulation</p>
       <h1>What does the camera actually record?</h1>
     </div>
-    <p>Light is traced through a real multi-element lens prescription, surface by surface, with a refractive index that depends on the wavelength. Spherical aberration, coma, chromatic aberration, vignetting and distortion are not effects applied afterwards &mdash; they are what happens when you trace real glass. The scene view shows where everything <em>is</em>; the image view under it shows what came out.</p>
+    <p>Light is traced through a real multi-element lens prescription, surface by surface, with a refractive index that depends on the wavelength. Spherical aberration, coma, chromatic aberration, vignetting and distortion are not effects applied afterwards; they are what happens when you trace real glass. The scene view shows where everything <em>is</em>; the image view under it shows what came out.</p>
   </div>
 
   <div class="toolbar" role="toolbar" aria-label="Scene tools">
@@ -145,26 +145,26 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
         <h3>Driving it</h3>
         <dl class="keys">
           <div><dt>focus</dt><dd>the distance the film is set for. At 2&nbsp;m the third sphere is the sharp one</dd></div>
-          <div><dt>aperture</dt><dd>stop down and the sharp slab widens &mdash; and the picture darkens, because that is what stopping down does</dd></div>
+          <div><dt>aperture</dt><dd>stop down and the sharp slab widens, and the picture darkens, because that is what stopping down does</dd></div>
           <div><dt>design</dt><dd>swap the achromat for the single element and the colour error jumps about twenty-fold</dd></div>
           <div><dt>lamps &rlarr; sky</dt><dd>a placed area light, or a uniform dome. Shadows and the terminator vanish with the lamp; the dome lights the subjects without being photographed, so the background stays black either way</dd></div>
-          <div><dt>lamp / sky</dt><dd>each mode brings its own brightness and colour &mdash; the lamp in lumens, the dome in lux</dd></div>
-          <div><dt>exposure</dt><dd>a viewing gain only. It never re-traces a ray &mdash; see below</dd></div>
+          <div><dt>lamp / sky</dt><dd>each mode brings its own brightness and colour: the lamp in lumens, the dome in lux</dd></div>
+          <div><dt>exposure</dt><dd>a viewing gain only. It never re-traces a ray; see below</dd></div>
           <div><dt>drag / scroll</dt><dd>orbit and zoom the scene view</dd></div>
         </dl>
       </div>
       <div>
         <h3>Why the exposure change is instant</h3>
-        <p>The film holds absolute spectral measurements, not pixels. Exposure is applied once, at the moment those measurements become colours, so changing it re-develops the frame that is already there rather than starting a new one. Everything else &mdash; aperture, focus, focal length &mdash; changes which rays exist, so it starts again.</p>
+        <p>The film holds absolute spectral measurements, not pixels. Exposure is applied once, at the moment those measurements become colours, so changing it re-develops the frame that is already there rather than starting a new one. Everything else (aperture, focus, focal length) changes which rays exist, so it starts again.</p>
         <p>The two lighting modes are not balanced to one exposure. A 2000&nbsp;lx overcast sky is a couple of stops brighter than the key lamp it replaces, so switching to it blows the highlights until you bring the exposure down. That is what happens with a real light meter too, and auto-exposure is deliberately absent: it would hide the one thing the aperture control is meant to show.</p>
         <h3 style="margin-top:24px">What it is doing</h3>
-        <p>Every camera ray starts on the sensor, is aimed at the exit pupil, and is refracted through each glass surface in turn with an index taken from the Sellmeier coefficients of the actual catalogue glass. A ray that misses a clear aperture is dead, and that is the <em>only</em> source of vignetting here &mdash; there is no darkening factor applied to the corners. Because the glass is dispersive, one ray can carry only one wavelength; carrying a whole spectrum down a path that only one colour actually took is precisely how a simulator erases the chromatic aberration it was built to show.</p>
+        <p>Every camera ray starts on the sensor, is aimed at the exit pupil, and is refracted through each glass surface in turn with an index taken from the Sellmeier coefficients of the actual catalogue glass. A ray that misses a clear aperture is dead, and that is the <em>only</em> source of vignetting here; there is no darkening factor applied to the corners. Because the glass is dispersive, one ray can carry only one wavelength; carrying a whole spectrum down a path that only one colour actually took is precisely how a simulator erases the chromatic aberration it was built to show.</p>
         <p>The depth-of-field figures are on-axis, from defocus alone, which is what depth of field has always meant. Off axis an uncorrected doublet adds coma and astigmatism that no depth-of-field formula knows about, so a sphere sitting inside the drawn slab can still be soft near the frame edge. The render is the honest answer; the slab is the textbook one.</p>
       </div>
     </div>
   </details>
 
-  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Optics-Simulation" target="_blank" rel="noopener">Optics-Simulation</a>, my physically-based camera simulator in C. It shares that project&rsquo;s vendored spectral core with <a href="light.html">the light simulator</a> &mdash; the same 95-bin spectra, the same CIE 1931 photometry, the same PCG32 stream &mdash; so the engine underneath this page is the one already checked against the C to eighteen significant digits. What is new here is the lens: the paraxial analysis, the pupils and the sequential ray trace through real glass. The desktop tool lets you arrange the scene and draws the lens in cross-section; this page fixes the scene and gives you the camera.</p>
+  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Optics-Simulation" target="_blank" rel="noopener">Optics-Simulation</a>, my physically-based camera simulator in C. It shares that project&rsquo;s vendored spectral core with <a href="light.html">the light simulator</a> (the same 95-bin spectra, the same CIE 1931 photometry, the same PCG32 stream), so the engine underneath this page is the one already checked against the C to eighteen significant digits. What is new here is the lens: the paraxial analysis, the pupils and the sequential ray trace through real glass. The desktop tool lets you arrange the scene and draws the lens in cross-section; this page fixes the scene and gives you the camera.</p>
 </section>
 </main>
 
