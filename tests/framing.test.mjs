@@ -12,12 +12,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { sweptBox, project, fitCamera } from "../js/walker/framing.js";
-import { legExtent } from "../js/walker/jansen.js";
+import { pairExtent } from "../js/walker/jansen.js";
+import { LAYOUT, PLANES, FRAMING } from "../js/walker/creature.js";
 
-/* The homepage's own numbers, from js/hero-walkers.js. */
-const LEGS = 3;
-const LEG_SPACING = 52;
-const FRAMING = { fillX: 1.22, fillY: 0.88 };
+/* The homepage's own numbers, imported rather than copied: these used to be
+   literals here and drifted the moment the creature changed. */
+const { LEG_SPACING } = LAYOUT;
 
 /* Shapes to stay SAFE at: everything from the letterbox the phone band is
    (190px tall across the full width) down to absurdly narrow, because the crop
@@ -34,13 +34,26 @@ const FILL_ASPECTS = [3.4, 2.4, 1.78, 1.4];
 const YAWS = [0, 0.4, 1.0, Math.PI / 2, 2.4, Math.PI];
 const PITCHES = [-0.5, 0, 0.5];
 
-const box = () => sweptBox(legExtent(), LEGS, LEG_SPACING);
+/* PLANES, not PINS: each leg has its own plane on the shaft, so the box is
+   as deep as the leg count, not the pin count. */
+const box = () => sweptBox(pairExtent(), PLANES, LEG_SPACING);
 
 function ndcFor(aspect, yaw, pitch, opts = FRAMING) {
   const b = box();
   const f = fitCamera(b, aspect, { ...opts, yaw, pitch });
   return project(
     b.corners.map((c) => spin(c, b, yaw, pitch)),
+    f.eye, f.at, f.fovDeg, aspect,
+  );
+}
+
+/* The silhouette alone -- the creature in the plane it walks in, feet included
+   -- with no crankshaft extending away from the camera. */
+function ndcPlaneFor(aspect, yaw, pitch, opts = FRAMING) {
+  const b = box();
+  const f = fitCamera(b, aspect, { ...opts, yaw, pitch });
+  return project(
+    b.plane.map((c) => spin(c, b, yaw, pitch)),
     f.eye, f.at, f.fovDeg, aspect,
   );
 }
@@ -87,7 +100,7 @@ test("the creature fills the frame it is given", () => {
      third of the frame at some angles, which is what made it unreadable. */
   for (const aspect of FILL_ASPECTS)
     for (const yaw of YAWS) {
-      const n = ndcFor(aspect, yaw, 0);
+      const n = ndcPlaneFor(aspect, yaw, 0);
       const height = n.y1 - n.y0;
       assert.ok(
         height >= 0.9,
@@ -122,11 +135,32 @@ test("the phone band centres the creature and still shows all of it", () => {
       const n = ndcFor(aspect, yaw, 0, BAND);
       const worst = Math.max(-n.y0, n.y1);
       assert.ok(worst <= 1, `clipped in the band at aspect ${aspect}, yaw ${yaw}: ${worst.toFixed(3)}`);
+      const p = ndcPlaneFor(aspect, yaw, 0, BAND);
       assert.ok(
-        n.y1 - n.y0 >= 0.9,
-        `too small in the band at aspect ${aspect}, yaw ${yaw}: ${(n.y1 - n.y0).toFixed(3)} of 2`,
+        p.y1 - p.y0 >= 0.9,
+        `too small in the band at aspect ${aspect}, yaw ${yaw}: ${(p.y1 - p.y0).toFixed(3)} of 2`,
       );
     }
+});
+
+test("the feet are never cropped, only the ends of the crankshaft", () => {
+  /* The crop exists because the ends of the crankshaft are a straight bar
+     carrying no information. That used to make a single generous fillX safe,
+     because the shaft WAS the widest thing on screen. It is not any more: each
+     pin carries a mirrored pair reaching 107 either side of the crank centre,
+     which is wider than the shaft is long, so the same overflow would now eat
+     feet. fillPlane is the limit the overflow may not reach past, and this is
+     what holds it there. */
+  for (const aspect of ASPECTS)
+    for (const yaw of YAWS)
+      for (const pitch of PITCHES) {
+        const n = ndcPlaneFor(aspect, yaw, pitch);
+        const worst = Math.max(-n.x0, n.x1, -n.y0, n.y1);
+        assert.ok(
+          worst <= 1,
+          `a foot left the frame at aspect ${aspect}, yaw ${yaw}, pitch ${pitch}: ${worst.toFixed(3)}`,
+        );
+      }
 });
 
 test("a box that is turned end-on is still solved, not backed away from", () => {

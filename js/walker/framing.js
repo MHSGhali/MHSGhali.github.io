@@ -14,20 +14,37 @@
    convex, so the extent of its projected corners IS the extent of its
    projection: eight points settle it exactly. */
 
-/* The corners of the box one leg sweeps over a revolution, extended along the
-   crankshaft. Callers pass the leg's swept extent so this stays honest if the
-   linkage changes. */
-export function sweptBox(legExtent, legCount, spacing) {
+/* The corners of the box the creature sweeps over a revolution: the extent a
+   mirrored PAIR of legs sweeps in its own plane, extended along the crankshaft.
+   Callers pass the swept extent so this stays honest if the linkage changes.
+
+   Two corner sets come back, and the difference between them is the whole
+   reason the camera can crop at all. `plane` is the creature's silhouette in
+   the plane it walks in -- feet, body, crank -- and every bit of that carries
+   information, so it must stay on screen. `corners` adds the extension along
+   the crankshaft, whose ends are a straight bar; those may run off the sides.
+
+   That distinction used to be implicit and has stopped being safe. When the
+   legs all faced one way the widest thing on screen WAS the shaft, so a single
+   generous fillX cropped nothing but bar ends. A mirrored pair reaches 107
+   either side of the crank centre, which is wider than the shaft, so the same
+   fillX would now crop feet. */
+export function sweptBox(extent, legCount, spacing) {
   const halfZ = ((legCount - 1) / 2) * spacing;
   const corners = [];
-  for (const x of [legExtent.x0, legExtent.x1])
-    for (const y of [legExtent.y0, legExtent.y1])
+  const plane = [];
+  for (const x of [extent.x0, extent.x1])
+    for (const y of [extent.y0, extent.y1]) {
+      plane.push({ x, y, z: 0 });
       for (const z of [-halfZ, halfZ]) corners.push({ x, y, z });
+    }
   return {
     corners,
-    cx: (legExtent.x0 + legExtent.x1) / 2,
-    cy: (legExtent.y0 + legExtent.y1) / 2,
-    halfW: (legExtent.x1 - legExtent.x0) / 2 + halfZ * 0.34,
+    plane,
+    cx: (extent.x0 + extent.x1) / 2,
+    cy: (extent.y0 + extent.y1) / 2,
+    halfW: (extent.x1 - extent.x0) / 2 + halfZ * 0.34,
+    planeHalfW: (extent.x1 - extent.x0) / 2,
   };
 }
 
@@ -90,56 +107,74 @@ function spinAbout(p, box, yaw, pitch) {
 export function fitCamera(box, aspect, opts = {}) {
   const fovDeg = opts.fovDeg ?? 34;
   const fill = opts.fill ?? 0.86;      /* leave a margin all round */
-  /* Horizontal and vertical are not the same question. Fitting the whole swept
-     box in BOTH leaves the creature small enough that six legs superimpose into
-     a knot. Vertically it must stay inside the frame -- crop the feet and it
-     stops reading as something that walks. Horizontally the extremes are the
-     ends of the crankshaft, a straight bar whose ends carry no information, so
-     letting those run past the edge buys the scale back for free.
-     fillX above 1 therefore means "allowed to overflow"; fillY never should. */
+  /* Horizontal and vertical are not the same question, and neither is the
+     creature's silhouette the same question as its shaft.
+
+     Vertically nothing may be cropped: take the feet off and it stops reading
+     as something that walks. Horizontally the ends of the crankshaft are a
+     straight bar carrying no information, so letting those run past the edge
+     buys back the scale that fitting the whole envelope would spend -- that is
+     what fillX above 1 means, "allowed to overflow". But the silhouette in the
+     walking plane is all information, feet included, so it gets its own limit
+     below 1 that the overflow cannot reach past. */
   const fillX = opts.fillX ?? fill;
   const fillY = opts.fillY ?? fill;
+  const fillPlane = opts.fillPlane ?? 0.96;
   const bias = opts.bias ?? 0.46;
   const yaw = opts.yaw ?? 0.36;        /* camera x offset as a share of distance */
   const rise = opts.rise ?? 105;       /* how far above the creature's centre  */
   const tanHalf = Math.tan((fovDeg * Math.PI) / 360);
 
   /* Turning the view changes what the frustum has to hold: seen down the
-     crankshaft, six legs that were stacked behind one another become a row
-     nearly three times as wide. Fitting the corners as the visitor has
-     actually turned them is what keeps the creature framed at every angle
-     instead of only at the one it was designed at. */
-  const corners = (opts.yaw || opts.pitch)
-    ? box.corners.map((c) => spinAbout(c, box, opts.yaw || 0, opts.pitch || 0))
-    : box.corners;
+     crankshaft, legs that were stacked behind one another become a row far
+     wider than one of them. Fitting the corners as the visitor has actually
+     turned them is what keeps the creature framed at every angle instead of
+     only at the one it was designed at. */
+  const turned = (opts.yaw || opts.pitch)
+    ? (set) => set.map((c) => spinAbout(c, box, opts.yaw || 0, opts.pitch || 0))
+    : (set) => set;
+  const corners = turned(box.corners);
+  const plane = turned(box.plane ?? box.corners);
+  const planeHalfW = box.planeHalfW ?? box.halfW;
 
   let dist = (box.halfW * 1.4) / (tanHalf * Math.max(aspect, 0.2));
-  let shift = 0, ndc = null;
+  let shift = 0, ndc = null, ndcPlane = null;
 
   for (let iter = 0; iter < 60; iter++) {
     const halfViewW = dist * tanHalf * aspect;
     /* The guard keeps the shift from pushing the box off the far edge. It has
        to allow the same horizontal overflow fillX does, or a frame deliberately
        cropped sideways would collapse the bias to zero and re-centre the
-       creature -- straight under the headline it is supposed to sit beside. */
-    shift = Math.max(0, Math.min(halfViewW * fillX - box.halfW * 1.08, halfViewW * bias));
+       creature -- straight under the headline it is supposed to sit beside.
+       The silhouette gets its own, tighter term for the same reason it gets its
+       own fill: a shift that runs a foot off the edge is not a crop worth
+       having, however far the shaft is allowed to go. */
+    shift = Math.max(0, Math.min(
+      halfViewW * fillX - box.halfW * 1.08,
+      halfViewW * fillPlane - planeHalfW * 1.04,
+      halfViewW * bias,
+    ));
     const aim = box.cx - shift;
     const eye = { x: aim + dist * yaw, y: box.cy + rise, z: dist };
     const at = { x: aim, y: box.cy - 6, z: 0 };
     ndc = project(corners, eye, at, fovDeg, aspect);
+    ndcPlane = project(plane, eye, at, fovDeg, aspect);
     const over = Math.max(
       Math.max(-ndc.x0, ndc.x1) / fillX,
       Math.max(-ndc.y0, ndc.y1) / fillY,
+      Math.max(-ndcPlane.x0, ndcPlane.x1) / fillPlane,
     );
     /* Converge from BOTH sides. Only ever backing away leaves the creature
        tiny at the angles where it is narrower than the estimate assumed --
        turned end-on to the crankshaft it filled barely a quarter of the frame.
        The projection scales as roughly 1/distance, so `over` is very nearly
        the correction factor and this settles in two or three passes. */
-    if (Math.abs(over - 1) < 0.01) return { dist, shift, eye, at, ndc, fovDeg };
+    if (Math.abs(over - 1) < 0.01) {
+      return { dist, shift, eye, at, ndc, ndcPlane, fovDeg };
+    }
     dist *= Math.max(0.6, Math.min(over, 1.5));
   }
-  return { dist, shift, ndc, fovDeg,
+  return { dist, shift, ndc, ndcPlane, fovDeg,
            eye: { x: box.cx - shift + dist * yaw, y: box.cy + rise, z: dist },
            at: { x: box.cx - shift, y: box.cy - 6, z: 0 } };
 }

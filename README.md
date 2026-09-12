@@ -12,7 +12,7 @@ pages/chat.html       the assistant, on its own
 css/main.css          design system and every component
 js/app.js             theme toggle, mobile nav, scroll reveal
 js/hero-walkers.js    the homepage background, driven by the real solver
-js/walker/            Jansen's leg, and the camera that keeps it framed
+js/walker/            Jansen's leg, the body it carries, and the camera that frames it
 js/linkage/           the mechanism engine and the tool's UI
 js/light/             the spectral light engine, its worker and the tool's UI
 js/optics/            the lens, the camera and the renderer behind the optics page
@@ -356,40 +356,116 @@ static `.js` file would be the easiest scrape on the site.
 
 ## The homepage background
 
-A Strandbeest walking in 3D, on the same solver the linkage tool runs. Three
-Jansen legs share one crankshaft, evenly spaced around the turn, and the body
-advances at the rate the stance foot sweeps backwards, so a planted foot stays
-planted rather than skating. Three is chosen for the silhouette, not for the
-gait: with a duty factor near 20% it takes six legs before some foot is always
-down, and nothing here simulates weight, so the creature simply reads as
-lighter and you can see through it.
+A Strandbeest walking in 3D, on the same solver the linkage tool runs. It is not
+carried along a path: it has a body with mass and rotational inertia that falls
+under gravity and is held up by whichever feet are touching the ground, and its
+speed is an output of that rather than a number written down.
 
-`js/walker/jansen.js` holds the thirteen "holy numbers" and the forward
-kinematics: two fixed pivots and five circle–circle intersections down to the
-foot, after Wang, *Durability-Aware Multi-Objective Optimization of the Jansen
-Linkage* (arXiv:2606.22129 §2). Two circles meet in two places and only one
-choice at each step assembles into Jansen's leg; that branch was found by
-sweeping all thirty-two and keeping the one whose foot path has the published
-duty factor of about 20%. `framing.js` solves where to put the camera, against
-the creature's own swept size and the viewport's shape.
+It used to be a number written down. Three legs all facing the same way, and the
+whole creature slid forwards at `advancePerRadian` -- the rate a planted foot
+sweeps backwards, so a planted foot stayed planted. That number was right and the
+creature was still skating, because nothing was ever held up by anything.
 
-It deliberately does not fit the whole creature. Framed end to end, legs 52
-apart superimpose into a knot of grey sticks at the size that leaves, so the
-camera is fitted vertically but allowed to run the ends of the crankshaft off
-the sides -- `fillX` above 1, `fillY` below it. The view also opens turned
-three-quarters on rather than square: at yaw 0 the camera looks straight down
-the crankshaft and every leg hides behind the one in front, which is an angle
-problem no amount of zoom fixes. `tests/framing.test.mjs` pins both -- that the
-crop never eats the creature vertically at any window shape or drag angle, that
-it stays bounded sideways, and that what is left still fills the frame.
+### Why four legs, and what it cost
+
+A planar body needs TWO feet on the ground at every instant. Two contacts fix a
+height and an angle; one fixes neither, and the body pivots about it and topples.
+So four legs need each leg planted for over half the turn.
+
+Jansen's classic assembly plants a foot for about 20% of the turn, which is why
+an earlier version of this needed ten legs. But the thirteen bars go together
+thirty-two different ways -- five circle-circle intersections, two solutions each
+-- and every one is a real linkage with a real gait. `jansen.js` now picks the
+assembly that plants its foot for **65%** of the turn: a long flat stance instead
+of a deep arc. Four legs, and never fewer than two down.
+
+Two other things came with that choice. The proportions collapse thirteen lengths
+onto six distinct ones, which is how a physical desktop walker is actually built.
+And no two members of the leg cross each other at any crank angle -- where the
+classic assembly has three pairs passing through one another for the whole
+revolution, which a drawing gets away with and a machine does not.
+
+What it gives up is stride: the foot advances 13.4 per radian rather than 34.5
+and lifts 13 rather than 27. It is a slower, flatter-footed walker. For something
+that has to carry its own weight on four legs and be buildable, that is the right
+way round.
+
+### It has to be buildable
+
+`tests/walker-clearance.test.mjs` takes the creature through a whole revolution
+and measures the distance between every pair of members in three dimensions,
+against the thicknesses they are actually drawn with. Members that share a pin
+may touch, because that is what a joint is; nothing else may come closer than its
+own radius.
+
+That test is why the crankshaft is a crankshaft. Main journals run on the axis in
+the bays between the legs, and at each leg station there is a throw -- a web out
+to the offset pin, the pin, and a web back. Drive a plain rod down the axis
+instead and the leg's own J1-J4 rocker sweeps straight through it twice a turn.
+It is also why each leg gets its own plane on the shaft: a forward-reaching leg
+and its backward-reaching partner used to share one, which put a whole second leg
+inside the first.
+
+### Level, and visibly moving
+
+With two feet down the contacts all but DETERMINE the body's tilt, so pitch is a
+pose the gait dictates rather than an oscillation the body settles out of --
+quadrupling the rotational inertia makes the rocking worse, not better. What
+matters is whether the two rows plant their feet at the same HEIGHT. Because the
+creature walks quasi-statically its pose is exactly the lower convex hull of its
+feet, which turns "how much does this rock?" into a geometry question answerable
+in microseconds, and `LAYOUT.REAR_OFFSET` is chosen by measuring it. It rides
+within about a degree and a half of level.
+
+The camera travels with the creature, so without something to pass it would walk
+on the spot. A scatter of stones runs beside the track on a treadmill: each keeps
+an unwrapped world x, and any that falls half a period behind is moved a whole
+period ahead, so a fixed pool paints a field of any length. They are laid down
+beside the creature rather than under it, because a leg passing through a stone
+would undo the clearance work above.
+
+### The rest of the machine
+
+`js/walker/` is three.js-free and therefore testable: `jansen.js` holds the
+proportions and the forward kinematics (two fixed pivots and five circle-circle
+intersections down to the foot, after Wang, *Durability-Aware Multi-Objective
+Optimization of the Jansen Linkage*, arXiv:2606.22129 §2); `body.js` is the rigid
+body and the contact model -- three degrees of freedom in the walking plane,
+penalty normal forces, and a Coulomb friction spring anchored where each foot
+touched down; `creature.js` puts them together and also describes what the
+machine is MADE of, so the renderer and the clearance test measure the same
+object. `hero-walkers.js` only draws it.
+
+`advancePerRadian` has changed jobs in all this. It used to move the creature;
+now it is a prediction the contact physics has to reproduce from gravity, normal
+forces and friction. A loaded foot holds still to within about 17% of the body's
+speed, and that remainder is honest: the foot's speed along so long a stance is
+far from constant, so several feet down at once ask the body for different
+velocities and the lightest-loaded gives way. Real Strandbeests scuff on sand for
+exactly this reason.
+
+`framing.js` solves where to put the camera against the creature's own swept size
+and the viewport's shape. It deliberately crops, letting the ends of the
+crankshaft run off the sides -- `fillX` above 1 -- while `fillPlane` holds the
+creature's silhouette in the walking plane, feet included, inside the frame.
+`tests/framing.test.mjs` pins that at every window shape and drag angle.
+
+`fillY` is lower than it has to be, and that is the bottom edge's doing. The hero
+box ends in a hard horizontal line above the About section, and the lit ground
+plane is a different tone from the page behind it, so that line reads as a
+rectangle drawn across the design. Fitted tight the feet reach 94% of the way
+down the frame and there is nothing to fade; at 0.70 they stop around 85% and the
+bottom seventh is empty ground, which main.css dissolves into the page. The fade
+lives on the canvas rather than on `.hero-walkers`, which already carries the
+horizontal mask: two mask layers on one element need `mask-composite`, whose
+prefixed and standard keyword sets disagree badly enough to blank the whole
+background on some browsers, and two elements with one layer each need none.
 
 On a phone it stops being a backdrop. The text column is the whole width there,
-so a creature behind it is behind every word and the mask has nothing to fade it
-into; below 640px it leaves the absolute layer and takes a band of its own under
-the buttons -- full contrast, still draggable, competing with nothing. The
-rightward bias goes with it: `refit()` asks the stylesheet which layout it chose
-(a backdrop is positioned, a band is static) rather than keeping its own copy of
-the breakpoint.
+so below 640px the creature leaves the absolute layer and takes a band of its
+own under the buttons. `refit()` asks the stylesheet which layout it chose (a
+backdrop is positioned, a band is static) rather than keeping its own copy of the
+breakpoint.
 
 ## Working on it
 

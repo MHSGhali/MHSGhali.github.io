@@ -1,25 +1,46 @@
 /* The homepage background: a Strandbeest walking, in 3D, casting shadows.
 
-   Three Jansen legs hang from one crankshaft, evenly spaced around the turn.
-   Each leg is a separate mechanism run by the real solver, exactly as the
-   linkage tool runs one; three of them cost well under a twentieth of a
-   millisecond a frame, so there was no reason to bake it.
+   It walks because it is held up. Five pins on one crankshaft, each carrying a
+   mirrored PAIR of Jansen legs -- one reaching forwards, one back -- and a body
+   with mass and rotational inertia that falls under gravity and is carried by
+   whichever feet are touching the ground. Every leg is a separate mechanism run
+   by the real solver, exactly as the linkage tool runs one.
 
-   Three is a deliberately open silhouette, not a walkable count: the leg's
-   duty factor is about 20% (gait() measures it), so it takes six legs before
-   some foot is always planted, and with three the creature is off the ground
-   for roughly two fifths of the turn. Nothing here simulates weight -- the
-   body is carried forwards at the stance rate regardless -- so the cost is
-   only that the gait no longer reads as load-bearing, and what is bought is
-   legs you can see through instead of a thicket of them.
+   That is measured at about a millisecond a frame for the ten of them, and it
+   is the one real cost here: the contact solve beside it is 0.013 ms, so this
+   is very nearly all solver. It buys the thing the page is actually claiming --
+   the background is the engine, not a recording of it -- and a millisecond of a
+   sixteen millisecond frame is a price worth paying for that. Do not go looking
+   for it in the iteration count: the solve converges on its own in five or six
+   passes, well short of maxIters, and cutting it to four is worth 0.04 ms and
+   costs three digits of the accuracy jansen.js claims.
 
-   WHY THE CREATURE MOVES. During its stance a foot travels backwards relative
-   to the body, so a body carried forwards at the same rate leaves the planted
-   foot standing still on the ground -- which is what walking is. The rate
-   comes from the leg itself (see gait() in jansen.js), not from a number
-   chosen to look right. The camera travels with it and the ground is
-   featureless, so the position is wrapped periodically; nothing on screen can
-   tell, and it keeps the coordinates small however long the tab is left open.
+   WHAT THIS USED TO BE, AND WHY IT CHANGED. Three legs all facing one way, and
+   the whole creature slid forwards at `advancePerRadian` radians of crank -- the
+   rate a planted foot sweeps backwards, so a planted foot stayed planted. The
+   number was right and the creature was still skating: nothing was ever held up
+   by anything. With a duty factor near 20% three legs leave it with no foot
+   down at all for two fifths of every turn, which does not matter when nothing
+   has weight and is fatal the moment something does.
+
+   The leg layout, the body and the contact model are all in walker/, which
+   imports no three.js and is therefore the part that can be driven by a test:
+   creature.js says what the creature is and body.js carries it. This file
+   draws it. tests/walker-physics.test.mjs is where "does it actually walk?"
+   is answered in numbers.
+
+   WHERE THE SPEED COMES FROM NOW. Nowhere. It is an output. The feet push, the
+   body accelerates until the pushing balances, and what comes out has to agree
+   with `advancePerRadian` -- which is no longer the thing that moves the
+   creature but the prediction the physics has to reproduce. The slack in that
+   agreement is real: Jansen's stance speed varies about a quarter either side
+   of its mean, so planted feet genuinely fight each other and the loser scuffs.
+
+   The camera travels with it and the ground is featureless, so the position is
+   wrapped periodically; nothing on screen can tell, and it keeps the
+   coordinates small however long the tab is left open. The wrap is anchored on
+   the CAMERA and the creature placed relative to it, so the two can never wrap
+   a frame apart and throw the creature across the screen.
 
    three.js is imported from a pinned URL rather than through an import map:
    the map on the tool pages exists only because OrbitControls and friends
@@ -27,29 +48,19 @@
    addon. If the import fails -- offline, blocked CDN -- the page simply has no
    background, which is why this is a background and not the content.
 
-   It stops when it is not being looked at: under prefers-reduced-motion, when
-   the tab is hidden, and when it is scrolled out of view. */
+   It stops when it is not being looked at: under prefers-reduced-motion, and
+   when the tab is hidden (which the browser does for us). */
 
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
 
-import * as M from "./linkage/mechanism.js?v=58764426";
-import * as S from "./linkage/solver.js?v=58764426";
-import { buildLeg, gait, legExtent } from "./walker/jansen.js?v=58764426";
-import { sweptBox, fitCamera } from "./walker/framing.js?v=58764426";
+import { pairExtent } from "./walker/jansen.js?v=3d923acb";
+import { sweptBox, fitCamera } from "./walker/framing.js?v=3d923acb";
+import * as RNG from "./light/rng.js?v=3d923acb";
+import { LAYOUT, PLANES, FRAMING, BUILD, buildCreature, advance, members }
+  from "./walker/creature.js?v=3d923acb";
 
-const LEGS = 3;
-const LEG_SPACING = 52;          /* along the crankshaft */
-const CRANK_DEG_S = 46;          /* a slow walk: one stride every eight seconds */
+const { LEG_SPACING } = LAYOUT;
 const WRAP = 4000;               /* invisible: the ground carries no features */
-
-/* Framing the WHOLE swept box was the honest reading of "keep it on screen",
-   and it made the creature unreadable: legs 52 apart, fitted end to end,
-   superimpose into a grey knot at the size that leaves. Nothing is lost by
-   letting the far end of the crankshaft run past the edge -- the walking is in
-   the near legs, and the shaft is a straight line either way -- so `fill` goes
-   past 1 and the creature is framed on the legs instead of on its envelope.
-   tests/framing.test.mjs pins how far past the edge that is allowed to go. */
-const FRAMING = { fillX: 1.22, fillY: 0.88 };
 
 
 const host = document.querySelector("[data-hero-walkers]");
@@ -62,26 +73,38 @@ async function start(host) {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   const THREE = await import(THREE_URL);
 
-  const G = gait();
-  const speedRad = (CRANK_DEG_S * Math.PI) / 180;
-  const box = sweptBox(legExtent(), LEGS, LEG_SPACING);
+  const extent = pairExtent();
+  const box = sweptBox(extent, PLANES, LEG_SPACING);
   /* Depends only on the aspect ratio, so it is solved on resize, not per frame. */
   let framing = fitCamera(box, 1, FRAMING);
 
-  /* ---- the creature: three legs on one crankshaft --------------------- */
-  const legs = [];
-  for (let n = 0; n < LEGS; n++) {
-    const { mechanism, id } = buildLeg(CRANK_DEG_S, 1);
-    /* Evenly spaced around the crank turn. accumulatedAngleRad is the motor's
-       own state, so setting it here is exactly what a phase offset is. */
-    mechanism.links[0].accumulatedAngleRad = (n / LEGS) * 2 * Math.PI;
-    S.solveAtCurrentAngle(mechanism, S.defaultParams());
-    legs.push({ mechanism, id, z: (n - (LEGS - 1) / 2) * LEG_SPACING });
-  }
-  const params = S.defaultParams();
+  /* ---- the creature ---------------------------------------------------
+     Ten legs, one crankshaft and a body with weight, all of it built and run by
+     walker/creature.js, which imports no three.js and is therefore the part a
+     test can drive. Everything below this line is drawing. */
+  const creatureState = buildCreature();
+  const { legs, physics, body } = creatureState;
+  /* The height the camera is aimed at. Fixed, not the live body height: a
+     camera that rode the bob would cancel it out and the creature would look
+     rigid again. */
+  const rideY = creatureState.rideY;
 
   /* ---- scene --------------------------------------------------------- */
   const scene = new THREE.Scene();
+  /* Depth fog, and it is doing the same job the ground's radial fade does.
+     Five leg planes strung along the crankshaft superimpose into one silhouette
+     from any angle worth looking from -- that is not a framing failure, it is
+     what a Strandbeest looks like, and no spacing fixes it because the legs are
+     215 wide and the planes can only ever be tens apart. What CAN be fixed is
+     that all five arrive at the eye with equal weight, so the near ones have
+     nothing to stand out against. Fading the far ones into the page colour puts
+     the tangle behind the creature instead of on top of it.
+
+     The range is set from the camera distance in refit(), not written down: the
+     camera backs off and closes in as the window changes shape, and a fixed
+     near and far would swallow the whole creature in one layout and do nothing
+     in another. */
+  scene.fog = new THREE.Fog(0x000000, 1, 3000);
   const camera = new THREE.PerspectiveCamera(34, 1, 1, 3000);
   /* preserveDrawingBuffer, and it is not optional here. With the default
      (false) a WebGL drawing buffer's contents are UNDEFINED once it has been
@@ -107,7 +130,8 @@ async function start(host) {
   const rodGeom = new THREE.CylinderGeometry(1, 1, 1, 10);
   rodGeom.rotateX(Math.PI / 2);                    /* stand it along +Z */
   const jointGeom = new THREE.SphereGeometry(1, 12, 8);
-  const ROD_R = 1.15, JOINT_R = 1.9;
+  /* Bar thicknesses live in creature.js, not here: they decide whether two
+     members foul, so the test has to see the same numbers the renderer does. */
 
   /* The floor fades out radially. A shadow can only darken something already
      drawn, so catching one needs a lit surface -- but a plain plane is a slab
@@ -135,56 +159,57 @@ async function start(host) {
     rod: new THREE.MeshStandardMaterial({ metalness: 0.5, roughness: 0.45 }),
     crank: new THREE.MeshStandardMaterial({ metalness: 0.7, roughness: 0.3 }),
     joint: new THREE.MeshStandardMaterial({ metalness: 0.3, roughness: 0.6 }),
+    frame: new THREE.MeshStandardMaterial({ metalness: 0.6, roughness: 0.35 }),
+    stone: new THREE.MeshStandardMaterial({ metalness: 0.05, roughness: 0.95 }),
     ground: new THREE.MeshStandardMaterial({
       roughness: 1, metalness: 0, transparent: true, alphaMap: radialFade(),
       depthWrite: false,
     }),
   };
 
-  /* One mesh per rod and per joint, for every leg. */
-  const parts = [];
+  /* One mesh per member, built straight off creature.js's own description of
+     the machine. The renderer does not decide what the creature is made of:
+     members() says, and the clearance test measures the same list, so what is
+     drawn and what is checked for fouling cannot drift apart. */
+  const memberMeshes = [];
+  for (const mem of members(creatureState)) {
+    const material = mem.kind === "crank" ? mat.crank
+                   : mem.kind === "rod" ? mat.rod
+                   : mat.frame;
+    const mesh = new THREE.Mesh(rodGeom, material);
+    mesh.castShadow = true;
+    creature.add(mesh);
+    memberMeshes.push(mesh);
+  }
+
+  /* Pins, one per joint per leg -- but not at O or J1.
+
+     Those two are the crankshaft's, not the leg's, and the crankshaft draws
+     them itself: J1 is the crank pin, already there as a pin between its webs,
+     and O is the main axis, which at a leg station is a GAP. A bead at O hangs
+     in the middle of the throw attached to nothing, which is exactly what it
+     looks like. */
+  const CRANK_JOINTS = new Set(["O", "J1"]);
   for (const leg of legs) {
-    for (let li = 0; li < leg.mechanism.links.length; li++) {
-      const l = leg.mechanism.links[li];
-      if (!l.alive) continue;
-      for (let i = 0; i < l.connectorIds.length; i++) {
-        for (let j = i + 1; j < l.connectorIds.length; j++) {
-          const mesh = new THREE.Mesh(rodGeom, l.isDriven ? mat.crank : mat.rod);
-          mesh.castShadow = true;
-          creature.add(mesh);
-          parts.push({ leg, a: l.connectorIds[i], b: l.connectorIds[j], mesh });
-        }
-      }
-    }
-    for (const cid of Object.values(leg.id)) {
+    leg.jointMeshes = [];
+    for (const [key, cid] of Object.entries(leg.id)) {
+      if (CRANK_JOINTS.has(key)) continue;
       const mesh = new THREE.Mesh(jointGeom, mat.joint);
-      mesh.scale.setScalar(JOINT_R);
+      mesh.scale.setScalar(BUILD.jointR);
       mesh.castShadow = true;
       mesh.position.z = leg.z;
       creature.add(mesh);
-      leg.jointMeshes = leg.jointMeshes || [];
       leg.jointMeshes.push({ cid, mesh });
     }
-  }
-
-  /* The chassis: two beams down the length of the creature, through the crank
-     centres and through the fixed pivots. Without them the legs read as
-     separate machines rather than as one animal. */
-  const spine = [];
-  for (const key of ["O", "G"]) {
-    const mesh = new THREE.Mesh(rodGeom, mat.rod);
-    mesh.castShadow = true;
-    creature.add(mesh);
-    spine.push({ key, mesh });
   }
 
   /* ---- ground and light ---------------------------------------------- */
   /* Sized to the creature, not the world: the fade has to happen within the
      plane, so a huge one would put the fade off in the distance and bring the
      slab back. */
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(620, 620), mat.ground);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(760, 760), mat.ground);
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = G.footLow;
+  ground.position.y = physics.groundY;
   ground.receiveShadow = true;
   scene.add(ground);
 
@@ -192,8 +217,10 @@ async function start(host) {
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   /* The shadow camera travels with the creature, so it only ever has to cover
-     the creature itself and can stay tight enough for a crisp shadow. */
-  const R = LEGS * LEG_SPACING * 0.75;
+     the creature itself and can stay tight enough for a crisp shadow. It is
+     sized on whichever of the creature's two spans is larger -- the legs reach
+     further across the walking plane than the shaft does along it. */
+  const R = Math.max(extent.x1 - extent.x0, (PLANES - 1) * LEG_SPACING) * 0.75;
   Object.assign(key.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 1, far: 900 });
   key.shadow.bias = -0.0012;
   key.shadow.normalBias = 0.6;
@@ -204,6 +231,56 @@ async function start(host) {
   scene.add(fill);
   const ambient = new THREE.AmbientLight(0xffffff, 0.5);
   scene.add(ambient);
+
+  /* ---- scenery ---------------------------------------------------------
+
+     The camera travels with the creature and the ground carries no features, so
+     without this the creature walks on the spot: every pixel that could tell
+     you it is moving is either moving with it or featureless. A scatter of
+     stones on the ground is the cheapest thing that fixes it.
+
+     Endless, from a fixed pool. Each stone carries an unwrapped world x, and
+     any that falls more than half a period behind the camera is moved a whole
+     period ahead -- a treadmill, so sixty stones make a field of any length.
+     The field therefore repeats every FIELD units, which nothing on screen can
+     tell because the repeat is four times wider than the view.
+
+     They are laid down BESIDE the creature's track rather than under it: the
+     creature would otherwise walk through them, and a leg passing through a
+     stone undoes the point of the clearance work. A real beach would have them
+     underfoot; a background that has to stay legible would rather not.
+
+     Sizes and distances are drawn from the product of two uniforms rather than
+     one, which piles most of them up small and near and leaves a few large ones
+     scattered out into the distance. A flat distribution gives an even gravel
+     that reads as texture; this reads as ground.
+
+     Deterministic, from the light engine's PCG32 rather than Math.random, so
+     the scatter is the same on every load and the same for every visitor. */
+  const STONES = 170;
+  const FIELD = 1400;            /* the repeat period, in creature units */
+  const LANE = (PLANES / 2) * LEG_SPACING + 40;   /* clear of the legs */
+  const stoneGeom = new THREE.IcosahedronGeometry(1, 0);
+  const stones = [];
+  {
+    const rng = RNG.seed(0x9e3779b97f4a7c15n, 1n);
+    for (let i = 0; i < STONES; i++) {
+      const mesh = new THREE.Mesh(stoneGeom, mat.stone);
+      /* Flattened and turned at random: an icosahedron scaled unevenly reads as
+         a rock, where the bare solid reads as a die. */
+      const size = 2.5 + RNG.f(rng) * RNG.f(rng) * 11;
+      mesh.scale.set(size * (0.7 + RNG.f(rng) * 0.8), size * (0.4 + RNG.f(rng) * 0.5),
+                     size * (0.7 + RNG.f(rng) * 0.8));
+      mesh.rotation.set(RNG.f(rng) * 3.14, RNG.f(rng) * 3.14, RNG.f(rng) * 3.14);
+      mesh.position.y = physics.groundY + mesh.scale.y * 0.35;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const side = RNG.f(rng) < 0.5 ? -1 : 1;
+      stones.push({ mesh, wx: RNG.f(rng) * FIELD, z: side * (LANE + RNG.f(rng) * RNG.f(rng) * 520) });
+      mesh.position.z = stones[i].z;
+      scene.add(mesh);
+    }
+  }
 
   /* ---- theme ---------------------------------------------------------- */
   /* Declared here rather than with the layout code below: applyTheme() runs
@@ -234,6 +311,9 @@ async function start(host) {
     mat.rod.color.set(pick("--text-faint", "#858585"));
     mat.crank.color.set(pick("--text", "#e9e9e9"));
     mat.joint.color.set(pick("--text-dim", "#a1a1a1"));
+    /* The frame reads as the heaviest thing on the creature, because it is the
+       thing being carried. */
+    mat.frame.color.set(pick("--text-dim", "#a1a1a1"));
     /* The ground is drawn, not transparent: a shadow can only darken what is
        already there, and on a near-black page there is nothing to darken. */
     /* The floor takes the PAGE's own background colour, not a raised surface
@@ -242,7 +322,13 @@ async function start(host) {
        behind the creature rather than a floor under it. Starting from the page
        colour, the key lifts it just clear of the page and the shadow drops it
        just below -- which is all a shadow on a near-black page can be. */
+    /* Set between the floor and the rods: the stones have to be visible against
+       the ground without ever competing with the creature for attention. */
+    mat.stone.color.set(pick("--surface-line", light ? "#d8d8d8" : "#242424"));
     mat.ground.color.set(pick("--bg", light ? "#ffffff" : "#0a0a0a"));
+    /* The same colour the floor takes, and for the same reason: fog that is not
+       the page's own colour reads as haze rather than as distance. */
+    scene.fog.color.set(pick("--bg", light ? "#ffffff" : "#0a0a0a"));
     mat.ground.opacity = light ? 0.85 : 1;
     ambient.intensity = light ? 0.5 : 0.4;
     key.intensity = light ? 1.8 : 1.5;
@@ -355,49 +441,72 @@ async function start(host) {
        - The observer was worse. Whenever it reported the hero as not
          intersecting the loop stopped, and if that report was wrong -- or
          arrived before layout settled -- nothing ever started it again. The
-         hero is at the top of the page; the work it was avoiding is a 0.05 ms
-         solve and one draw call batch.
+         hero is at the top of the page; the work it was avoiding is about a
+         millisecond of solve and one draw call batch.
 
      A loop with one condition cannot get stuck in a state I can't see. */
   reduce.addEventListener?.("change", () => tick());
   const running = () => !reduce.matches;
 
-  let theta = 0;          /* crank angle, the one input the creature has */
   let raf = 0, last = 0;
+  /* The camera lags the body through a first-order filter. The body's x is an
+     output of a contact solve now, so it carries the ripple of feet landing and
+     breaking away; a camera rigidly bolted to it would hand that ripple to
+     every pixel on screen instead of to the creature. A quarter-second constant
+     is long enough to swallow the ripple and far shorter than a stride. */
+  const CAM_LAG = 0.25;
+  let camX = body.x;
+
+  /* The furthest any part of the creature can be from its own centre, however
+     the visitor has turned it: the half-diagonal of the swept box. The fog is
+     scaled by this so the fade always spans the creature rather than a fixed
+     number of units. */
+  const DEPTH = Math.hypot(box.halfW, ((PLANES - 1) / 2) * LEG_SPACING);
 
   function place() {
-    /* Walk: the body advances at the rate the stance foot sweeps backwards. */
-    const bodyX = ((-G.advancePerRadian * theta) % WRAP + WRAP) % WRAP;
-    creature.position.x = bodyX;
+    /* Wrap the CAMERA and hang the creature off it. Wrapping each separately
+       would, once every few minutes, leave them a frame apart across the
+       boundary and throw the creature clean across the screen. */
+    const anchor = ((camX % WRAP) + WRAP) % WRAP;
+    const bodyX = anchor + (body.x - camX);
+
+    creature.position.set(bodyX, body.y, 0);
+    creature.rotation.z = body.pitch;
+
+    /* Roll the stone field past the camera. Positions are kept unwrapped and
+       rendered relative to the same anchor the creature uses, so the field and
+       the creature can never drift apart across a wrap. */
+    for (const st of stones) {
+      let d = st.wx - camX;
+      if (d > FIELD / 2) { st.wx -= FIELD; d -= FIELD; }
+      else if (d < -FIELD / 2) { st.wx += FIELD; d += FIELD; }
+      st.mesh.position.x = anchor + d;
+    }
 
     const va = new THREE.Vector3(), vb = new THREE.Vector3(), dir = new THREE.Vector3();
     const up = new THREE.Vector3(0, 0, 1), quat = new THREE.Quaternion();
-    for (const p of parts) {
-      const a = p.leg.mechanism.connectors[p.a].pos;
-      const b = p.leg.mechanism.connectors[p.b].pos;
-      va.set(a.x, a.y, p.leg.z);
-      vb.set(b.x, b.y, p.leg.z);
-      dir.subVectors(vb, va);
+    const beam = (mesh, a, b, r) => {
+      dir.subVectors(b, a);
       const len = dir.length();
-      p.mesh.position.copy(va).add(vb).multiplyScalar(0.5);
+      mesh.position.copy(a).add(b).multiplyScalar(0.5);
       if (len > 1e-9) {
         quat.setFromUnitVectors(up, dir.divideScalar(len));
-        p.mesh.quaternion.copy(quat);
+        mesh.quaternion.copy(quat);
       }
-      p.mesh.scale.set(ROD_R, ROD_R, Math.max(len, 1e-6));
+      mesh.scale.set(r, r, Math.max(len, 1e-6));
+    };
+
+    const mem = members(creatureState);
+    for (let i = 0; i < mem.length; i++) {
+      va.set(mem[i].a.x, mem[i].a.y, mem[i].a.z);
+      vb.set(mem[i].b.x, mem[i].b.y, mem[i].b.z);
+      beam(memberMeshes[i], va, vb, mem[i].r);
     }
     for (const leg of legs) {
       for (const jm of leg.jointMeshes) {
         const q = leg.mechanism.connectors[jm.cid].pos;
         jm.mesh.position.set(q.x, q.y, leg.z);
       }
-    }
-    const half = ((LEGS - 1) / 2) * LEG_SPACING + LEG_SPACING * 0.6;
-    for (const s of spine) {
-      const q = legs[0].mechanism.connectors[legs[0].id[s.key]].pos;
-      s.mesh.position.set(q.x, q.y, 0);
-      s.mesh.quaternion.identity();
-      s.mesh.scale.set(ROD_R * 1.5, ROD_R * 1.5, half * 2);
     }
 
     /* Camera and key light travel with the creature. Where to put the camera
@@ -406,23 +515,39 @@ async function start(host) {
        or tall and narrow -- a fixed offset that parks it nicely in one clips
        it clean out of frame in the other.
 
+       It is aimed at the creature's NOMINAL height, not its live one. The bob
+       and the pitch are the whole point of giving it weight, and a camera that
+       tracked them would subtract them straight back out.
+
        Dragging orbits that whole rig about the CREATURE, turning the eye and
        the point it aims at together. Turning only the eye would swing the
        creature across the frame and out of it; turning both leaves the
        composition exactly where framing.js put it -- same distance, same
        position on screen -- and changes only the side you are looking from. */
-    const cx = bodyX + box.cx, cy = box.cy;
+    const cx = anchor + box.cx, cy = rideY + box.cy;
     const qYaw = tmpQ1.setFromAxisAngle(AXIS_Y, orbit.yaw);
     const right = tmpV3.set(1, 0, 0).applyQuaternion(qYaw);
     const spin = tmpQ2.setFromAxisAngle(right, orbit.pitch).multiply(qYaw);
 
-    eyeRel.set(framing.eye.x - box.cx, framing.eye.y - cy, framing.eye.z).applyQuaternion(spin);
-    atRel.set(framing.at.x - box.cx, framing.at.y - cy, framing.at.z).applyQuaternion(spin);
+    eyeRel.set(framing.eye.x - box.cx, framing.eye.y - box.cy, framing.eye.z).applyQuaternion(spin);
+    atRel.set(framing.at.x - box.cx, framing.at.y - box.cy, framing.at.z).applyQuaternion(spin);
     camera.position.set(cx + eyeRel.x, cy + eyeRel.y, eyeRel.z);
     camera.lookAt(cx + atRel.x, cy + atRel.y, atRel.z);
-    ground.position.x = bodyX;
-    key.position.set(bodyX + 190, 320, 200);
-    key.target.position.set(bodyX, G.footLow, 0);
+
+    /* Fog range from where the camera ACTUALLY is, every frame, rather than
+       from the distance framing.js solved for. Those two are not the same
+       number -- the solved distance is the depth component, while the eye also
+       stands off sideways and above -- and dragging the view changes the gap
+       between them. Setting the fade from the solved value at refit time made
+       the creature sink into the background as it was turned, and at some
+       angles vanish outright. The eye's real distance to the creature cannot
+       disagree with itself. */
+    const eyeDist = Math.hypot(camera.position.x - cx, camera.position.y - cy, camera.position.z);
+    scene.fog.near = Math.max(1, eyeDist - DEPTH * 0.2);
+    scene.fog.far = eyeDist + DEPTH * 2.2;
+    ground.position.x = anchor;
+    key.position.set(anchor + 190, 320, 200);
+    key.target.position.set(anchor, physics.groundY, 0);
     key.target.updateMatrixWorld();
     dirty = true;
   }
@@ -436,8 +561,11 @@ async function start(host) {
        step would jump the solver clean off the branch it is tracking. */
     const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 1 / 60;
     if (now) last = now;
-    theta += speedRad * dt;
-    for (const leg of legs) S.advance(leg.mechanism, dt, params);
+
+    advance(creatureState, dt);
+
+    camX += (body.x - camX) * (1 - Math.exp(-dt / CAM_LAG));
+
     place();
     renderer.render(scene, camera);
     dirty = false;

@@ -4,9 +4,9 @@
    first use, and exposed as per-bin weight tables so that every spectral
    integral in the engine goes through integrateWeighted(). */
 
-import { interpTable } from "./core.js?v=58764426";
-import { CIE_LAMBDA, CIE_XBAR, CIE_YBAR, CIE_ZBAR, CIE_COUNT } from "./cie-data.js?v=58764426";
-import { NBINS, SPECTRAL_STEP_NM, binLambda, integrateWeighted } from "./spectrum.js?v=58764426";
+import { interpTable } from "./core.js?v=3d923acb";
+import { CIE_LAMBDA, CIE_XBAR, CIE_YBAR, CIE_ZBAR, CIE_COUNT } from "./cie-data.js?v=3d923acb";
+import { NBINS, SPECTRAL_STEP_NM, binLambda, integrateWeighted } from "./spectrum.js?v=3d923acb";
 
 let xbar = null, ybar = null, zbar = null, ybarIntegral = 0;
 

@@ -1,4 +1,4 @@
-import { makeRetriever, MARKDOWN } from "./retrieve.js?v=58764426";
+import { makeRetriever, MARKDOWN } from "./retrieve.js?v=3d923acb";
 
 /* ---------------------------------------------------------------
    Everything the in-browser model is told about Mark, and the rules
@@ -152,8 +152,14 @@ Mark's own desktop C programs, and both run entirely on the visitor's machine.
   stored measurement rather than applying a correction factor. Its starter scenes are an inspection
   workcell, one panel over a bare surface, a spot on a curved part, a warm and a cool source
   together, and daylight through an opening.
-- The creature walking across the homepage is a Strandbeest: three Jansen legs sharing one
-  crankshaft, running on the same solver the linkage tool uses.
+- The creature walking across the homepage is a Strandbeest: four Jansen legs on one crankshaft,
+  two pins each carrying a pair that reach opposite ways, running on the same solver the linkage
+  tool uses. It is not animated along a path. It has a body with mass and rotational inertia that
+  falls under gravity and is carried by whichever feet are touching the ground, so its speed is an
+  output of the contact forces rather than a number chosen to look right. The thirteen bars can be
+  assembled thirty-two ways; this one keeps a foot down for 65% of the turn instead of the classic
+  20%, which is what lets four legs always keep two feet on the ground, and no two of its members
+  ever pass through one another.
 - This chat runs a small quantized language model downloaded into the visitor's own browser and
   compiled to WebGPU shaders. Nothing they type is sent anywhere.
 `.trim();
