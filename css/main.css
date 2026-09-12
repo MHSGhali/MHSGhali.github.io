@@ -397,7 +397,16 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
    ============================================================ */
 
 .tool { padding-block: 28px 60px; }
-.tool-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px; margin-bottom: 20px; }
+/* Title on the left, standfirst on the right, stacked on a narrow screen.
+   This was a wrapping flex row, which paired the two only when the h1 happened
+   to be short enough to leave room -- so the same markup read one way on Light
+   and another on Optics, whose longer title pushed the paragraph onto its own
+   line. The columns are explicit now: the text column takes its 60ch measure
+   and the title wraps inside whatever is left. 60ch taken literally would
+   swallow most of the row just above the breakpoint and leave the title in a
+   gutter, so it yields to a share of the width there. */
+.tool-head { display: grid; gap: 20px; align-items: end; margin-bottom: 20px; }
+@media (min-width: 900px) { .tool-head { grid-template-columns: minmax(0, 1fr) minmax(0, min(60ch, 55%)); } }
 .tool-head h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0; }
 .tool-head p { margin: 0; max-width: 60ch; }
 

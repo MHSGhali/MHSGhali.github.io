@@ -11,7 +11,7 @@
    Dead (tombstoned) entries are dropped and ids renumbered on encode, so a
    long editing session doesn't produce a long link. */
 
-import * as M from "./mechanism.js?v=82f4d047";
+import * as M from "./mechanism.js?v=58764426";
 
 const b64urlEncode = (s) => {
   const bytes = new TextEncoder().encode(s);
