@@ -199,7 +199,12 @@ strong { color: var(--text); font-weight: 600; }
 .btn svg { width: 15px; height: 15px; flex: none; }
 
 /* ---------- hero ---------- */
-.hero { padding-block: 92px 76px; position: relative; }
+/* Bottom padding is much smaller than the top's, and smaller than the section
+   rhythm elsewhere, because the stat strip is already a hard-edged panel: it
+   closes the hero by itself, and 76px under it on top of About's own 84px left
+   the two reading as unrelated pages. The section rhythm itself is untouched --
+   About still opens with the same 84px every other section does. */
+.hero { padding-block: 92px 26px; position: relative; }
 .hero-grid { display: grid; grid-template-columns: 1fr 440px; gap: 40px; align-items: center; }
 /* Smaller than the global h1: the hero shares its row with the canvas, so the
    headline has about half the page to wrap in. The two halves are separated by
@@ -211,7 +216,7 @@ strong { color: var(--text); font-weight: 600; }
 .hero-role .sep { color: var(--text-faint); margin: 0 8px; }
 .hero-cta { display: flex; flex-wrap: wrap; gap: 11px; margin-top: 30px; }
 @media (max-width: 900px) {
-  .hero { padding-block: 56px 48px; }
+  .hero { padding-block: 56px 18px; }
   .hero-grid { grid-template-columns: 1fr; }
 }
 
@@ -246,6 +251,25 @@ strong { color: var(--text); font-weight: 600; }
 }
 .hero-walkers canvas {
   display: block; width: 100%; height: 100%;
+  /* Fade the bottom edge into the page.
+
+     The hero box ends in a hard horizontal line just above the About section,
+     and the lit ground plane is a different tone from the page behind it, so
+     that line reads as a rectangle drawn across the design. This dissolves it.
+
+     It is on the CANVAS rather than on .hero-walkers, which carries the
+     horizontal mask, and that is the whole trick: the rule above explains that
+     two mask layers on one element need mask-composite, whose -webkit- and
+     standard keyword sets disagree badly enough to produce an empty mask on
+     some browsers. Two elements, one layer each, composite the ordinary way and
+     need no such thing.
+
+     The stops are set against the geometry, not by eye. creature.js fits the
+     camera so the feet stop around 85% of the way down at any angle the drag
+     allows, so the fade starts below that and nothing of the creature is ever
+     dimmed by it. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 86%, rgba(0,0,0,.45) 94%, transparent);
+          mask-image: linear-gradient(to bottom, #000 86%, rgba(0,0,0,.45) 94%, transparent);
   /* Drag to turn the creature. pan-y leaves a vertical swipe to the page, so
      this never eats scrolling on a phone. */
   touch-action: pan-y; -webkit-user-select: none; user-select: none;
@@ -256,8 +280,14 @@ strong { color: var(--text); font-weight: 600; }
    headline stays selectable and the buttons stay clickable. */
 .hero-grid { pointer-events: none; }
 .hero-grid > * { pointer-events: auto; }
-/* The content has to sit above it, and .hero-grid is the only thing between. */
-.hero-grid { position: relative; z-index: 1; }
+/* The content has to sit above it. Both siblings, not just one: .hero-walkers is
+   POSITIONED, so it paints after every in-flow box in the hero regardless of
+   source order, and anything that has not lifted itself out of the flow ends up
+   underneath it. .hero-grid always had this; the stat strip never did, so the
+   canvas was painting across the cards and washing their text out -- worst on
+   the right, where the horizontal mask leaves the canvas at full strength and
+   the creature's ground plane sits behind the last two numbers. */
+.hero-grid, .hero .stats { position: relative; z-index: 1; }
 /* One column now that the figure is gone: the background owns the right-hand
    side, so the text is held to a readable measure instead of filling it. */
 .hero-grid { grid-template-columns: minmax(0, 620px); }
