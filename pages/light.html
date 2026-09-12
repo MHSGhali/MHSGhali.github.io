@@ -7,7 +7,7 @@
 <meta name="description" content="A physically-based spectral light simulator in the browser: build a scene, place real light sources, and see the illuminance field on every surface in lux or W/m². The engine is a JavaScript port of my C ray tracer.">
 <link rel="canonical" href="https://mhsghali.github.io/pages/light.html">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Light Simulation — spectral illuminance in the browser">
+<meta property="og:title" content="Light Simulation: spectral illuminance in the browser">
 <meta property="og:description" content="Place lamps, move parts, and read the illuminance field on every surface. 95 spectral bins, CIE 1931 photometry, real interreflection.">
 <meta property="og:url" content="https://mhsghali.github.io/pages/light.html">
 <meta name="twitter:card" content="summary">
@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="../css/main.css?v=7d7aad78">
+<link rel="stylesheet" href="../css/main.css?v=82f4d047">
 <script>/* Runs before paint: marks JS alive so the reveal animation can hide
    things it will later show, and settles the theme so there is no flash. */
 document.documentElement.classList.add("js");
@@ -25,7 +25,7 @@ try{var t=localStorage.getItem("theme");
 /* No stored choice means the visitor has not chosen; follow the OS. */
 if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
 document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="../js/app.js?v=7d7aad78" defer></script>
+<script src="../js/app.js?v=82f4d047" defer></script>
 <!-- three.js is pinned here rather than in view3d.js because OrbitControls and
      TransformControls import the bare specifier "three" internally, which only
      resolves through an import map. One place to bump the version. -->
@@ -37,7 +37,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
   }
 }
 </script>
-<script type="module" src="../js/light/app.js?v=7d7aad78"></script>
+<script type="module" src="../js/light/app.js?v=82f4d047"></script>
 </head>
 <body>
 <div class="sheen" aria-hidden="true"></div>
@@ -56,6 +56,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
       <a href="../index.html#contact">Contact</a>
       <a href="../pages/linkage.html">Linkage</a>
       <a href="../pages/light.html" aria-current="page">Light</a>
+      <a href="../pages/optics.html">Optics</a>
       <a href="../pages/chat.html">Ask</a>
       <a href="../assets/files/MarkGerges.pdf" target="_blank" rel="noopener"
          aria-label="Resume (PDF, opens in a new tab)">Resume<span class="ext" aria-hidden="true">PDF</span></a>
@@ -77,7 +78,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
       <p class="eyebrow">Light Simulation</p>
       <h1>Where does the light land?</h1>
     </div>
-    <p>Place lamps and parts, and read the illuminance falling on every surface — in lux or in watts per square metre, from the same stored measurement. Radiance is carried as 95 spectral bins, so the photometric numbers come from an exact integral against the CIE observer rather than a correction factor.</p>
+    <p>Place lamps and parts, and read the illuminance falling on every surface, in lux or in watts per square metre, from the same stored measurement. Radiance is carried as 95 spectral bins, so the photometric numbers come from an exact integral against the CIE observer rather than a correction factor.</p>
   </div>
 
   <div class="toolbar" role="toolbar" aria-label="Scene tools">
@@ -151,22 +152,22 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
           <div><dt>Drag gizmo</dt><dd>move the selected lamp. The field re-solves as you release</dd></div>
           <div><dt>Hover</dt><dd>probe the surface under the pointer, with each lamp's share of it</dd></div>
           <div><dt>Drag / scroll</dt><dd>orbit and zoom the camera</dd></div>
-          <div><dt>lx ⇄ W·m⁻²</dt><dd>switch unit systems. This never re-solves — see below</dd></div>
+          <div><dt>lx ⇄ W·m⁻²</dt><dd>switch unit systems. This never re-solves; see below</dd></div>
           <div><dt>full ⇄ direct</dt><dd>with or without light that has bounced off the enclosure</dd></div>
           <div><dt>draft ⇄ fine</dt><dd>solve resolution: fine is slower but resolves shadow edges</dd></div>
         </dl>
       </div>
       <div>
         <h3>Why the unit switch is instant</h3>
-        <p>Every internal quantity is radiometric. Lux exists only as an exact integral of the stored spectrum against the CIE luminous efficiency function V(λ) — never as a fudge factor on a radiometric number.</p>
-        <p>Direct light from a source is always that source's normalised spectrum scaled by one number, so what is stored per point is that number, per lamp. Both lux and W·m⁻² are linear functionals of a spectrum, so each is a different dot product against the same stored row. Changing units, or isolating one lamp, is arithmetic over numbers already in memory — not another solve.</p>
+        <p>Every internal quantity is radiometric. Lux exists only as an exact integral of the stored spectrum against the CIE luminous efficiency function V(λ), never as a fudge factor on a radiometric number.</p>
+        <p>Direct light from a source is always that source's normalised spectrum scaled by one number, so what is stored per point is that number, per lamp. Both lux and W·m⁻² are linear functionals of a spectrum, so each is a different dot product against the same stored row. Changing units, or isolating one lamp, is arithmetic over numbers already in memory, not another solve.</p>
         <h3 style="margin-top:24px">What it is doing</h3>
-        <p>Direct light is next-event estimation against every lamp, with visibility, so shadows are real. Interreflection is a path traced with multiple importance sampling, accumulated progressively — watch the numbers settle after a change. A lamp given in lumens is converted to watts once, when the scene loads, so no photometric value is ever stored or accumulated.</p>
+        <p>Direct light is next-event estimation against every lamp, with visibility, so shadows are real. Interreflection is a path traced with multiple importance sampling, accumulated progressively; watch the numbers settle after a change. A lamp given in lumens is converted to watts once, when the scene loads, so no photometric value is ever stored or accumulated.</p>
       </div>
     </div>
   </details>
 
-  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Light-Simulation" target="_blank" rel="noopener">Light-Simulation</a>, my spectral ray tracer in C. It reproduces that engine's spectral and colorimetric output to all 18 significant digits, and its 4096-point workcell field to within float32 round-off — the same random stream, so the comparison is of numbers rather than of averages. The scene format is the CLI's, so a scene you download here runs there unchanged. The workcell preset is the geometry behind <a href="../index.html#publications">US Patent 12,610,446</a> and the adaptive-lighting work in my thesis.</p>
+  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Light-Simulation" target="_blank" rel="noopener">Light-Simulation</a>, my spectral ray tracer in C. It reproduces that engine's spectral and colorimetric output to all 18 significant digits, and its 4096-point workcell field to within float32 round-off, using the same random stream, so the comparison is of numbers rather than of averages. The scene format is the CLI's, so a scene you download here runs there unchanged. The workcell preset is the geometry behind <a href="../index.html#publications">US Patent 12,610,446</a> and the adaptive-lighting work in my thesis.</p>
 </section>
 </main>
 

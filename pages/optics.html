@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optics Simulation | Mark Gerges</title>
+<meta name="description" content="A physically-based camera simulator in the browser: light traced through real multi-element lens prescriptions, surface by surface, at a wavelength at a time. Change the focal length, aperture and focus and watch the photograph change.">
+<link rel="canonical" href="https://mhsghali.github.io/pages/optics.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Optics Simulation: a real lens, traced in the browser">
+<meta property="og:description" content="Aberration, vignetting, depth of field and distortion are not effects here; they are what happens when you trace real glass. Scene view and image view, side by side.">
+<meta property="og:url" content="https://mhsghali.github.io/pages/optics.html">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+<link rel="stylesheet" href="../css/main.css?v=82f4d047">
+<script>/* Runs before paint: marks JS alive so the reveal animation can hide
+   things it will later show, and settles the theme so there is no flash. */
+document.documentElement.classList.add("js");
+try{var t=localStorage.getItem("theme");
+/* No stored choice means the visitor has not chosen; follow the OS. */
+if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
+document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<script src="../js/app.js?v=82f4d047" defer></script>
+<!-- three.js is pinned here rather than in view3d.js because OrbitControls
+     imports the bare specifier "three" internally, which only resolves through
+     an import map. One place to bump the version. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="../js/optics/app.js?v=82f4d047"></script>
+</head>
+<body>
+<div class="sheen" aria-hidden="true"></div>
+
+<!-- BUILD:nav -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="../index.html">Mark Gerges</a>
+    <button class="icon-btn nav-toggle" data-nav-toggle aria-expanded="false" aria-label="Toggle navigation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#experience">Experience</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../index.html#contact">Contact</a>
+      <a href="../pages/linkage.html">Linkage</a>
+      <a href="../pages/light.html">Light</a>
+      <a href="../pages/optics.html" aria-current="page">Optics</a>
+      <a href="../pages/chat.html">Ask</a>
+      <a href="../assets/files/MarkGerges.pdf" target="_blank" rel="noopener"
+         aria-label="Resume (PDF, opens in a new tab)">Resume<span class="ext" aria-hidden="true">PDF</span></a>
+    </nav>
+    <div class="nav-actions">
+      <button class="icon-btn" data-theme-toggle aria-label="Toggle color theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<!-- /BUILD:nav -->
+
+<main>
+<section class="tool wrap">
+  <div class="tool-head">
+    <div>
+      <p class="eyebrow">Optics Simulation</p>
+      <h1>What does the camera actually record?</h1>
+    </div>
+    <p>Light is traced through a real multi-element lens prescription, surface by surface, with a refractive index that depends on the wavelength. Spherical aberration, coma, chromatic aberration, vignetting and distortion are not effects applied afterwards &mdash; they are what happens when you trace real glass. The scene view shows where everything <em>is</em>; the image view under it shows what came out.</p>
+  </div>
+
+  <div class="toolbar" role="toolbar" aria-label="Scene tools">
+    <!-- The lighting switch reports STATE, so it shows both options with the
+         live one lit, rather than a bare word that could equally mean "you are
+         here" or "click to go here". -->
+    <button class="tbtn tbtn-toggle" id="btn-lighting" type="button" aria-pressed="true" title="Light the scene with the placed area lamp, or with a uniform overhead sky. A choice, not a blend.">
+      <span data-on>lamps</span><span class="tbtn-alt" data-off>sky</span>
+    </button>
+    <span class="tbtn-sep" aria-hidden="true"></span>
+    <button class="tbtn" id="btn-fit" type="button" title="Frame the scene view again.">Fit</button>
+    <button class="tbtn" id="btn-reset" type="button" title="Back to the shipped camera and scene.">Reset</button>
+  </div>
+
+  <div class="stage-switch" role="group" aria-label="Which view to show">
+    <button class="tbtn" type="button" data-view="scene" aria-pressed="false">Scene</button>
+    <button class="tbtn" type="button" data-view="image" aria-pressed="true">Image</button>
+  </div>
+
+  <!-- The two viewports stack, so they share one column and the controls get
+       the other. Both are the same height, because the point of having them
+       together is comparing them. -->
+  <div class="stage stage-optics" id="stage" data-show="image">
+    <div class="views">
+      <div class="viewport" id="scene-vp">
+        <span class="vp-label">Scene</span>
+        <div id="scene" style="position:absolute;inset:0"></div>
+        <p class="vp-note" id="scene-note">Loading the 3D view&hellip;</p>
+      </div>
+      <div class="viewport" id="image-vp">
+        <span class="vp-label">Image</span>
+        <canvas id="image" width="320" height="213"></canvas>
+        <p class="vp-note" id="image-note">Tracing&hellip;</p>
+      </div>
+    </div>
+    <aside class="optics-panel" aria-label="Camera and scene settings">
+      <div id="panel"></div>
+    </aside>
+  </div>
+
+  <div class="status">
+    <span id="status-counts"></span>
+    <span class="msg" id="status-msg"></span>
+    <span class="actions">
+      <button class="tbtn" id="btn-share" type="button">Copy link</button>
+    </span>
+  </div>
+
+  <!-- Measurements, not controls, so they are not in the column with the
+       controls: twelve of them behind an inner scrollbar is twelve numbers
+       nobody reads, where one wide strip is scannable at a glance. -->
+  <div id="derived" aria-label="Derived measurements"></div>
+
+  <details class="howto assistant-shell">
+    <summary>Ask the assistant, or tell it what to do</summary>
+    <p class="panel-hint" style="margin:0 0 14px">Commands are executed exactly and need no model at all: try &ldquo;stop down to f/16&rdquo;, &ldquo;focus at 5 metres&rdquo;, &ldquo;use the singlet&rdquo;, &ldquo;switch to the sky&rdquo; or &ldquo;what is sharp&rdquo;. Prose questions need a small language model, which downloads into this browser once and then answers on your own GPU, with nothing sent anywhere.</p>
+    <div id="assistant"></div>
+  </details>
+
+  <details class="howto">
+    <summary>How to use it, and what the numbers mean</summary>
+    <div class="grid grid-2">
+      <div>
+        <h3>Driving it</h3>
+        <dl class="keys">
+          <div><dt>focus</dt><dd>the distance the film is set for. At 2&nbsp;m the third sphere is the sharp one</dd></div>
+          <div><dt>aperture</dt><dd>stop down and the sharp slab widens &mdash; and the picture darkens, because that is what stopping down does</dd></div>
+          <div><dt>design</dt><dd>swap the achromat for the single element and the colour error jumps about twenty-fold</dd></div>
+          <div><dt>lamps &rlarr; sky</dt><dd>a placed area light, or a uniform dome. Shadows and the terminator vanish with the lamp; the dome lights the subjects without being photographed, so the background stays black either way</dd></div>
+          <div><dt>lamp / sky</dt><dd>each mode brings its own brightness and colour &mdash; the lamp in lumens, the dome in lux</dd></div>
+          <div><dt>exposure</dt><dd>a viewing gain only. It never re-traces a ray &mdash; see below</dd></div>
+          <div><dt>drag / scroll</dt><dd>orbit and zoom the scene view</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3>Why the exposure change is instant</h3>
+        <p>The film holds absolute spectral measurements, not pixels. Exposure is applied once, at the moment those measurements become colours, so changing it re-develops the frame that is already there rather than starting a new one. Everything else &mdash; aperture, focus, focal length &mdash; changes which rays exist, so it starts again.</p>
+        <p>The two lighting modes are not balanced to one exposure. A 2000&nbsp;lx overcast sky is a couple of stops brighter than the key lamp it replaces, so switching to it blows the highlights until you bring the exposure down. That is what happens with a real light meter too, and auto-exposure is deliberately absent: it would hide the one thing the aperture control is meant to show.</p>
+        <h3 style="margin-top:24px">What it is doing</h3>
+        <p>Every camera ray starts on the sensor, is aimed at the exit pupil, and is refracted through each glass surface in turn with an index taken from the Sellmeier coefficients of the actual catalogue glass. A ray that misses a clear aperture is dead, and that is the <em>only</em> source of vignetting here &mdash; there is no darkening factor applied to the corners. Because the glass is dispersive, one ray can carry only one wavelength; carrying a whole spectrum down a path that only one colour actually took is precisely how a simulator erases the chromatic aberration it was built to show.</p>
+        <p>The depth-of-field figures are on-axis, from defocus alone, which is what depth of field has always meant. Off axis an uncorrected doublet adds coma and astigmatism that no depth-of-field formula knows about, so a sphere sitting inside the drawn slab can still be soft near the frame edge. The render is the honest answer; the slab is the textbook one.</p>
+      </div>
+    </div>
+  </details>
+
+  <p style="margin-top:32px;font-size:.9rem">This is a JavaScript port of <a href="https://github.com/MHSGhali/Optics-Simulation" target="_blank" rel="noopener">Optics-Simulation</a>, my physically-based camera simulator in C. It shares that project&rsquo;s vendored spectral core with <a href="light.html">the light simulator</a> &mdash; the same 95-bin spectra, the same CIE 1931 photometry, the same PCG32 stream &mdash; so the engine underneath this page is the one already checked against the C to eighteen significant digits. What is new here is the lens: the paraxial analysis, the pupils and the sequential ray trace through real glass. The desktop tool lets you arrange the scene and draws the lens in cross-section; this page fixes the scene and gives you the camera.</p>
+</section>
+</main>
+
+<!-- BUILD:footer -->
+<footer>
+  <div class="wrap foot">
+    <p>&copy; <span data-year></span> Mark Gerges</p>
+    <div class="social">
+      <a data-mailto data-mailto-user="mrkghali" data-mailto-domain="gmail.com" href="#contact" aria-label="Email" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></a>
+      <a href="https://www.linkedin.com/in/mark-gerges-9899967a/" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.06c.53-.95 1.83-1.95 3.76-1.95C20.5 8.75 22 11 22 14.5V21h-4v-5.9c0-1.4-.03-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9z"/></svg></a>
+      <a href="https://github.com/MHSGhali" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.35-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.78 2.71 1.27 3.37.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg></a>
+    </div>
+  </div>
+</footer>
+<!-- /BUILD:footer -->
+</body>
+</html>

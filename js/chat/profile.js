@@ -1,4 +1,4 @@
-import { makeRetriever, MARKDOWN } from "./retrieve.js?v=7d7aad78";
+import { makeRetriever, MARKDOWN } from "./retrieve.js?v=82f4d047";
 
 /* ---------------------------------------------------------------
    Everything the in-browser model is told about Mark, and the rules
@@ -166,19 +166,20 @@ Mark's own desktop C programs, and both run entirely on the visitor's machine.
    and is printed from there. */
 export const TOOL_HELP = {
   links:
-    "I can open either simulator for you with a particular mechanism or scene already loaded. "
-    + "Ask for one by name, or say \"open the linkage simulator\". Once you are there I can drive "
-    + "it directly from the panel on that page, all the way down to building a mechanism joint by "
-    + "joint or setting a lamp's colour temperature.",
+    "I can open any of the three simulators for you with a particular mechanism, scene or camera "
+    + "already loaded. Ask for one by name, or say \"open the linkage simulator\". Once you are "
+    + "there I can drive it directly from the panel on that page, all the way down to building a "
+    + "mechanism joint by joint, setting a lamp's colour temperature, or stopping a lens down.",
 };
 
 export function systemPrompt(mode, context = PROFILE) {
-  const here = mode === "linkage"
-    ? "\nYou are on the linkage simulator page, and the visitor can see the mechanism next to you."
-    : mode === "light"
-      ? "\nYou are on the light simulator page, and the visitor can see the scene next to you."
-      : "";
-  return `You are the assistant on Mark Gerges's personal website. You answer questions from visitors (recruiters, engineers, collaborators, and the curious) about Mark's background, experience, projects and skills, and about the two simulators on this site.
+  const HERE = {
+    linkage: "\nYou are on the linkage simulator page, and the visitor can see the mechanism next to you.",
+    light: "\nYou are on the light simulator page, and the visitor can see the scene next to you.",
+    optics: "\nYou are on the optics simulator page, and the visitor can see the camera's scene and the photograph it took next to you.",
+  };
+  const here = HERE[mode] || "";
+  return `You are the assistant on Mark Gerges's personal website. You answer questions from visitors (recruiters, engineers, collaborators, and the curious) about Mark's background, experience, projects and skills, and about the three simulators on this site.
 
 You are running entirely inside the visitor's browser, on their own GPU. Nothing they type leaves their machine.${here}
 
@@ -242,6 +243,7 @@ export const SUGGESTIONS = {
     "What is the benchmarking harness for?",
     "Tell me about the patent",
     "Open the linkage simulator with a Hoeken",
+    "Open the optics simulator with the depth rail",
   ],
   linkage: [
     "Load the Hoeken straight-line and run it",
@@ -257,6 +259,14 @@ export const SUGGESTIONS = {
     "Select lamp 1 and make it 2700 K",
     "Turn off interreflection",
     "What does it read?",
+    "What can you do?",
+  ],
+  optics: [
+    "Stop down to f/16",
+    "Focus at 5 metres",
+    "Use the singlet",
+    "Switch to the sky",
+    "What is sharp?",
     "What can you do?",
   ],
 };

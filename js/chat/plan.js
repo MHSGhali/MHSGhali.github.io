@@ -16,7 +16,7 @@
    No DOM in here, so tests/chat.test.mjs can check the validation.
    --------------------------------------------------------------- */
 
-import { parse, splitClauses, LINKAGE_PRESETS, LIGHT_PRESETS } from "./commands.js?v=7d7aad78";
+import { parse, splitClauses, presetsFor } from "./commands.js?v=82f4d047";
 
 /* The instructions, as a SYSTEM message.
 
@@ -35,7 +35,11 @@ import { parse, splitClauses, LINKAGE_PRESETS, LIGHT_PRESETS } from "./commands.
    answers questions about the tool -- so the planner and the explanation can
    no longer disagree about what the thing can do. */
 export function planSystem(knowledge) {
-  const kind = knowledge.KNOWLEDGE.includes("light simulator") ? "light" : "linkage";
+  /* Which tool this document describes, taken from the document's own first
+     line rather than from a flag the caller has to remember to pass. */
+  const kind = knowledge.KNOWLEDGE.includes("optics simulator") ? "optics"
+    : knowledge.KNOWLEDGE.includes("light simulator") ? "light"
+    : "linkage";
   return `You are a command compiler for the ${kind} simulator on this website.
 You do not converse. You translate a request into commands, and nothing else.
 
@@ -178,7 +182,8 @@ export function validatePlan(text, domain, { limit = 24, slack = 2 } = {}) {
 const WANTS_MOTION = /\b(spin|spins|spinning|run|runs|running|move|moves|moving|turn|turns|turning|animate|animated|go(?:es)?)\b/i;
 
 export function repairPlan(steps, question, domain) {
-  if (domain === "light") return steps;
+  /* The repair adds a missing "run it", which only the linkage has. */
+  if (domain !== "linkage") return steps;
   const has = (action) => steps.some((s) => s.cmds.some((c) => c.action === action));
   if (WANTS_MOTION.test(question) && (has("motor") || has("gravity")) && !has("run")) {
     return [...steps, { line: "run it", cmds: parse("run it", domain), repaired: true }];
@@ -211,6 +216,5 @@ export function looksLikeABuild(text, domain) {
      vocabulary, and adding "spins" to the run verbs was enough to push "build
      me a three bar mechanism driven by a motor that spins" over the line and
      out of the planner entirely. */
-  const presets = domain === "light" ? LIGHT_PRESETS : LINKAGE_PRESETS;
-  return splitClauses(raw, presets).length < 3;
+  return splitClauses(raw, presetsFor(domain)).length < 3;
 }

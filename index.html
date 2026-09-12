@@ -19,7 +19,7 @@
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="css/main.css?v=7d7aad78">
+<link rel="stylesheet" href="css/main.css?v=82f4d047">
 <script>/* Runs before paint: marks JS alive so the reveal animation can hide
    things it will later show, and settles the theme so there is no flash. */
 document.documentElement.classList.add("js");
@@ -27,8 +27,8 @@ try{var t=localStorage.getItem("theme");
 /* No stored choice means the visitor has not chosen; follow the OS. */
 if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
 document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="js/app.js?v=7d7aad78" defer></script>
-<script type="module" src="js/hero-walkers.js?v=7d7aad78"></script>
+<script src="js/app.js?v=82f4d047" defer></script>
+<script type="module" src="js/hero-walkers.js?v=82f4d047"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -66,6 +66,7 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
       <a href="#contact">Contact</a>
       <a href="pages/linkage.html">Linkage</a>
       <a href="pages/light.html">Light</a>
+      <a href="pages/optics.html">Optics</a>
       <a href="pages/chat.html">Ask</a>
       <a href="assets/files/MarkGerges.pdf" target="_blank" rel="noopener"
          aria-label="Resume (PDF, opens in a new tab)">Resume<span class="ext" aria-hidden="true">PDF</span></a>
@@ -225,6 +226,12 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
   <div class="wrap">
     <p class="eyebrow reveal">Selected projects</p>
     <div class="grid grid-2">
+      <a class="card reveal card-live" href="pages/optics.html">
+        <p class="meta"><span class="tag hot">Live in your browser</span></p>
+        <h3>Optics Simulation &rarr;</h3>
+        <p class="meta">Personal &middot; C, JavaScript</p>
+        <p style="margin:0">A physically-based <strong>camera</strong>: light traced through real multi-element lens prescriptions, surface by surface, with a per-wavelength refractive index. Aberration, vignetting, depth of field and distortion are not effects applied afterwards &mdash; they are what happens when you trace real glass.</p>
+      </a>
       <a class="card reveal card-live" href="pages/light.html">
         <p class="meta"><span class="tag hot">Live in your browser</span></p>
         <h3>Light Simulation &rarr;</h3>

@@ -512,6 +512,104 @@ footer { border-top: 1px solid var(--surface-line); padding: 40px 0; margin-top:
 .keys dd { margin: 0; }
 
 /* ============================================================
+   Optics simulator (pages/optics.html)
+   ============================================================ */
+
+/* The two viewports stack in one column and the controls take the other, so
+   the whole tool is one screenful: change a number on the right and watch both
+   pictures answer, without scrolling between them. */
+.stage-optics {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  /* No height of its own: the CONTROLS set it, and the two viewports split
+     whatever that comes to. Fixing the height instead put the sensor rows
+     behind an inner scrollbar on a laptop screen, which is a worse failure
+     than the stage being a little taller -- a control you cannot see is a
+     control that does not exist.
+
+     The floor keeps the pictures usable if the panel is ever short. */
+  min-height: 430px;
+}
+.views { display: grid; grid-template-rows: 1fr 1fr; gap: 12px; min-height: 0; }
+/* min-height:0 on both, or a grid child refuses to shrink below its content and
+   the row split silently stops being equal. */
+.views .viewport { min-height: 0; }
+
+/* The cap is a backstop, not the usual case: on any ordinary window the panel
+   is shorter than this and nothing scrolls. It exists so a very short viewport
+   cannot stretch the stage past the screen. */
+.optics-panel {
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 0; max-height: 88vh; overflow-y: auto;
+  scrollbar-width: thin;
+}
+.optics-panel > div { display: contents; }
+
+/* The derived readouts, as a full-width strip below the stage. */
+#derived { margin-top: 12px; }
+/* Three columns, not four. At four the tracks come out around 260px and
+   "axis sharp from" wraps onto two lines, which makes a row of measurements
+   look like a paragraph. */
+#derived .pgroup .derived-rows {
+  display: grid; gap: 0 32px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+@media (max-width: 900px) {
+  /* One column, and the switch decides which viewport is on screen -- so the
+     stage holds ONE picture and the controls follow it. */
+  .stage-optics { grid-template-columns: 1fr; height: auto; min-height: 0; }
+  .views { grid-template-rows: auto; }
+  #scene-vp, #image-vp { aspect-ratio: 3 / 2; }
+  #stage[data-show="scene"] #image-vp,
+  #stage[data-show="image"] #scene-vp { display: none; }
+  /* max-height as well as overflow: left at 88vh with overflow visible, the
+     panel's BOX stops short while its content runs on, and the status bar
+     below is drawn straight through it. */
+  .optics-panel { overflow: visible; max-height: none; }
+}
+
+#scene-vp, #image-vp { touch-action: none; }
+/* Give the vertical swipe back to the page; two-finger orbit still works. */
+@media (max-width: 900px) { #scene-vp { touch-action: pan-y; } }
+
+/* The render is a small grid scaled up, and it is a PHOTOGRAPH -- smoothing is
+   right where a pixel-art `pixelated` would be wrong. Letterboxed rather than
+   stretched, so a square crop of the format is not silently widened. */
+/* Absolutely positioned, exactly as the scene view's container is, so the
+   canvas does NOT contribute to layout. Left in flow its intrinsic 320x213
+   drives the viewport's height -- the render grid would silently decide how
+   tall the page is, and raising the resolution would resize the furniture. */
+#image {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+/* .viewport sets `canvas { width:100%; height:100% }` for the linkage editor,
+   which in a flow layout is what pins the height; the absolute positioning
+   above overrides that here. */
+
+.pgroup {
+  background: var(--bg-elev); border: 1px solid var(--surface-line);
+  border-radius: var(--radius); padding: 14px 16px;
+}
+.pgroup h3 {
+  font-family: var(--font-mono); font-size: .7rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-faint);
+  margin: 0 0 10px; font-weight: 500;
+}
+/* A read-only row is a measurement, not a control, so it reads as text rather
+   than as a box someone tried and failed to type in. */
+/* .prow is a flex row, so a grid-template-columns here would do nothing at all.
+   The value takes the rest of the row and right-aligns in it, which is what
+   puts a column of measurements on a common edge. */
+.prow-ro span {
+  flex: 1; min-width: 0;
+  font-size: .78rem; color: var(--text-dim); text-align: right;
+}
+.derived-rows { display: grid; }
+
+/* ============================================================
    Light simulator (pages/light.html)
    ============================================================ */
 

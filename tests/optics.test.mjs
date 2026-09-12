@@ -1,0 +1,1567 @@
+/* Ported from the C engine's tests/ -- test_glass.c, test_lens.c,
+   test_camera.c, test_spectral.c, test_trace.c, test_env.c and
+   test_render_focus.c -- keeping the original assertions where they survive
+   the port, as tests/linkage.test.mjs does.
+
+   The ones that carry real weight are the ones where a wrong answer still
+   produces a completely convincing picture: a lens of the wrong focal length,
+   a pupil bound that eats the corners, a wavelength sampler that is not
+   unbiased.
+
+   Run: node --test tests/optics.test.mjs */
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+import * as G from "../js/optics/glass.js";
+import * as P from "../js/optics/prescription.js";
+import * as L from "../js/optics/lens.js";
+import * as PU from "../js/optics/pupil.js";
+import * as SP from "../js/optics/spectral.js";
+import * as CAM from "../js/optics/camera.js";
+import * as SD from "../js/optics/scenedesc.js";
+import * as S3 from "../js/optics/scene3d.js";
+import * as T from "../js/optics/trace.js";
+import * as FILM from "../js/optics/film.js";
+import * as ST from "../js/optics/settings.js";
+import * as optics from "../js/optics/knowledge.js";
+import { setup, renderRows, derivedOf, } from "../js/optics/render.js";
+
+import * as S from "../js/light/spectrum.js";
+import * as C from "../js/light/color.js";
+import * as U from "../js/light/units.js";
+import * as v from "../js/light/vec3.js";
+import * as R from "../js/light/rng.js";
+
+/* Relative comparison, falling back to absolute near zero -- the C's
+   CHECK_NEAR. */
+function near(got, want, tol, msg) {
+  const d = Math.abs(got - want);
+  const r = Math.abs(want) > 1e-12 ? d / Math.abs(want) : d;
+  assert.ok(r <= tol, `${msg}: got ${got}, want ${want} (rel err ${r} > tol ${tol})`);
+}
+
+/* ------------------------------------------------------------------ glass */
+
+test("every catalogue glass reproduces its own published n_d and V_d", () => {
+  /* The data checks itself. A mistyped digit in B_2 or C_3 shifts the index in
+     the fourth decimal place -- invisible by eye, and it changes the colour
+     correction of any lens built on it. */
+  assert.equal(G.selfCheck(), null);
+});
+
+test("air is exactly 1.0 at every wavelength, with no sqrt rounding", () => {
+  /* The lens tracer compares indices to decide whether a surface refracts at
+     all, so this has to be exact rather than close. */
+  for (const lam of [360, 486.1327, 550, 587.5618, 656.2725, 830]) {
+    assert.equal(G.n(G.AIR, lam), 1);
+  }
+  assert.equal(G.abbe(G.AIR), 0, "air has no dispersion to divide by");
+});
+
+test("a constant glass has zero dispersion by construction", () => {
+  const c = G.constant(1.7);
+  for (const lam of [400, 550, 700]) assert.equal(G.n(c, lam), 1.7);
+  assert.equal(G.dispersion(c), 0);
+});
+
+test("a model glass hits its (n_d, V_d) pair exactly", () => {
+  /* Guessing "nearest catalogue entry" gets n_d right and V_d wrong, which is
+     backwards: V_d is what decides colour correction. */
+  for (const [nd, vd] of [[1.5168, 64.17], [1.62004, 36.37], [1.72, 50.0], [1.45, 70.0]]) {
+    const g = G.model(nd, vd);
+    near(G.n(g, G.LINE_D), nd, 1e-9, `model n_d for (${nd}, ${vd})`);
+    near(G.abbe(g), vd, 1e-9, `model V_d for (${nd}, ${vd})`);
+  }
+});
+
+test("an impossible glass is refused rather than silently substituted", () => {
+  assert.throws(() => G.model(0.5, 60), /nd > 1/);
+  assert.throws(() => G.model(1.5, -3), /vd > 0/);
+});
+
+/* ------------------------------------------------------- paraxial analysis */
+
+test("every shipped design comes out at the focal length it claims", () => {
+  /* THE transcription gate. A prescription whose paraxial focal length does not
+     match its design value has a typo in it, and the resulting lens renders a
+     completely convincing image of the wrong field of view. */
+  for (const id of P.IDS) {
+    const p = P.prescription(id);
+    const lens = L.build(id, 0, p.designFno);
+    near(lens.eflMm, p.designEflMm, 0.01, `${P.NAMES[id]} paraxial EFL`);
+  }
+});
+
+test("the ideal lens is ideal in COLOUR, not in its rays", () => {
+  /* Two comments used to call it aberration-free. It is a single spherical
+     surface, which is not aplanatic: at f/5 it leaves MORE spherical aberration
+     than the achromat does, because the doublet's second element bends the
+     marginal rays back and this has nothing to do that with. What it really
+     guarantees is an exact focal length and no colour. */
+  const ideal = L.build(P.THIN, 100, 5);
+  const achromat = L.build(P.ACHROMAT_100, 100, 5);
+  L.focus(ideal, 2);
+  L.focus(achromat, 2);
+  assert.ok(L.spotMm(ideal, 2, 0, 21) > L.spotMm(achromat, 2, 0, 21),
+    "the ideal lens is not the sharpest one, and nothing should claim it is");
+  /* And stopping down still cleans it up, as spherical aberration does. */
+  const stopped = L.build(P.THIN, 100, 16);
+  L.focus(stopped, 2);
+  assert.ok(L.spotMm(stopped, 2, 0, 21) < L.spotMm(ideal, 2, 0, 21) / 10);
+});
+
+test("the ideal lens is exactly 100 mm at every wavelength", () => {
+  const lens = L.build(P.THIN, 100, 5);
+  for (const lam of [G.LINE_F, G.LINE_D, G.LINE_C, 380, 800]) {
+    assert.equal(L.eflAt(lens, lam), 100, `ideal EFL at ${lam} nm`);
+  }
+});
+
+test("a singlet's chromatic error is close to -1/V_d, and the achromat kills it", () => {
+  /* For a THIN singlet the longitudinal chromatic aberration is exactly
+     -1/V_d. The shipped one has 4 mm of glass in it, so it lands near rather
+     than on -- and the doublet has to be more than an order of magnitude
+     better, which is the whole reason both are shipped. */
+  const s = L.build(P.SINGLET_100, 100, 10);
+  const vd = G.abbe(G.glass("N-BK7"));
+  const measured = (L.eflAt(s, G.LINE_F) - L.eflAt(s, G.LINE_C)) / s.eflMm;
+  near(measured, -1 / vd, 0.02, "singlet longitudinal chromatic aberration");
+
+  const a = L.build(P.ACHROMAT_100, 100, 5);
+  const achro = (L.eflAt(a, G.LINE_F) - L.eflAt(a, G.LINE_C)) / a.eflMm;
+  assert.ok(Math.abs(achro) < Math.abs(measured) / 10,
+    `the achromat should correct by more than 10x: singlet ${measured}, doublet ${achro}`);
+});
+
+test("scaling a design moves every length and leaves the f-number alone", () => {
+  /* Scaling the radii but forgetting the thicknesses produces a lens that is
+     neither the original design nor any other real design, and which still
+     renders a perfectly plausible image. */
+  const a = P.prescription(P.ACHROMAT_100);
+  const b = P.scale(P.prescription(P.ACHROMAT_100), 2.5);
+  assert.equal(b.designFno, a.designFno, "the f-number is not a length");
+  near(b.designEflMm, a.designEflMm * 2.5, 1e-12, "design EFL");
+  for (let i = 0; i < a.surf.length; i++) {
+    near(b.surf[i].radiusMm, a.surf[i].radiusMm * 2.5, 1e-12, `surface ${i} radius`);
+    near(b.surf[i].thicknessMm, a.surf[i].thicknessMm * 2.5, 1e-12, `surface ${i} thickness`);
+    near(b.surf[i].semiApMm, a.surf[i].semiApMm * 2.5, 1e-12, `surface ${i} semi-aperture`);
+  }
+});
+
+test("asking for a focal length gives that focal length, not the design's nominal one", () => {
+  /* The design values come from thin-lens equations and a real doublet comes
+     out ~0.4 % shorter, so scaling by the nominal value would hand back an
+     84.7 mm lens when 85 was asked for -- small, permanent, invisible. */
+  for (const mm of [24, 50, 85, 200, 400]) {
+    const lens = L.build(P.ACHROMAT_100, mm, 5);
+    near(lens.eflMm, mm, 1e-9, `built ${mm} mm lens`);
+  }
+});
+
+/* ------------------------------------------------------------- the pupils */
+
+test("focusing at infinity puts the film exactly at the back focal distance", () => {
+  /* The two paths -- the conjugate equation and the definition of BFD -- have
+     to agree at the limit. */
+  for (const id of P.IDS) {
+    const lens = L.build(id, 100, 5);
+    L.focus(lens, Infinity);
+    assert.equal(lens.filmZMm, lens.bfdMm, `${P.NAMES[id]} at infinity`);
+  }
+});
+
+test("the f-number comes from the entrance pupil, not from f/(2N) directly", () => {
+  /* Only stops this design can reach: its front element is 20 mm across at
+     f = 100 mm, so f/5 is wide open and anything faster is the clamp's
+     business, tested below. */
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  for (const fno of [5.6, 8, 11, 16, 22]) {
+    L.setFnumber(lens, fno);
+    near(2 * lens.epSemiApMm, lens.eflMm / fno, 1e-9,
+      `entrance pupil diameter at f/${fno}`);
+  }
+});
+
+test("a clamped aperture reports the f-number it actually passes", () => {
+  /* Storing the requested value would make the lens report f/1.4 while passing
+     f/5 worth of light, and every exposure computed from it would be wrong by
+     that ratio with nothing to show for it. */
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  L.setFnumber(lens, 1.0);                    /* far wider than the glass allows */
+  assert.ok(lens.fNumber > 1.0, "an unreachable aperture must be reported as clamped");
+  near(2 * lens.epSemiApMm, lens.eflMm / lens.fNumber, 1e-9,
+    "the reported f-number matches the pupil that exists");
+  assert.ok(lens.stopSemiApMm <= lens.surf[lens.stopIndex].semiApMm + 1e-12,
+    "the stop cannot open wider than the hole it sits in");
+});
+
+test("the coc is zero at the focused distance and grows either side", () => {
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  L.focus(lens, 2.0);
+  near(L.cocMm(lens, 2.0), 0, 1e-9, "blur at the plane of focus");
+  assert.ok(L.cocMm(lens, 1.5) > 0 && L.cocMm(lens, 3.0) > 0);
+  assert.ok(L.cocMm(lens, 1.0) > L.cocMm(lens, 1.5), "blur grows toward the lens");
+  assert.ok(L.cocMm(lens, 6.0) > L.cocMm(lens, 3.0), "and away from it");
+});
+
+test("the depth-of-field solve brackets the focus and agrees with the coc it came from", () => {
+  /* Solved by bisection from the real lens rather than from the textbook
+     hyperfocal formula, so it has to be self-consistent with cocMm. */
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  L.focus(lens, 2.0);
+  const limit = 0.030;
+  const d = L.dof(lens, limit);
+  assert.ok(d.near < 2.0 && d.far > 2.0, "the slab must contain the focus");
+  near(L.cocMm(lens, d.near), limit, 1e-4, "blur at the near limit");
+  near(L.cocMm(lens, d.far), limit, 1e-4, "blur at the far limit");
+});
+
+test("stopping down widens the sharp slab", () => {
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  let prev = 0;
+  for (const fno of [2.8, 5.6, 11, 22]) {
+    L.setFnumber(lens, fno);
+    L.focus(lens, 2.0);
+    const d = L.dof(lens, 0.030);
+    const span = d.far - d.near;
+    assert.ok(span > prev, `f/${fno} should be deeper than the stop before it`);
+    prev = span;
+  }
+});
+
+test("past the hyperfocal distance the far limit is infinity", () => {
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  L.setFnumber(lens, 8);
+  const h = L.hyperfocalM(lens, 0.030);
+  assert.ok(Number.isFinite(h) && h > 0);
+
+  L.focus(lens, h * 1.02);
+  assert.equal(L.dof(lens, 0.030).far, Infinity, "just past hyperfocal reaches infinity");
+  L.focus(lens, h * 0.9);
+  assert.ok(Number.isFinite(L.dof(lens, 0.030).far), "just inside it does not");
+});
+
+/* ------------------------------------------------------- sequential tracing */
+
+test("Snell round-trips through a flat interface", () => {
+  const d = v.normalize(v.v3(0.3, 0.1, 1));
+  const n = v.v3(0, 0, -1);
+  const into = L.refract(d, n, 1 / 1.5);
+  assert.ok(into);
+  const back = L.refract(into, n, 1.5 / 1);
+  assert.ok(back);
+  for (const k of ["x", "y", "z"]) near(back[k], d[k], 1e-12, `Snell round trip ${k}`);
+});
+
+test("total internal reflection kills the ray rather than reflecting it", () => {
+  /* That light does not reach the film along the intended path, and the
+     reflected branch is a flare pass's business, not the primary trace's. */
+  const grazing = v.normalize(v.v3(1, 0, 0.05));
+  assert.equal(L.refract(grazing, v.v3(0, 0, -1), 1.5 / 1.0), null);
+});
+
+test("a plano surface is a plane and a curved one picks the right cap", () => {
+  /* Taking -b - sqrt(disc) unconditionally picks the far side of the sphere for
+     a negative radius: the lens still traces, it just uses the wrong cap. */
+  const down = { o: v.v3(0, 0, -10), d: v.v3(0, 0, 1) };
+  near(L.surfaceHit(0, 5, down).t, 15, 1e-12, "plano hit");
+
+  for (const R of [50, -50]) {
+    const h = L.surfaceHit(R, 0, down);
+    assert.ok(h, `radius ${R} must be hit`);
+    /* The vertex is at z = 0 for an on-axis ray whatever the sign of R. */
+    near(down.o.z + h.t, 0, 1e-9, `radius ${R} on-axis vertex`);
+  }
+});
+
+test("the real focus converges to the paraxial one as the pupil closes", () => {
+  /* That it does NOT converge at larger fractions is spherical aberration,
+     measured rather than invented. */
+  const lens = L.build(P.SINGLET_100, 100, 4);
+  L.focus(lens, Infinity);
+  const tiny = L.realFocusZ(lens, G.LINE_D, Infinity, 0.02);
+  near(tiny, lens.bfdMm, 1e-3, "a paraxial ray must land at the paraxial focus");
+
+  const marginal = L.realFocusZ(lens, G.LINE_D, Infinity, 1.0);
+  assert.ok(Math.abs(marginal - lens.bfdMm) > Math.abs(tiny - lens.bfdMm) * 10,
+    "a marginal ray on an uncorrected singlet must miss it by much more");
+});
+
+test("the ideal lens survives a real trace, in both directions", () => {
+  /* It regressed once: its two surfaces sat at the same z, so a sequential
+     reverse trace reached the plano first, having already flown through where
+     the sphere was, and then missed the sphere entirely. Every camera ray came
+     back vignetted and the ideal lens rendered pure black. */
+  const lens = L.build(P.THIN, 100, 5);
+  L.focus(lens, 2);
+  const filmZ = L.filmZ(lens);
+  let through = 0;
+  for (let i = 0; i < 40; i++) {
+    const h = (i / 40) * lens.epSemiApMm * 0.9;
+    const film = v.v3(0, 0, filmZ);
+    const rear = v.v3(h, 0, L.vertexZ(lens, lens.surf.length - 1));
+    const r = { o: film, d: v.normalize(v.sub(rear, film)) };
+    if (L.traceReverse(lens, G.LINE_D, r, null)) through++;
+  }
+  assert.ok(through > 20, `the ideal lens must pass reverse rays, passed ${through}/40`);
+});
+
+test("transmittance is below one, and more glass of the same kind loses more", () => {
+  /* The f-stop / T-stop gap, and it is real: an uncoated lens does not transmit
+     what its geometry promises. */
+  const singlet = L.build(P.SINGLET_100, 100, 10);      /* two N-BK7 interfaces  */
+  const achromat = L.build(P.ACHROMAT_100, 100, 5);     /* three, N-BK7 then F2  */
+  for (const lens of [singlet, achromat]) {
+    const t = L.transmittance(lens, G.LINE_D);
+    assert.ok(t > 0 && t < 1, "uncoated glass reflects some light at every interface");
+  }
+  assert.ok(L.transmittance(achromat, G.LINE_D) < L.transmittance(singlet, G.LINE_D),
+    "three interfaces of ordinary glass lose more than two");
+
+  /* Interface COUNT is not the whole story, and asserting it would be wrong:
+     Fresnel loss goes with the size of the index step. The ideal lens has only
+     two interfaces but they are air-to-n=2, so it loses far more than either
+     real design does. */
+  const ideal = L.build(P.THIN, 100, 5);
+  assert.ok(L.transmittance(ideal, G.LINE_D) < L.transmittance(achromat, G.LINE_D),
+    "a bigger index step loses more, however few interfaces there are");
+});
+
+test("the spot on axis at the focused distance is small, and grows off axis", () => {
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  L.focus(lens, 2.0);
+  const onAxis = L.spotMm(lens, 2.0, 0, 9);
+  /* Not zero: a doublet at f/5 has residual spherical aberration, and that it
+     is measured rather than assumed away is the point of tracing real glass.
+     What must hold is that focus dominates -- the focused spot is an order of
+     magnitude tighter than a defocused one. */
+  const defocused = L.spotMm(lens, 3.0, 0, 9);
+  assert.ok(onAxis * 5 < defocused,
+    `focus must dominate: at focus ${onAxis}, one metre out ${defocused}`);
+  const offAxis = L.spotMm(lens, 2.0, 0.28, 9);
+  assert.ok(offAxis > onAxis,
+    "an uncorrected doublet has coma and astigmatism off axis");
+});
+
+/* ------------------------------------------------------------- the pupil cache */
+
+test("the cached pupil bound CONTAINS every ray that really gets through", () => {
+  /* A loose bound costs only speed. A tight bound silently deletes light from
+     the frame's corners -- and the result looks exactly like tasteful
+     vignetting, which is why nobody would ever find it by looking.
+
+     Probed at the d line, so the check at 400 and 700 nm is the one that
+     matters: it says the padding really does absorb the band. */
+  const lens = L.build(P.ACHROMAT_100, 100, 4);
+  L.focus(lens, 2.0);
+  const diag = 0.5 * Math.sqrt(36 * 36 + 24 * 24);
+  const cache = PU.build(lens, diag);
+  const rearSemi = lens.surf[lens.surf.length - 1].semiApMm;
+  const box = new Float64Array(4);
+
+  let outside = 0, through = 0;
+  for (const lam of [400, 550, 700]) {
+    for (let z = 0; z < cache.nzones; z++) {
+      const fr = (diag * z) / (cache.nzones - 1);
+      const film = v.v3(fr, 0, L.filmZ(lens));
+      PU.bounds(cache, fr, box);
+      for (let iy = 0; iy < 24; iy++) {
+        for (let ix = 0; ix < 24; ix++) {
+          const rx = -rearSemi + 2 * rearSemi * ((ix + 0.5) / 24);
+          const ry = -rearSemi + 2 * rearSemi * ((iy + 0.5) / 24);
+          if (rx * rx + ry * ry > rearSemi * rearSemi) continue;
+          const r = { o: film, d: v.normalize(v.sub(v.v3(rx, ry, cache.rearZMm), film)) };
+          if (!L.traceReverse(lens, lam, r, null)) continue;
+          through++;
+          if (rx < box[0] || rx > box[1] || ry < box[2] || ry > box[3]) outside++;
+        }
+      }
+    }
+  }
+  assert.ok(through > 1000, "the probe must actually find rays");
+  assert.equal(outside, 0, `${outside} of ${through} transmitted rays fell outside the cached box`);
+});
+
+test("the zone lookup takes a union, never an interpolation", () => {
+  /* Interpolation can produce a box narrower than either neighbour where the
+     pupil is changing shape quickly, which breaks the superset invariant
+     exactly where it matters most. A union cannot. */
+  const lens = L.build(P.ACHROMAT_100, 100, 4);
+  const diag = 21.63;
+  const cache = PU.build(lens, diag);
+  const box = new Float64Array(4);
+  for (let z = 0; z < cache.nzones - 1; z++) {
+    const fr = (diag * (z + 0.5)) / (cache.nzones - 1);
+    PU.bounds(cache, fr, box);
+    for (const zi of [z, z + 1]) {
+      const o = zi * 4;
+      if (cache.zone[o + 1] - cache.zone[o] <= 0) continue;   /* degenerate */
+      assert.ok(box[0] <= cache.zone[o] + 1e-12 && box[1] >= cache.zone[o + 1] - 1e-12,
+        `zone ${zi} x-bound must be contained`);
+      assert.ok(box[2] <= cache.zone[o + 2] + 1e-12 && box[3] >= cache.zone[o + 3] - 1e-12,
+        `zone ${zi} y-bound must be contained`);
+    }
+  }
+});
+
+/* -------------------------------------------------------- hero wavelengths */
+
+test("every drawn wavelength is a bin centre with a positive probability", () => {
+  /* Depositing then needs no redistribution between neighbours, and reading a
+     spectrum back at that wavelength is exact to the last bit. */
+  for (let i = 0; i < 500; i++) {
+    const w = SP.lambdaPick(i, SP.pixelHash(i % 17, (i * 3) % 11));
+    assert.ok(w.bin >= 0 && w.bin < S.NBINS);
+    assert.equal(w.lambdaNm, S.binLambda(w.bin));
+    assert.equal(S.binIndex(w.lambdaNm), w.bin, "a bin centre must round-trip");
+    assert.ok(w.invPdf > 0);
+  }
+});
+
+test("the golden-ratio sequence walks the visible band without state", () => {
+  /* Independent uniform draws leave gaps and clumps for any one pixel, which
+     reads as colour noise. And it must be stateless, so a pass can be split
+     across chunks without changing the result.
+
+     "The whole band" is the wrong claim now that the draw is importance
+     sampled: the bins the CIE observer cannot see are deliberately never drawn,
+     because a sample spent there could only add noise to an estimate of zero.
+     What must be covered is every bin that can actually reach the film. */
+  const xb = C.cmfXbar(), yb = C.cmfYbar(), zb = C.cmfZbar();
+
+  /* "Covered" has to mean the bins that carry the picture, not every bin with a
+     non-zero response: the deep violet and far red are sampled in PROPORTION to
+     what they contribute, which is a hundredth of the peak, so they turn up
+     once in a few thousand draws and that is the sampler working. The bins
+     holding 99 % of the response between them are the ones a short render must
+     not miss. */
+  const weights = [];
+  let total = 0;
+  for (let i = 0; i < S.NBINS; i++) {
+    const w = xb[i] + yb[i] + zb[i];
+    weights.push([i, w]);
+    total += w;
+  }
+  weights.sort((a, b) => b[1] - a[1]);
+  const core = [];
+  let acc = 0;
+  for (const [i, w] of weights) {
+    if (acc / total >= 0.99) break;
+    core.push(i);
+    acc += w;
+  }
+
+  const hash = SP.pixelHash(5, 9);
+  const seen = new Set();
+  for (let i = 0; i < S.NBINS * 8; i++) seen.add(SP.lambdaPick(i, hash).bin);
+  for (const bin of core) {
+    assert.ok(seen.has(bin),
+      `bin ${bin} (${S.binLambda(bin)} nm) carries part of the visible 99% but was never drawn`);
+  }
+  assert.ok(core.length > 50, `the core should be most of the band, was ${core.length} bins`);
+  /* Stateless: the same index gives the same answer whenever it is asked. */
+  assert.equal(SP.lambdaPick(37, hash).bin, SP.lambdaPick(37, hash).bin);
+});
+
+test("importance sampling the wavelength leaves the estimator unbiased", () => {
+  /* The whole point of invPdf. Drawing proportional to the observer's response
+     and dividing by that same probability must reproduce a flat spectrum's XYZ
+     exactly -- otherwise the picture's colour would depend on the sampler,
+     which is the one thing a sampler is not allowed to do. */
+  const xb = C.cmfXbar(), yb = C.cmfYbar(), zb = C.cmfZbar();
+  const step = S.SPECTRAL_STEP_NM;
+
+  /* The truth: XYZ of a flat unit spectrum, integrated directly. */
+  const flat = S.constant(1);
+  const want = {
+    x: S.integrateWeighted(flat, xb),
+    y: S.integrateWeighted(flat, yb),
+    z: S.integrateWeighted(flat, zb),
+  };
+
+  const hash = SP.pixelHash(7, 3);
+  const N = 200000;
+  let gx = 0, gy = 0, gz = 0;
+  for (let i = 0; i < N; i++) {
+    const w = SP.lambdaPick(i, hash);
+    gx += w.invPdf * xb[w.bin] * step;
+    gy += w.invPdf * yb[w.bin] * step;
+    gz += w.invPdf * zb[w.bin] * step;
+  }
+  near(gx / N, want.x, 2e-3, "X of a flat spectrum");
+  near(gy / N, want.y, 2e-3, "Y of a flat spectrum");
+  near(gz / N, want.z, 2e-3, "Z of a flat spectrum");
+});
+
+test("no ray is spent on a wavelength the film cannot see", () => {
+  /* A bin with zero observer response contributes exactly zero to X, Y and Z,
+     so tracing one through the glass and out into the scene is work that can
+     only ever produce noise. */
+  const xb = C.cmfXbar(), yb = C.cmfYbar(), zb = C.cmfZbar();
+  const hash = SP.pixelHash(2, 11);
+  for (let i = 0; i < 20000; i++) {
+    const w = SP.lambdaPick(i, hash);
+    assert.ok(xb[w.bin] + yb[w.bin] + zb[w.bin] > 0,
+      `drew ${w.lambdaNm} nm, which the observer cannot see`);
+    assert.ok(Number.isFinite(w.invPdf) && w.invPdf > 0, "and its weight must be usable");
+  }
+});
+
+test("neighbouring pixels do not walk the spectrum in lockstep", () => {
+  const a = SP.pixelHash(10, 10), b = SP.pixelHash(11, 10), c = SP.pixelHash(10, 11);
+  assert.notEqual(a, b);
+  assert.notEqual(a, c);
+  assert.notEqual(b, c);
+});
+
+/* --------------------------------------------------------------- the camera */
+
+test("the two y flips cancel and the x flip survives", () => {
+  /* Applying one and not the other gives a vertically mirrored render that
+     looks entirely plausible until something in the scene is not symmetric. So:
+     a subject up and to the right must land up and to the right. */
+  const cam = CAM.build(P.THIN, 100, 5, 36, 240, 160);
+  const centre = CAM.project(cam, v.v3(0, 0, -3));
+  near(centre.x, 120, 1e-9, "an axial point lands at the centre column");
+  near(centre.y, 80, 1e-9, "and the centre row");
+
+  const upRight = CAM.project(cam, v.v3(0.2, 0.15, -3));
+  assert.ok(upRight.x > 120, "world +x must land right of centre");
+  assert.ok(upRight.y < 80, "world +y must land ABOVE centre, i.e. at a lower row");
+
+  const downLeft = CAM.project(cam, v.v3(-0.2, -0.15, -3));
+  near(downLeft.x, 240 - upRight.x, 1e-9, "and the mapping is symmetric");
+  near(downLeft.y, 160 - upRight.y, 1e-9, "in both axes");
+});
+
+test("a point at or behind the front vertex has no pixel", () => {
+  const cam = CAM.build(P.THIN, 100, 5, 36, 64, 43);
+  assert.equal(CAM.project(cam, v.v3(0, 0, 0)), null);
+  assert.equal(CAM.project(cam, v.v3(0, 0, 1)), null);
+});
+
+test("a camera sample carries a forward ray and a positive weight", () => {
+  const cam = CAM.build(P.ACHROMAT_100, 100, 5, 36, 64, 43);
+  L.focus(cam.lens, 2);
+  CAM.refresh(cam);
+  const rng = R.seed(1n, 2n);
+  const s = CAM.makeSample();
+  let through = 0;
+  for (let i = 0; i < 2000; i++) {
+    if (!CAM.sample(cam, i % 64, (i * 7) % 43, i, rng, s)) continue;
+    through++;
+    assert.ok(s.weight > 0, "a transmitted sample must carry positive weight");
+    assert.ok(s.d.z < 0, "and travel away from the camera, down -z");
+    near(v.len(s.d), 1, 1e-9, "with a unit direction");
+  }
+  assert.ok(through > 100, `too few samples got through: ${through}`);
+});
+
+test("vignetting is reported, not renormalised away", () => {
+  /* Retrying until a ray gets through would make the corners exactly as bright
+     as the centre, which looks entirely plausible and is the opposite of what a
+     real lens does. So a corner pixel must lose MORE samples than the centre. */
+  const cam = CAM.build(P.ACHROMAT_100, 100, 2.8, 36, 64, 43);
+  L.focus(cam.lens, 2);
+  CAM.refresh(cam);
+  const rng = R.seed(3n, 4n);
+  const s = CAM.makeSample();
+  /* The MEAN WEIGHT over every sample, with a vignetted one contributing zero
+     -- which is exactly what the film accumulates. Not the hit rate: the pupil
+     bound is fitted per zone, so the fraction of box samples that get through
+     is roughly flat across the frame even as the light falls away. Measuring
+     the rate would have reported no vignetting at all. */
+  const meanWeight = (x, y) => {
+    let w = 0;
+    const N = 4000;
+    for (let i = 0; i < N; i++) if (CAM.sample(cam, x, y, i, rng, s)) w += s.weight;
+    return w / N;
+  };
+  const centre = meanWeight(32, 21);
+  const edge = meanWeight(2, 21);
+  const corner = meanWeight(1, 1);
+  assert.ok(centre > 0, "the centre must pass light");
+  assert.ok(edge < centre, `the edge must be down on the centre: ${edge} vs ${centre}`);
+  assert.ok(corner < edge, `and the corner further still: ${corner} vs ${edge}`);
+});
+
+/* ---------------------------------------------------------------- the scene */
+
+test("a lamp's authored lumens survive into the built scene as watts", () => {
+  const d = SD.preset(SD.RAIL);
+  const { scene } = SD.build(d);
+  assert.equal(scene.lights.length, 1);
+  const lamp = scene.lights[0];
+  const spd = S.blackbody(5500);
+  near(lamp.phiE, U.wattsFromLumens(20800, spd), 1e-9, "lumens became watts once");
+  near(U.photometric(S.scale(lamp.sHat, lamp.phiE)), 20800, 1e-6,
+    "and converting back gives the number on the lamp");
+});
+
+test("the key light is an area source facing down", () => {
+  const { scene } = SD.build(SD.preset(SD.RAIL));
+  const lamp = scene.lights[0];
+  near(lamp.n.y, -1, 1e-12, "an overhead panel points at the floor");
+  near(lamp.area, 1.0, 1e-12, "a 1 x 1 m panel has 1 m^2 of area");
+});
+
+test("AMBIENT turns the lamps off entirely rather than dimming them", () => {
+  /* A choice, not a blend: a scene half-lit by each is a third thing that
+     answers neither. */
+  const d = SD.preset(SD.RAIL);
+  d.lightMode = SD.AMBIENT;
+  const b = SD.build(d);
+  assert.equal(b.scene.lights.length, 0, "no lamp is emitted at all");
+  assert.equal(b.scene.prims.length, d.objects.length, "and no emissive face either");
+  assert.ok(b.env.on);
+
+  const lamps = SD.build(SD.preset(SD.RAIL));
+  assert.equal(lamps.scene.lights.length, 1);
+  assert.equal(lamps.env.on, false, "and the dome is off when the lamps are on");
+});
+
+test("the lamp's brightness and colour are controls, and independent", () => {
+  /* LAMPS had no controls at all while AMBIENT had two. The lamp's flux is
+     AUTHORED IN LUMENS -- the number printed on a real bulb -- and that is the
+     number held fixed: watts are recomputed from the lumens and the colour on
+     every build, so changing the colour of an 80000 lm lamp leaves it an
+     80000 lm lamp. Storing watts instead would silently change the brightness
+     every time the colour moved. */
+  const at = (lm, k) => {
+    const d = SD.preset(SD.RAIL);
+    d.lampLm = lm; d.lampCctK = k;
+    return SD.build(d).scene.lights[0];
+  };
+
+  /* Watts are exactly linear in lumens at a fixed colour. */
+  const perLumen = at(20800, 5500).phiE / 20800;
+  for (const lm of [10400, 41600, 208000]) {
+    near(at(lm, 5500).phiE / lm, perLumen, 1e-12, `${lm} lm should scale exactly`);
+  }
+
+  /* And the authored lumens survive any colour, which is the whole point of
+     authoring in lumens. */
+  for (const k of [2700, 5500, 9000]) {
+    const l = at(20800, k);
+    near(U.photometric(S.scale(l.sHat, l.phiE)), 20800, 1e-6,
+      `at ${k} K the lamp must still be a 20800 lm lamp`);
+  }
+
+  /* Each mode shows its own source's controls and only its own. */
+  const lamps = ST.defaults();
+  const sky = { ...ST.defaults(), lightMode: SD.AMBIENT };
+  const ids = (s) => ST.visibleFields(s).filter((f) => f.section === "SCENE").map((f) => f.id);
+  /* `sizing` is in both lists on purpose: it describes the SCENE, not the
+     source lighting it, so it has no business appearing and disappearing with
+     the lighting mode. */
+  assert.deepEqual(ids(lamps), ["sizing", "lightMode", "lampLm", "lampCctK"]);
+  assert.deepEqual(ids(sky), ["sizing", "lightMode", "ambientLux", "ambientCctK"]);
+});
+
+test("every setting the panel can change reaches the renderer", () => {
+  /* THE BUG THIS EXISTS FOR
+       The worker's payload was written out by hand at the postMessage call, so
+       a new field could be added to the panel, to the field table, to the URL
+       hash and to the scene diagram and still never reach the render. It was:
+       TARGET SIZE moved the select and moved the diagram, and the photograph
+       underneath went on being rendered at the default, because an absent field
+       silently took its default inside setup(). Nothing threw.
+
+     So the payload is derived from FIELDS, and this is the assertion that says
+     so -- it fails the moment anything starts hand-listing again. */
+  const s = ST.defaults();
+  /* Move every field off its default, so a payload that copied the defaults
+     instead of the state would fail too. */
+  for (const f of ST.FIELDS) {
+    if (f.enumOf) {
+      const other = f.enumOf().find((o) => o !== s[f.id]);
+      if (other !== undefined) ST.set(s, f.id, other);
+    } else {
+      ST.set(s, f.id, s[f.id] === f.hi ? f.lo : f.hi);
+    }
+  }
+
+  const req = ST.renderRequest(s);
+  for (const f of ST.FIELDS) {
+    assert.ok(req[f.id] !== undefined, `${f.id} never reaches the renderer`);
+    assert.equal(req[f.id], s[f.id], `${f.id} reaches the renderer stale`);
+  }
+  /* And the three the field table deliberately does not carry. */
+  for (const id of ["spp", "depth", "passes"]) {
+    assert.ok(Number.isFinite(req[id]), `${id} must be in the request`);
+  }
+
+  /* A request must survive the structured clone postMessage puts it through. */
+  assert.deepEqual(structuredClone(req), req);
+
+  /* And setup() must accept it: the payload IS the settings object the render
+     core reads, not a subset of one. */
+  assert.doesNotThrow(() => setup({ ...ST.defaults(), ...ST.renderRequest(ST.defaults()) }));
+});
+
+test("the camera has perspective, and only the scene's sizing hides it", () => {
+  /* THE CLAIM THIS PINS
+       A rail whose targets all image the same size looks like an orthographic
+       projection, which is what a TELECENTRIC lens produces -- and the page was
+       read that way. It is not telecentric. Under METRIC, where every target is
+       the same 30 mm sphere in the world, the image sizes must fall off as
+       1/distance and nothing else. Under FILMED they must not fall off at all,
+       because the SCENE is scaling the radii to cancel exactly that.
+
+     Measured through camera.project(), which is the paraxial inverse of the
+     mapping sample() actually uses, so this is the size the renderer draws. */
+  const build = (sizing) => {
+    const st = setup({ ...ST.defaults(), sizing, resW: 320 });
+    return st.desc.objects.map((o) => {
+      const c = o.centre;
+      const a = CAM.project(st.cam, c);
+      const b = CAM.project(st.cam, { x: c.x + o.radius, y: c.y, z: c.z });
+      return { depth: -c.z, radius: o.radius, px: 2 * Math.abs(b.x - a.x) };
+    });
+  };
+
+  const metric = build(SD.METRIC);
+  for (const t of metric) {
+    assert.equal(t.radius, 0.024, "METRIC gives every target the same real size");
+  }
+  /* NEWTON'S MAGNIFICATION, m = f/x, with x the object's distance from the
+     front focal point. So image size times (distance - focal length) is a
+     constant across the rail, and the reference is the near target -- making
+     this a statement about the SHAPE of the falloff rather than about a
+     magnification constant, which could be wrong by any factor and still pass.
+
+     It is emphatically NOT constant times distance: that is the crude 1/d
+     approximation, and at 100 mm on a 1 m subject it is already 7 % out. */
+  const fMm = ST.defaults().focalMm;
+  const law = (t) => t.px * (t.depth * 1000 - fMm);   /* the rail is in metres */
+  for (const t of metric) {
+    near(law(t), law(metric[0]), 1e-3 * law(metric[0]),
+      `a fixed sphere at ${t.depth} m must image at f/(distance - f)`);
+  }
+  /* And the falloff has to be LARGE, or the picture still looks flat: the 1 m
+     target is more than five times the diameter of the 5 m one. */
+  assert.ok(metric[0].px / metric[4].px > 4.8,
+    `near/far size ratio was ${(metric[0].px / metric[4].px).toFixed(2)}, expected about 5.4`);
+
+  const filmed = build(SD.FILMED);
+  for (const t of filmed) {
+    near(t.px, filmed[0].px, 0.1 * filmed[0].px,
+      "FILMED must land every target the same size on the sensor");
+    near(t.radius, 0.024 * t.depth, 1e-12, "FILMED scales the radius with the distance");
+  }
+
+  /* Both sizings agree at 1 m, so switching modes is a change of depth cue and
+     not a change of subject. */
+  near(metric[0].px, filmed[0].px, 1e-9, "the near target is the same in both");
+
+  /* The two are separate settings and neither implies the other. */
+  const s = ST.defaults();
+  assert.equal(s.sizing, SD.METRIC, "the shipped camera shows perspective");
+  assert.ok(ST.set(s, "sizing", SD.FILMED));
+  assert.ok(!ST.set(s, "sizing", "telecentric"), "there is no telecentric sizing");
+  assert.equal(s.sizing, SD.FILMED);
+});
+
+test("the dome is authored in lux and stored as radiance", () => {
+  /* A uniform dome of radiance L puts exactly pi*L on a surface facing it, so
+     the radiance is E/pi -- and the division happens in one place. */
+  const d = SD.preset(SD.RAIL);
+  d.lightMode = SD.AMBIENT;
+  d.ambientLux = 2000;
+  const { env } = SD.build(d);
+  /* Integrate the stored radiance back to an illuminance and compare. */
+  const ePerp = U.photometric(env.le) * Math.PI;
+  near(ePerp, 2000, 1e-6, "lux in, lux back out");
+});
+
+test("the rail's targets differ in hue and in nothing else", () => {
+  /* The rail exists to show that the ONLY difference between these five is how
+     far out of focus they are. Colouring them made them tellable apart under a
+     flat sky, where neutral greys are nearly identical -- but a brighter or
+     darker one would be a second difference, and the eye reads brightness as
+     sharpness readily enough to confuse exactly the demonstration this scene is
+     for. So: five hues, one reflectance. */
+  const { markers } = SD.build(SD.preset(SD.RAIL));
+  assert.equal(markers.length, 5);
+
+  const white = S.daylight(6504);
+  const yWhite = C.spectrumToXyz(white).y;
+  const lum = [], chrom = [];
+  for (const m of markers) {
+    assert.ok(m.colour, `${m.label} should be nameable by colour`);
+    const spd = SD.spectrumFromRgbReflectance(m.rgb);
+    const seen = C.spectrumToXyz(S.mul(spd, white));
+    lum.push(seen.y / yWhite);
+    chrom.push(C.xyzChromaticity(seen));
+  }
+  for (const y of lum) near(y, lum[0], 0.005, "every target reflects the same fraction");
+
+  /* And they have to be far enough apart in colour to actually read as
+     different, or the exercise was pointless. */
+  let closest = Infinity;
+  for (let i = 0; i < chrom.length; i++) {
+    for (let j = i + 1; j < chrom.length; j++) {
+      closest = Math.min(closest, Math.hypot(chrom[i].x - chrom[j].x, chrom[i].y - chrom[j].y));
+    }
+  }
+  assert.ok(closest > 0.05, `the closest two targets are only ${closest.toFixed(3)} apart`);
+
+  /* Every colour name must be distinct, since the assistant identifies a target
+     by it. */
+  assert.equal(new Set(markers.map((m) => m.colour)).size, 5);
+});
+
+test("an object's colour keeps its luminance through the spectral uplift", () => {
+  /* Smits' basis reproduces a colour approximately, and the approximation is
+     worst in the saturated corners. The quantity this simulator reports is
+     photometric, so of the two errors it is luminance that must not drift. */
+  const white = S.daylight(6504);
+  const yWhite = C.spectrumToXyz(white).y;
+  for (const rgb of [[0.75, 0.75, 0.78], [0.55, 0.20, 0.18], [0.5, 0.5, 0.5], [0.2, 0.6, 0.3]]) {
+    const s = SD.spectrumFromRgbReflectance(rgb);
+    const got = C.spectrumToXyz(S.mul(s, white)).y / yWhite;
+    const want = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    near(got, want, 1e-6, `luminance of ${JSON.stringify(rgb)}`);
+    for (let i = 0; i < S.NBINS; i++) {
+      assert.ok(s[i] >= 0 && s[i] <= 0.99, "no bin may reflect more than it receives");
+    }
+  }
+});
+
+test("the clamps refuse every value that would throw inside a light build", () => {
+  /* A zero-area light divides by zero; a colour temperature below about 1200 K
+     underflows every visible bin so the shape cannot be normalised. Both throw
+     inside a worker build, nowhere near the control that was moved. */
+  const d = SD.preset(SD.RAIL);
+  d.lights[0].sizeU = 0;
+  d.lights[0].sizeV = -5;
+  d.lights[0].cctK = 1;
+  d.lights[0].fluxLm = 1e12;
+  d.objects[0].radius = 0;
+  assert.doesNotThrow(() => SD.build(d));
+});
+
+/* ---------------------------------------------------------------- transport */
+
+test("the dome lights the subjects without being photographed", () => {
+  /* The two lighting modes exist to be set against each other, and while the
+     sky was directly visible switching between them changed the LIGHTING and
+     the BACKDROP at once. So the dome is invisible to the CAMERA ray only.
+
+     What must not change is how brightly it lights anything: NEE toward the
+     dome is untouched, and so is every escaping ray at depth 1 or deeper, which
+     is where indirect sky light comes from. */
+  const d = SD.preset(SD.RAIL);
+  d.lightMode = SD.AMBIENT;
+  const b = SD.build(d);
+  const lam = 550;
+
+  /* A camera ray into empty sky is black. */
+  const rng = R.seed(21n, 5n);
+  const up = { o: v.v3(0, 0, 0), d: v.v3(0, 1, 0) };
+  assert.equal(T.radiance(b.scene, b.env, up, lam, rng, 5), 0,
+    "the background must be black under the dome");
+
+  /* And a surface lit by that same dome comes back at exactly rho * L, which is
+     the closed form for a convex Lambertian under a uniform sky -- so nothing
+     was lost from the lighting when the backdrop went. */
+  const one = {
+    objects: [{ kind: "sphere", centre: v.v3(0, 0, -2), radius: 0.4,
+                rgb: [0.5, 0.5, 0.5], colour: "grey", name: "S" }],
+    lights: [], camEye: v.v3(0, 0, 0), camTarget: v.v3(0, 0, -1),
+    lightMode: SD.AMBIENT, ambientLux: 2000, ambientCctK: 6500,
+  };
+  const built = SD.build(one);
+  const rho = SD.spectrumFromRgbReflectance([0.5, 0.5, 0.5]);
+  const want = S.at(rho, lam) * SD.envRadiance(built.env, null, lam);
+
+  const rng2 = R.seed(11n, 3n);
+  let sum = 0;
+  const N = 20000;
+  for (let i = 0; i < N; i++) {
+    sum += T.radiance(built.scene, built.env, { o: v.v3(0, 0, 0), d: v.v3(0, 0, -1) }, lam, rng2, 4);
+  }
+  near(sum / N, want, 0.02, "the sky must still light a surface at rho * L");
+});
+
+test("an escaping ray at depth carries the dome, and a camera ray does not", () => {
+  /* The distinction the invisible backdrop rests on. A ray that has bounced at
+     least once and then escapes IS indirect sky light and must carry it; the
+     camera ray is the picture's background and must not. */
+  const d = SD.preset(SD.RAIL);
+  d.lightMode = SD.AMBIENT;
+  const b = SD.build(d);
+  const rng = R.seed(1n, 1n);
+  const up = { o: v.v3(0, 0, 0), d: v.v3(0, 1, 0) };
+  assert.equal(T.radiance(b.scene, b.env, up, 550, rng, 5), 0, "camera ray: black");
+
+  /* A ray leaving a surface toward open sky still finds it -- which is what the
+     rho * L check above measures end to end. */
+  assert.ok(SD.envRadiance(b.env, null, 550) > 0, "the dome is still emitting");
+
+  const lamps = SD.build(SD.preset(SD.RAIL));
+  assert.equal(T.radiance(lamps.scene, lamps.env, up, 550, rng, 5), 0,
+    "and with no dome at all there is nothing out there either");
+});
+
+test("a sphere under a uniform dome comes back at its own reflectance", () => {
+  /* A convex object in empty space sees the whole hemisphere at every point, so
+     its radiance is exactly rho * L_sky. That is a closed form the estimator
+     has to reproduce, and it exercises NEE, the dome strategy and MIS at once. */
+  const d = {
+    objects: [{ kind: "sphere", centre: v.v3(0, 0, -2), radius: 0.4, rgb: [0.5, 0.5, 0.5], name: "S" }],
+    lights: [], camEye: v.v3(0, 0, 0), camTarget: v.v3(0, 0, -1),
+    lightMode: SD.AMBIENT, ambientLux: 2000, ambientCctK: 6500,
+  };
+  const b = SD.build(d);
+  const rho = SD.spectrumFromRgbReflectance([0.5, 0.5, 0.5]);
+  const lam = 550;
+  const want = S.at(rho, lam) * SD.envRadiance(b.env, null, lam);
+
+  const rng = R.seed(11n, 3n);
+  let sum = 0;
+  const N = 20000;
+  for (let i = 0; i < N; i++) {
+    sum += T.radiance(b.scene, b.env, { o: v.v3(0, 0, 0), d: v.v3(0, 0, -1) }, lam, rng, 4);
+  }
+  near(sum / N, want, 0.02, "a lit convex Lambertian must return rho * L");
+});
+
+test("the film's XYZ accumulation equals accumulating the spectrum", () => {
+  /* This is the one liberty taken with the C's data structures, so it is pinned
+     rather than argued: X, Y and Z are linear functionals of the spectrum, so
+     depositing cmf[bin]*step per sample is the same as building the mean
+     spectrum and projecting it afterwards. */
+  const f = FILM.create(1, 1);
+  const acc = S.accZero();
+  const rng = R.seed(5n, 6n);
+  const n = 400;
+  for (let i = 0; i < n; i++) {
+    const bin = Math.floor(R.f(rng) * S.NBINS);
+    const val = R.f(rng) * 4;
+    FILM.add(f, 0, 0, bin, val);
+    acc[bin] += val;
+  }
+  const meanSpec = new Float64Array(S.NBINS);
+  for (let i = 0; i < S.NBINS; i++) meanSpec[i] = acc[i] / n;
+  const ref = {
+    x: S.integrateWeighted(meanSpec, C.cmfXbar()),
+    y: S.integrateWeighted(meanSpec, C.cmfYbar()),
+    z: S.integrateWeighted(meanSpec, C.cmfZbar()),
+  };
+  near(f.xyz[0] / n, ref.x, 1e-12, "X");
+  near(f.xyz[1] / n, ref.y, 1e-12, "Y");
+  near(f.xyz[2] / n, ref.z, 1e-12, "Z");
+});
+
+test("an unsampled pixel is black and opaque, not transparent", () => {
+  const f = FILM.create(2, 1);
+  FILM.add(f, 0, 0, 40, 1);
+  const out = FILM.tonemap(f, 100, new Uint8ClampedArray(8));
+  assert.equal(out[7], 255, "alpha must be opaque even where nothing was traced");
+  assert.equal(out[4], 0);
+  assert.equal(out[5], 0);
+  assert.equal(out[6], 0);
+});
+
+/* ------------------------------------------------------------------ render */
+
+const baseSettings = () => ({
+  design: P.ACHROMAT_100, focalMm: 100, fno: 5, focusM: 2,
+  preset: SD.RAIL, lightMode: SD.LAMPS, ambientLux: 2000, ambientCctK: 6500,
+  sensorWMm: 36, resW: 48, exposure: 100, cocLimitMm: 0.03, spp: 2, depth: 3,
+});
+
+test("a render is identical however the rows are chunked", () => {
+  /* THE determinism contract. Seeding per chunk would make every render depend
+     on how the scheduler happened to slice it, so a bug would reproduce only
+     sometimes and a regression test could not exist at all. */
+  const s = baseSettings();
+  const st = setup(s);
+
+  const whole = FILM.create(st.width, st.height);
+  renderRows(st, whole, s, 0, 0, st.height);
+
+  const chunked = FILM.create(st.width, st.height);
+  for (let y = 0; y < st.height; y += 7) {
+    renderRows(st, chunked, s, 0, y, Math.min(st.height, y + 7));
+  }
+
+  assert.deepEqual(Array.from(chunked.xyz), Array.from(whole.xyz));
+  assert.deepEqual(Array.from(chunked.n), Array.from(whole.n));
+});
+
+test("every sample is counted, vignetted or not", () => {
+  /* Skipping a vignetted sample would renormalise the vignetting away. */
+  const s = baseSettings();
+  const st = setup(s);
+  const f = FILM.create(st.width, st.height);
+  renderRows(st, f, s, 0, 0, st.height);
+  for (let i = 0; i < f.n.length; i++) {
+    assert.equal(f.n[i], s.spp, `pixel ${i} must have counted every sample`);
+  }
+});
+
+const RAIL_DEPTHS = [1.0, 1.5, 2.0, 3.0, 5.0];
+/* The rail's targets sit off axis in proportion to their distance, so they all
+   subtend the same angle. */
+const RAIL_FRAC = { 1.0: -0.140, 1.5: -0.070, 2.0: 0, 3.0: 0.070, 5.0: 0.140 };
+
+const sharpestAt = (lens, heightOf) => {
+  let best = Infinity, bestAt = 0;
+  for (const dist of RAIL_DEPTHS) {
+    const spot = L.spotMm(lens, dist, heightOf(dist), 11);
+    if (spot < best) { best = spot; bestAt = dist; }
+  }
+  return bestAt;
+};
+
+test("focus decides which target is sharp, on the axis", () => {
+  /* The whole point of the rail, measured by the real traced spot rather than
+     by the paraxial slab. On axis, defocus is the whole story and the focused
+     distance must win every time. */
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  for (const at of RAIL_DEPTHS) {
+    L.focus(lens, at);
+    assert.equal(sharpestAt(lens, () => 0), at,
+      `focused at ${at} m, the ${at} m target must be sharpest on axis`);
+  }
+});
+
+test("off axis, an uncorrected doublet can beat focus -- and does, at 5 m", () => {
+  /* This is not a defect being tolerated, it is the thing the panel's SPOT row
+     exists to report. Off axis a simple doublet's coma and astigmatism grow
+     with field angle, and by 0.7 m off the axis at 5 m they dominate defocus
+     entirely: focus the lens at 5 m and the 3 m target -- half the field angle
+     away -- resolves better than the one actually in focus.
+
+     The depth-of-field slab says the opposite, and neither is wrong: they are
+     answers to different questions. Pinned here so that if the aberration ever
+     silently disappears from the trace, a test says so. */
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  const height = (d) => Math.abs(RAIL_FRAC[d]) * d;
+
+  L.focus(lens, 2.0);
+  assert.equal(sharpestAt(lens, height), 2.0,
+    "near the axis the focused target still wins");
+
+  L.focus(lens, 5.0);
+  assert.equal(sharpestAt(lens, height), 3.0,
+    "but at the edge of the field, aberration beats focus");
+  assert.ok(L.spotMm(lens, 5.0, height(5.0), 11) > L.spotMm(lens, 5.0, 0, 11) * 10,
+    "and the cause is the field angle, not the focus");
+});
+
+test("stopping down darkens the frame by about the right number of stops", () => {
+  /* Exposure comes from the aperture, so halving the pupil area must roughly
+     halve the light. Roughly, because vignetting and the real pupil are not a
+     textbook f-number -- but two stops must not come out as one or as three. */
+  const meanY = (fno) => {
+    const s = { ...baseSettings(), fno, lightMode: SD.AMBIENT, resW: 36 };
+    const st = setup(s);
+    const f = FILM.create(st.width, st.height);
+    renderRows(st, f, s, 0, 0, st.height);
+    let sum = 0;
+    for (let i = 0; i < f.n.length; i++) sum += f.xyz[i * 3 + 1] / f.n[i];
+    return sum / f.n.length;
+  };
+  /* Both reachable: this design is wide open at f/5, so f/4 would clamp and the
+     "two stops" would silently be one and a third. */
+  const wide = meanY(5.6);
+  const stopped = meanY(11);         /* two stops down: expect about 1/4 */
+  const ratio = wide / stopped;
+  assert.ok(ratio > 2.8 && ratio < 5.6,
+    `two stops should be about 4x, got ${ratio.toFixed(2)}x`);
+});
+
+test("nothing promises a starburst this renderer cannot produce", () => {
+  /* A real lens's sunstars are diffraction at the edges of the iris blades.
+     This renderer has neither: it is geometric, so it knows where rays land and
+     not how they interfere, and its aperture is a plain circle. The prompt
+     promised spikes in three places, which would have had the assistant
+     confidently describing an effect that can never appear on screen. */
+  const K = readFileSync("js/optics/knowledge.js", "utf8");
+  const A = readFileSync("js/optics/assistant.js", "utf8");
+  for (const [name, src] of [["knowledge", K], ["assistant", A]]) {
+    for (const m of src.matchAll(/^.*\b(starburst|sunstar|spike)\w*\b.*$/gim)) {
+      const line = m[0];
+      /* Saying it is ABSENT is the point; saying it is present is the bug. */
+      assert.match(line, /\bno\b|\bNOT\b|never|cannot|diffraction/i,
+        `${name} mentions a starburst without denying it: ${line.trim()}`);
+    }
+  }
+  /* And the limits section has to name it, since a visitor will ask. */
+  assert.match(optics.LIMITS_TEXT ?? K, /starburst|sunstar/i,
+    "the limits should say plainly that there are no sunstars");
+});
+
+/* ------------------------------------------------------------- the diagram */
+
+test("the diagram's distances come from the lens, not from a formula of its own", () => {
+  /* A diagram that disagrees with the render is worse than no diagram. */
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  L.focus(lens, 2.0);
+  const d = SD.preset(SD.RAIL);
+  const s = S3.build(d, lens, 36, 24, 0.03);
+  const ref = L.dof(lens, 0.03);
+  assert.equal(s.nearM, ref.near);
+  assert.equal(s.farM, ref.far);
+  assert.equal(s.hyperfocalM, L.hyperfocalM(lens, 0.03));
+});
+
+test("focusing at a target is what makes that target the sharpest", () => {
+  /* THE PROMISE THIS SCENE MAKES, and for a long time did not keep.
+
+     Depth of field is an on-axis, defocus-only idea; every other aberration
+     grows with how far off the axis the subject sits. The targets used to be
+     spread along a row from -0.140 to +0.140 radians so they would not occlude,
+     which put the outer two at 59 % of a full-frame half-diagonal -- and there
+     the achromat's coma beat the defocus outright. Focused at 5 m the 5 m
+     target measured 0.44 mm and the 3 m target 0.11 mm. Nothing was wrong with
+     either number. Setting the focus to 5 m simply did not make the 5 m target
+     the sharpest thing in frame.
+
+     They now sit at the same angular radius from the axis, so the field
+     aberration is identical for all five and cancels out of the comparison. */
+  const ring = SD.preset(SD.RAIL);
+  const field = ring.objects.map((o) => Math.hypot(o.centre.x, o.centre.y) / -o.centre.z);
+  for (const f of field) near(f, field[0], 1e-12, "every target must be at the same field radius");
+  assert.ok(field[0] > 0, "and off the axis, or they would occlude one another");
+
+  for (const [focal, fno] of [[25, 1], [50, 5], [100, 5], [100, 16], [200, 8]]) {
+    const lens = L.build(P.ACHROMAT_100, focal, fno);
+    for (let k = 0; k < ring.objects.length; k++) {
+      const want = ring.objects[k];
+      if (!L.focus(lens, -want.centre.z)) continue;
+      const spots = ring.objects.map((o) =>
+        L.spotMm(lens, -o.centre.z, Math.hypot(o.centre.x, o.centre.y), 15));
+      const min = Math.min(...spots);
+      const best = spots.indexOf(min);
+      /* Sharpest, or close enough that the photograph cannot show it.
+
+         Two residuals survive the ring, and both are small. At short focal
+         lengths the whole scene is inside the depth of field and the ordering
+         is settled by the aberration floor rather than by focus: at 25 mm f/5
+         focused at 1.5 m the 1 m target measures 0.0177 mm against the 1.5 m
+         target's 0.0216 mm. And FIELD CURVATURE bows the best-focus surface
+         toward the lens -- by the same amount for all five, since they share a
+         field radius -- so the ring's sharpest distance sits slightly nearer
+         than the on-axis setting, which at 50 mm f/5 focused at 5 m puts the
+         3 m target 0.0135 mm ahead of the 5 m one.
+
+         The bar is therefore 0.02 mm, which is what the IMAGE can resolve: one
+         pixel is 0.1125 mm at the default 36 mm across 320, and 0.056 mm at the
+         widest 640. Nothing below that is a disagreement anyone can see. */
+      assert.ok(best === k || spots[k] - min < 0.02,
+        `${focal} mm f/${lens.fNumber.toFixed(1)} focused at ${-want.centre.z} m made `
+        + `${ring.objects[best].name} visibly sharper than ${want.name}: `
+        + `[${spots.map((x) => x.toFixed(4)).join(" ")}]`);
+    }
+  }
+});
+
+/* The blur a target's EDGE really has in the rendered pixels, in pixels.
+
+   The radial profile about the target is averaged over every angle, which
+   cancels the Monte Carlo noise and makes the curve fine enough to interpolate;
+   the 10 %-to-90 % fall of that curve is the blur. Three details are load
+   bearing, and each of them was a wrong answer first:
+
+     - Only the OUTWARD-facing sector is sampled. The targets are a ring, and
+       under SAME ON FILM they are wider than the gaps between them, so a full
+       annulus reaches the neighbour and takes its light as the background.
+     - The crossings are found scanning INWARD from the background. The 90 %
+       level sits about a tenth below the plateau and the plateau's own bin
+       noise is the same size, so scanning outward stops at the first bin that
+       dips -- which returned a 41 px edge for a profile that is flat to r=42
+       and zero by r=47.
+     - The background is a MEDIAN of the outer bins. A mean chases one bright
+       bin and drags the 10 % crossing out with it. */
+function edgeBlurPx(Y, W, H, cx, cy, dia, ux, uy) {
+  const step = 0.5, rMax = dia * 0.75 + 14, bins = Math.ceil(rMax / step);
+  if (cx - rMax < 0 || cx + rMax > W - 1 || cy - rMax < 0 || cy + rMax > H - 1) return null;
+  const sum = new Float64Array(bins), cnt = new Float64Array(bins);
+  for (let y = Math.floor(cy - rMax); y <= cy + rMax; y++) {
+    for (let x = Math.floor(cx - rMax); x <= cx + rMax; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
+      if (r >= rMax) continue;
+      if (r > 1 && (dx * ux + dy * uy) / r < 0.5) continue;   /* 60 deg outward */
+      const b = Math.floor(r / step); sum[b] += Y[y * W + x]; cnt[b]++;
+    }
+  }
+  const prof = [];
+  for (let b = 0; b < bins; b++) prof.push(cnt[b] >= 2 ? sum[b] / cnt[b] : NaN);
+  const mid = (a) => a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2;
+  const inner = prof.slice(Math.round(dia * 0.10 / step), Math.round(dia * 0.35 / step))
+    .filter(Number.isFinite).sort((a, b) => a - b);
+  const outer = prof.slice(Math.max(0, bins - Math.round(9 / step)))
+    .filter(Number.isFinite).sort((a, b) => a - b);
+  if (inner.length < 2 || outer.length < 2) return null;
+  const hi = mid(inner), lo = mid(outer);
+  if (!(hi > lo * 3)) return null;
+  const cross = (frac) => {
+    const t = lo + frac * (hi - lo);
+    for (let b = bins - 1; b >= 1; b--) {
+      const a = prof[b - 1], c = prof[b];
+      if (!Number.isFinite(a) || !Number.isFinite(c)) continue;
+      if (c < t && a >= t) return (b - 1 + (a - t) / (a - c)) * step;
+    }
+    return null;
+  };
+  const r90 = cross(0.9), r10 = cross(0.1);
+  return (r90 !== null && r10 !== null && r10 > r90) ? r10 - r90 : null;
+}
+
+test("the blur the diagram predicts is the blur the render actually has", () => {
+  /* THE CLAIM THE WHOLE PAGE RESTS ON. The scene view prints a spot beside every
+     target, from LENS.spotMm -- a ray traced through the real glass at that
+     target's real field position. The image view is made by render.js. If the
+     diagram and the photograph agree, then the edge in the pixels has to be as
+     soft as the spot says, target by target, and the target labelled SHARPEST
+     has to be the crispest thing in the frame.
+
+     Measured on a lighting-neutral, equal-size render. spotMm knows the lens,
+     the distance and the field angle and nothing whatever about the lamp, so
+     a lamp-lit frame would import 1/r^2 falloff and a terminator -- neither of
+     which is focus. SAME ON FILM removes size as a second variable, and the
+     ring already holds every target at one field radius. */
+  for (const focusM of [1, 2, 5]) {
+    const s = { ...ST.defaults(), resW: 240, sizing: SD.FILMED,
+                lightMode: SD.AMBIENT, focusM };
+    const lens = L.build(s.design, s.focalMm, s.fno);
+    assert.ok(L.focus(lens, focusM));
+
+    /* what the DIAGRAM says, read off the labels it actually draws */
+    const sensorH = s.sensorWMm * ST.resH(s.resW) / s.resW;
+    const desc = SD.preset(s.preset, s.sizing);
+    desc.lightMode = SD.AMBIENT;
+    const said = {};
+    let best = null;
+    for (const lab of S3.build(desc, lens, s.sensorWMm, sensorH, s.cocLimitMm).labels) {
+      const m = /^(\S+)\s+([\d.]+)MM( SHARPEST)?$/.exec(lab.text);
+      if (m && [S3.SUBJECT, S3.OBJECT, S3.BEST].includes(lab.kind)) {
+        said[m[1]] = +m[2];
+        if (m[3]) best = m[1];
+      }
+    }
+    assert.ok(best, "the diagram must name a sharpest target");
+
+    /* what the IMAGE has */
+    const st = setup(s);
+    const film = FILM.create(st.width, st.height);
+    for (let p = 0; p < 16; p++) renderRows(st, film, s, p, 0, st.height);
+    const Y = new Float64Array(st.width * st.height);
+    for (let i = 0; i < Y.length; i++) Y[i] = film.n[i] > 0 ? film.xyz[i * 3 + 1] / film.n[i] : 0;
+
+    const pxPerMm = s.resW / s.sensorWMm;
+    const got = [];
+    for (const o of st.desc.objects) {
+      const a = CAM.project(st.cam, o.centre);
+      const b = CAM.project(st.cam, { x: o.centre.x + o.radius, y: o.centre.y, z: o.centre.z });
+      if (!a || !b) continue;
+      const dia = 2 * Math.abs(b.x - a.x);
+      const nx = a.x - st.width / 2, ny = a.y - st.height / 2, nn = Math.hypot(nx, ny) || 1;
+      const w = edgeBlurPx(Y, st.width, st.height, a.x, a.y, dia, nx / nn, ny / nn);
+      if (w === null) continue;
+      got.push({ name: o.name, want: said[o.name] * pxPerMm, got: w });
+    }
+    assert.ok(got.length >= 4, `only ${got.length} targets measurable at ${focusM} m`);
+
+    for (const r of got) {
+      /* A perfectly sharp edge still spans a couple of pixels once it has been
+         sampled onto a grid, so the floor is absolute and the rest relative. */
+      const tol = Math.max(2.5, 0.45 * r.want);
+      near(r.got, r.want, tol,
+        `focused at ${focusM} m, ${r.name}: the diagram predicts ${r.want.toFixed(1)} px of blur`);
+    }
+
+    const sharpest = got.reduce((m, r) => r.got < m.got ? r : m);
+    const claimed = got.find((r) => r.name === best);
+    assert.ok(sharpest.name === best || claimed.got - sharpest.got <= 2,
+      `focused at ${focusM} m the diagram says ${best} is sharpest (${claimed.got.toFixed(1)} px) `
+      + `but the render is crispest at ${sharpest.name} (${sharpest.got.toFixed(1)} px)`);
+  }
+});
+
+test("the diagram marks what the camera resolves, not what the slab predicts", () => {
+  /* The two are still different quantities and still disagree -- just not about
+     WHICH target any more. The slab is paraxial and counts defocus alone, so it
+     promises a sharpness the glass may be unable to deliver anywhere at all.
+
+     At 100 mm and f/8 focused at 2 m, with a 0.030 mm criterion, the slab says
+     1.91 m to 2.10 m is sharp. The traced spot at the 2 m target -- zero
+     defocus, dead in the middle of that slab -- is 0.0459 mm. The lens is
+     aberration limited at f/8 and nothing in the frame meets the criterion. The
+     slab is not wrong; it is answering a different question. */
+  const lens = L.build(P.ACHROMAT_100, 100, 8);
+  L.focus(lens, 2.0);
+  const coc = 0.030;
+
+  const slab = L.dof(lens, coc);
+  assert.ok(2.0 >= slab.near && 2.0 <= slab.far, "the slab contains the 2 m target");
+
+  const desc = SD.preset(SD.RAIL);
+  const twoM = desc.objects.find((o) => o.name === "2M");
+  const spot = L.spotMm(lens, 2.0, Math.hypot(twoM.centre.x, twoM.centre.y), 15);
+  assert.ok(spot > coc,
+    `the trace must exceed the criterion the slab promises: ${spot} vs ${coc}`);
+
+  const s = S3.build(desc, lens, 36, 24, coc);
+
+  /* The diagram prints the spot beside every target, so the comparison is
+     legible even when none of them meets the criterion. */
+  const targets = s.labels.filter((l) =>
+    l.kind === S3.SUBJECT || l.kind === S3.OBJECT || l.kind === S3.BEST);
+  assert.equal(targets.length, 5);
+  for (const t of targets) {
+    assert.match(t.text, /\d+MM( SHARPEST)?$/, `"${t.text}" should carry its spot`);
+  }
+
+  /* Nothing qualifies, so nothing is marked sharp -- and that is exactly the
+     case that used to leave the diagram with no highlight at all. The sharpest
+     thing in frame is marked regardless, and says so. */
+  assert.equal(s.labels.filter((l) => l.kind === S3.SUBJECT).length, 0,
+    "nothing meets the criterion at f/8");
+  const bestLabels = s.labels.filter((l) => l.kind === S3.BEST);
+  assert.equal(bestLabels.length, 1, "exactly one target is the best");
+  assert.match(bestLabels[0].text, /^2M /, "and it is the one the film is set for");
+  assert.match(bestLabels[0].text, /SHARPEST$/, "and it has to say so in words");
+
+  /* And the focus plane must not read as a claim about what is sharp. */
+  const focusLabel = s.labels.find((l) => l.kind === S3.FOCUS);
+  assert.match(focusLabel.text, /^FILM SET FOR /,
+    `"${focusLabel.text}" reads as a promise the lens does not always keep`);
+
+  /* The slab is still drawn, as a box around the range, and it is drawn in its
+     own kind so nothing can confuse it with the focus plane or with a target. */
+  const dofLabels = s.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text);
+  assert.deepEqual(dofLabels, ["NEAR 1.91M", "FAR 2.10M"]);
+  assert.equal(s.segs.filter((g) => g.kind === S3.DOF).length, 12, "a closed box");
+  /* The box contains the 2 m target it disagrees with, which is the whole
+     point of drawing both: the number says sharp and the spot says not. */
+  assert.ok(2.0 >= slab.near && 2.0 <= slab.far);
+});
+
+test("the depth of field is drawn as a range, however far out its ends are", () => {
+  /* IT USED TO DISAPPEAR. The axis was drawn to a fixed 8 m, and an end past
+     that was silently dropped -- so at 100 mm and f/5 focused at 5 m, where the
+     range is 3.36 m to 9.81 m, the diagram showed AXIS NEAR and nothing else.
+     A range with one end drawn reads as a range that stops there.
+
+     Four cases, because either end can fall outside the picture, and every one
+     of them has to say what it is. */
+  const desc = SD.preset(SD.RAIL);
+  const dofOf = (focal, fno, focusM, coc) => {
+    const lens = L.build(P.ACHROMAT_100, focal, fno);
+    assert.ok(L.focus(lens, focusM), `cannot focus ${focal} mm at ${focusM} m`);
+    const built = S3.build(desc, lens, 36, 24, coc);
+    return {
+      built,
+      range: L.dof(lens, coc),
+      labels: built.labels.filter((l) => l.kind === S3.DOF).map((l) => l.text),
+      segs: built.segs.filter((g) => g.kind === S3.DOF),
+    };
+  };
+
+  /* Both ends inside: a face at each, and four walls joining them. A CLOSED
+     box -- twelve segments, and that count is the assertion, because an open
+     one would mean something else entirely. */
+  const both = dofOf(100, 5, 5, 0.200);
+  assert.deepEqual(both.labels, ["NEAR 3.36M", "FAR 9.81M"]);
+  assert.equal(both.segs.length, 12, "a bounded range is a closed box");
+
+  /* Past the hyperfocal distance the far limit is infinite. There is no far
+     face, because there is no far limit -- the box stays open and says so. A
+     closed box ending at the edge of the picture would be claiming an end the
+     calculation never gave. */
+  const open = dofOf(25, 45, 2, 0.030);
+  assert.ok(!Number.isFinite(open.range.far), "this one must be unbounded");
+  assert.deepEqual(open.labels, ["NEAR 0.38M", "FAR INFINITY"]);
+  assert.equal(open.segs.length, 8, "one face and four walls: open at the far end");
+
+  /* Wide and stopped down enough and the near limit reaches the lens itself,
+     so neither end has a face -- but the range is still drawn. */
+  const atLens = dofOf(12, 45, 0.5, 0.200);
+  assert.ok(atLens.range.near <= 0.02, "the near limit must be at the lens");
+  assert.deepEqual(atLens.labels, ["FAR INFINITY"]);
+  assert.equal(atLens.segs.length, 4, "walls only: open at both ends");
+
+  /* Focused far enough out and the whole range is past the end of the axis.
+     Nothing on screen is inside it, so nothing on screen may be drawn as
+     though it were: an arrow out of the picture, and both numbers in words. */
+  const beyond = dofOf(100, 5, 50, 0.030);
+  assert.ok(beyond.range.near > 14, "the near limit must be past the axis");
+  assert.deepEqual(beyond.labels, ["AXIS SHARP 28.60M TO 199M"]);
+  for (const g of beyond.segs) {
+    assert.ok(-g.a.z > 13 && -g.b.z > 13,
+      "nothing inside the picture may be marked sharp when none of it is");
+  }
+
+  /* And the labels sit on the box's corners, not on the axis, where they used
+     to overprint the targets and the focus plane at a shallow depth of field. */
+  const tight = dofOf(100, 5, 2, 0.030);
+  assert.deepEqual(tight.labels, ["NEAR 1.94M", "FAR 2.06M"]);
+  const [near, far] = tight.built.labels.filter((l) => l.kind === S3.DOF);
+  assert.ok(near.at.x < 0 && near.at.y < 0, "NEAR goes to a bottom corner");
+  assert.ok(far.at.x < 0 && far.at.y > 0, "FAR goes to a top corner");
+  const focusLabel = tight.built.labels.find((l) => l.kind === S3.FOCUS);
+  assert.ok(focusLabel.at.x > 0 && focusLabel.at.y > 0,
+    "and the focus plane's label goes to the other side, so the three cannot collide");
+});
+
+test("stopped down, the focused target is marked and the numbers agree", () => {
+  /* The other half: when the lens can actually meet the criterion, the mark
+     appears, and it appears on the target the film is set for. */
+  const lens = L.build(P.ACHROMAT_100, 100, 11);
+  L.focus(lens, 2.0);
+  const s = S3.build(SD.preset(SD.RAIL), lens, 36, 24, 0.030);
+  const marked = s.labels.filter((l) => l.kind === S3.SUBJECT).map((l) => l.text);
+  assert.equal(marked.length, 1, `expected one sharp target, got ${JSON.stringify(marked)}`);
+  assert.match(marked[0], /^2M /, "the 2 m target is the one the film is set for");
+  /* When something does meet the criterion it is marked sharp, and since it is
+     also the best it still says so -- one target, not two markings. */
+  assert.match(marked[0], /SHARPEST$/);
+  assert.equal(s.labels.filter((l) => l.kind === S3.BEST).length, 0);
+});
+
+test("the lamp is drawn as off, and the sky appears, under AMBIENT", () => {
+  /* Still drawn: losing it off the screen would make switching modes feel like
+     deleting it. */
+  const lens = L.build(P.ACHROMAT_100, 100, 5);
+  L.focus(lens, 2);
+  const lamps = S3.build(SD.preset(SD.RAIL), lens, 36, 24, 0.03);
+  assert.ok(lamps.labels.some((l) => l.text === "KEY 20800LM"));
+  assert.ok(!lamps.segs.some((g) => g.kind === S3.SKY));
+
+  const d = SD.preset(SD.RAIL);
+  d.lightMode = SD.AMBIENT;
+  const sky = S3.build(d, lens, 36, 24, 0.03);
+  assert.ok(sky.labels.some((l) => l.text === "KEY OFF"));
+  assert.ok(sky.labels.some((l) => l.text === "SKY 2000 LX"));
+  assert.ok(sky.segs.some((g) => g.kind === S3.SKY));
+});
+
+test("the diagram survives having no lens at all", () => {
+  const s = S3.build(SD.preset(SD.RAIL), null, 36, 24, 0.03);
+  assert.ok(s.segs.length > 0, "the ground and the camera are still drawn");
+  assert.ok(!s.segs.some((g) => g.kind === S3.FOCUS), "but nothing that needs a lens");
+});
+
+/* ------------------------------------------------------------- the settings */
+
+test("there is one clamp path, and it holds for every field", () => {
+  for (const f of ST.FIELDS) {
+    if (f.enumOf) {
+      const s = ST.defaults();
+      ST.set(s, f.id, "definitely-not-a-valid-option");
+      assert.ok(f.enumOf().includes(s[f.id]), `${f.id} must stay a legal option`);
+      continue;
+    }
+    const lo = ST.defaults(); ST.set(lo, f.id, f.lo - 1e6);
+    const hi = ST.defaults(); ST.set(hi, f.id, f.hi + 1e6);
+    assert.ok(lo[f.id] >= f.lo, `${f.id} clamped below its floor`);
+    assert.ok(hi[f.id] <= f.hi, `${f.id} clamped above its ceiling`);
+    const nan = ST.defaults();
+    ST.set(nan, f.id, NaN);
+    assert.ok(Number.isFinite(nan[f.id]), `${f.id} must reject NaN`);
+  }
+});
+
+test("exposure and the sharpness limit never restart a render", () => {
+  const a = ST.defaults(), b = ST.defaults();
+  ST.set(b, "exposure", 1234);
+  ST.set(b, "cocLimitMm", 0.01);
+  assert.equal(ST.imageDiffers(a, b), false);
+  ST.set(b, "fno", 11);
+  assert.equal(ST.imageDiffers(a, b), true);
+});
+
+test("every settable field survives a hash round trip", () => {
+  const s = ST.defaults();
+  ST.set(s, "design", P.SINGLET_100);
+  ST.set(s, "focalMm", 55);
+  ST.set(s, "fno", 2.8);
+  ST.set(s, "focusM", 1.25);
+  ST.set(s, "lightMode", SD.AMBIENT);
+
+  const back = ST.defaults();
+  ST.fromHash(`#${ST.toHash(s)}`, back);
+  for (const f of ST.FIELDS) {
+    assert.equal(back[f.id], s[f.id], `${f.id} did not survive the round trip`);
+  }
+});
+
+test("a hand-edited link cannot produce a state the panel could not", () => {
+  const s = ST.defaults();
+  ST.fromHash("#fno=0.001&resW=99999&focusM=-4&design=made-up", s);
+  assert.ok(s.fno >= 1 && s.fno <= 45);
+  assert.ok(s.resW <= 640);
+  assert.ok(s.focusM >= 0.15);
+  assert.ok(P.IDS.includes(s.design));
+});
+
+test("an incoming link is a whole state, not a diff against this one", () => {
+  /* fromHash reports whether the hash was UNDERSTOOD. It used to report whether
+     it had CHANGED anything, which is not the same: a link back to the shipped
+     camera is "#preset=rail", so a visitor who had stopped down to f/16 and
+     then pasted a colleague's default link was told nothing had changed, and
+     the page kept f/16 while the address bar claimed otherwise. */
+  const s = ST.defaults();
+  assert.equal(ST.toHash(s), "preset=rail", "the default state shares as a bare preset");
+  assert.equal(ST.fromHash("#preset=rail", ST.defaults()), true,
+    "a link that names the state it already is was still understood");
+
+  /* And the caller can then apply it wholesale: a field the link omits goes
+     back to its default rather than keeping what this session left it at. */
+  const incoming = ST.defaults();
+  ST.fromHash("#preset=rail", incoming);
+  assert.equal(incoming.fno, ST.defaults().fno);
+
+  /* Something it cannot read is still refused. */
+  assert.equal(ST.fromHash("#preset=not-a-scene", ST.defaults()), false);
+  assert.equal(ST.fromHash("#nonsense=1", ST.defaults()), false);
+  assert.equal(ST.fromHash("", ST.defaults()), false);
+});
+
+test("a bare preset link loads that preset", () => {
+  const s = ST.defaults();
+  assert.ok(ST.fromHash("#preset=rail", s));
+  assert.equal(s.preset, SD.RAIL);
+  const t = ST.defaults();
+  assert.equal(ST.fromHash("#preset=not-a-scene", t), false);
+  assert.equal(t.preset, SD.RAIL);
+});
+
+test("the render height follows the sensor and never degenerates", () => {
+  assert.equal(ST.resH(320), 213);
+  assert.equal(ST.resH(64), 43);
+  assert.ok(ST.resH(1) >= 2, "a degenerate grid would divide by zero downstream");
+});
+
+test("the derived readouts are finite and agree with the lens they came from", () => {
+  const s = baseSettings();
+  const st = setup(s);
+  const d = derivedOf(st.cam.lens, st.cam.sensorWMm, st.cam.sensorHMm, s.cocLimitMm);
+  near(d.eflMm, st.cam.lens.eflMm, 1e-12, "focal length");
+  near(d.fNumber, st.cam.lens.fNumber, 1e-12, "f-number");
+  near(d.hfovDeg, CAM.hfovDeg(st.cam), 1e-12, "field of view");
+  assert.ok(d.tstop > d.fNumber, "a T-stop is always slower than the f-stop it comes from");
+  assert.ok(Number.isFinite(d.nearM) && d.nearM > 0);
+  assert.ok(Number.isFinite(d.hyperfocalM));
+
+  /* RESOLVING is the sharpness criterion said in the other unit -- 1/c line
+     pairs per millimetre -- so it must track the control exactly and rise as the
+     criterion tightens. It is a geometric cutoff, not an MTF: nothing in this
+     program computes contrast against spatial frequency. */
+  near(d.resolvingLpMm, 1 / s.cocLimitMm, 1e-12, "lp/mm is the reciprocal");
+  const at = (coc) =>
+    derivedOf(st.cam.lens, st.cam.sensorWMm, st.cam.sensorHMm, coc).resolvingLpMm;
+  near(at(0.030), 100 / 3, 1e-12, "the default criterion is about 33 lp/mm");
+  near(at(0.002), 500, 1e-12, "the tightest is 500 lp/mm");
+  near(at(0.200), 5, 1e-12, "the loosest is 5 lp/mm");
+  assert.ok(at(0.002) > at(0.030) && at(0.030) > at(0.200),
+    "a tighter criterion must read as MORE line pairs, not fewer");
+});

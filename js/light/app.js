@@ -1,12 +1,12 @@
 /* Page controller for the light simulator: scene state, the worker, the 3D
    view, the property panel, and the readouts. */
 
-import { createView } from "./view3d.js?v=7d7aad78";
-import { PRESETS, presetById } from "./presets.js?v=7d7aad78";
-import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=7d7aad78";
-import { viridis } from "./viridis.js?v=7d7aad78";
-import { stats } from "./stats.js?v=7d7aad78";
-import * as v from "./vec3.js?v=7d7aad78";
+import { createView } from "./view3d.js?v=82f4d047";
+import { PRESETS, presetById } from "./presets.js?v=82f4d047";
+import { parseScene, serializeScene, buildScene } from "./scenefile.js?v=82f4d047";
+import { viridis } from "./viridis.js?v=82f4d047";
+import { stats } from "./stats.js?v=82f4d047";
+import * as v from "./vec3.js?v=82f4d047";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -330,7 +330,7 @@ function buildPanel() {
 
   if (sel.kind === "light") {
     const l = state.desc.lights[sel.index];
-    panel.appendChild(el("h3", null, `Light ${sel.index + 1} — ${l.kind}`));
+    panel.appendChild(el("h3", null, `Light ${sel.index + 1}: ${l.kind}`));
     if (l.p) vecRow("position", l.p, () => view.placeLamp(sel.index, l));
     if (l.kind === "rect") {
       vecRow("half edge u", l.ex, () => view.placeLamp(sel.index, l));
@@ -390,7 +390,7 @@ function buildPanel() {
     panel.appendChild(del);
   } else {
     const p = state.desc.prims[sel.index];
-    panel.appendChild(el("h3", null, `Surface ${sel.index + 1} — ${p.kind}`));
+    panel.appendChild(el("h3", null, `Surface ${sel.index + 1}: ${p.kind}`));
     vecRow("centre", p.c);
     if (p.kind === "quad") { vecRow("normal", p.n); vecRow("half edge u", p.ex); vecRow("half edge v", p.ey); }
     if (p.kind === "plane") vecRow("normal", p.n);
@@ -648,7 +648,7 @@ async function main() {
     setToggle("#btn-units", state.photometric);
     /* No re-solve: both unit systems are dot products against the same rows. */
     repaint();
-    say(`showing ${state.photometric ? "illuminance in lux" : "irradiance in W·m⁻²"} — no re-solve needed`);
+    say(`showing ${state.photometric ? "illuminance in lux" : "irradiance in W·m⁻²"}, no re-solve needed`);
   });
   $("#btn-mode").addEventListener("click", () => {
     state.includeIndirect = !state.includeIndirect;
@@ -663,16 +663,16 @@ async function main() {
   $("#btn-fit").addEventListener("click", frameView);
   $("#btn-scene").addEventListener("click", () => {
     download("scene.scene", serializeScene(state.desc), "text/plain");
-    say("downloaded scene.scene — the C CLI reads it: ./lightsim grid scene.scene");
+    say("downloaded scene.scene; the C CLI reads it: ./lightsim grid scene.scene");
   });
   $("#btn-share").addEventListener("click", async () => {
     const url = location.origin + location.pathname + "#" + await encodeScene(serializeScene(state.desc));
     history.replaceState(null, "", url);
     try {
       await navigator.clipboard.writeText(url);
-      say("link copied — it carries the whole scene");
+      say("link copied; it carries the whole scene");
     } catch {
-      say("this page's address now holds the scene — copy it from the address bar");
+      say("this page's address now holds the scene; copy it from the address bar");
     }
   });
 
@@ -751,7 +751,7 @@ async function main() {
      about what the scene is doing. */
   const assistantHost = $("#assistant");
   if (assistantHost) {
-    import("./assistant.js?v=7d7aad78").then(({ mountAssistant }) => {
+    import("./assistant.js?v=82f4d047").then(({ mountAssistant }) => {
       const click = (sel) => $(sel).click();
       mountAssistant(assistantHost, {
         loadPreset(id) {
