@@ -276,7 +276,7 @@ export const PRESETS = [
     blurb: "The crank pin runs in a slot across a sliding yoke, so the yoke's travel is an exact sine of the crank angle.",
     gravity: false, build: scotchYoke },
   { id: "quick-return", name: "Whitworth quick return",
-    blurb: "A slotted lever pivoted off to one side, so the ram goes out slowly and comes back fast \u2014 a shaping machine's stroke.",
+    blurb: "A slotted lever pivoted off to one side, so the ram goes out slowly and comes back fast: a shaping machine's stroke.",
     gravity: false, build: quickReturn },
   { id: "scissor", name: "Scissor lift",
     blurb: "Crossed arms on a sliding foot, with the platform pinned at one top corner and sliding at the other.",
