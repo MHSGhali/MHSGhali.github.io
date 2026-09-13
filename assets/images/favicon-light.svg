@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="A lamp">
+  <!-- The light simulator's tab. Same theme-aware ink as favicon.svg, and the
+       same drawing as the homepage button that opens this page, so the icon a
+       visitor clicked and the icon in the tab strip are one mark. Authored in a
+       24 box rather than the site mark's 32 so it can BE that button's path,
+       unscaled; 2 here is the 2.6 there, at the same visual weight. -->
+  <style>
+    :root { --ink: #858585; }
+    @media (prefers-color-scheme: light) { :root { --ink: #131313; } }
+    @media (prefers-color-scheme: dark)  { :root { --ink: #ffffff; } }
+  </style>
+  <g fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 14c.2-1 .7-1.8 1.5-2.5A6 6 0 1 0 6 8c0 1.3.5 2.6 1.5 3.5.8.7 1.3 1.5 1.5 2.5"/>
+    <path d="M9 18h6M10 21.5h4"/>
+  </g>
+</svg>

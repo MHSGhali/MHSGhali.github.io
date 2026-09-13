@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="180" height="180" role="img" aria-label="A four-bar linkage">
+  <!-- The source of apple-touch-icon.png, which is what iOS saves a home-screen
+       bookmark as. Regenerate with:
+
+         rsvg-convert -w 180 -h 180 assets/images/apple-touch-icon.svg \
+           -o assets/images/apple-touch-icon.png
+
+       It is the site mark from favicon.svg with three differences, all forced by
+       where it ends up. The ground is PAINTED: iOS composites a home-screen icon
+       on nothing, and transparency there comes out black. The ink is fixed
+       rather than theme-aware, because the icon is a file the phone has already
+       saved and no media query reaches it; the dark ground is the site's own
+       default. And the mark is centred and inset, because it sits low in the
+       favicon's box: no one notices that at 16px and it reads as crooked at
+       180. (An XML comment cannot carry the dashes the rest of the site's prose
+       would use here.) -->
+  <rect width="32" height="32" fill="#0a0a0a"/>
+  <g transform="translate(16 16) scale(.86) translate(-16 -19.6)">
+    <g fill="none" stroke="#f5f5f5" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 24 L11 11 L24 15 L26 24"/>
+    </g>
+    <g fill="#f5f5f5">
+      <circle cx="11" cy="11" r="2.6"/>
+      <circle cx="24" cy="15" r="2.6"/>
+    </g>
+    <g fill="#a1a1a1">
+      <path d="M6 24 l-3.4 5 h6.8 z"/>
+      <path d="M26 24 l-3.4 5 h6.8 z"/>
+    </g>
+  </g>
+</svg>

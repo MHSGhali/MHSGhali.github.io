@@ -19,6 +19,7 @@ js/optics/            the lens, the camera and the renderer behind the optics pa
 js/chat/              the in-browser model, the command grammar and the panel
 sw.js                 the service worker that keeps the model resident
 partials/             nav and footer, stamped into pages by the build script
+assets/images/        one favicon per tool page, and the iOS touch icon
 scripts/build-site.py stamps the partials and versions every asset URL
 js/*/knowledge.js     what the assistant knows about each simulator
 js/linkage/generate.js  four-, six- and eight-bar linkages built to order
