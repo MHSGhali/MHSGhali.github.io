@@ -53,11 +53,11 @@
 
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
 
-import { pairExtent } from "./walker/jansen.js?v=3d923acb";
-import { sweptBox, fitCamera } from "./walker/framing.js?v=3d923acb";
-import * as RNG from "./light/rng.js?v=3d923acb";
+import { pairExtent } from "./walker/jansen.js?v=4c85dc67";
+import { sweptBox, fitCamera } from "./walker/framing.js?v=4c85dc67";
+import * as RNG from "./light/rng.js?v=4c85dc67";
 import { LAYOUT, PLANES, FRAMING, BUILD, buildCreature, advance, members }
-  from "./walker/creature.js?v=3d923acb";
+  from "./walker/creature.js?v=4c85dc67";
 
 const { LEG_SPACING } = LAYOUT;
 const WRAP = 4000;               /* invisible: the ground carries no features */

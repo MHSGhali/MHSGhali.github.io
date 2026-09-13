@@ -77,6 +77,47 @@
       targets.forEach(function (el) { io.observe(el); });
     }
 
+    // --- rotating call to action -----------------------------------------
+    /* The hero's primary button offers one of the three simulators at a time.
+       The href moves with the face on show, so a click always lands where the
+       label reads, and rotation HOLDS while the pointer is on the button, while
+       it has focus, while the tab is hidden and while it is scrolled out of
+       sight: nothing may change under someone who is about to click it, and
+       nothing should cycle where no one is looking. Under
+       prefers-reduced-motion it never rotates at all -- the markup's first face
+       and its href are already a working button, which is also what a visitor
+       without JavaScript gets. */
+    var cta = document.querySelector('[data-cta-rotate]');
+    var faces = cta ? cta.querySelectorAll('.cta-face') : [];
+    if (cta && faces.length > 1 && !reduce) {
+      var at = 0, held = false, onScreen = true;
+      var hold = function (state) { return function () { held = state; }; };
+      cta.addEventListener('pointerenter', hold(true));
+      cta.addEventListener('pointerleave', hold(false));
+      cta.addEventListener('focus', hold(true));
+      cta.addEventListener('blur', hold(false));
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+          onScreen = entries[entries.length - 1].isIntersecting;
+        }).observe(cta);
+      }
+      /* The face on show fades out before the next fades in, so for one fade
+         the label still being read is the OLD one -- and the href has to stay
+         with it until the new label has actually arrived. This is main.css's
+         .cta-face fade, in milliseconds; the two have to agree. */
+      var FADE = 280;
+      setInterval(function () {
+        if (held || !onScreen || document.hidden) return;
+        faces[at].setAttribute('aria-hidden', 'true');
+        at = (at + 1) % faces.length;
+        var next = faces[at];
+        next.removeAttribute('aria-hidden');
+        setTimeout(function () {
+          cta.setAttribute('href', next.getAttribute('data-cta-href'));
+        }, FADE);
+      }, 4200);
+    }
+
     // --- email links -----------------------------------------------------
     /* The address never appears in the served HTML: it is carried as two
        halves and joined here. That defeats the naive `mailto:` and plain-text

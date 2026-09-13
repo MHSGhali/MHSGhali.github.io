@@ -198,6 +198,37 @@ strong { color: var(--text); font-weight: 600; }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.08); border-color: var(--accent); }
 .btn svg { width: 15px; height: 15px; flex: none; }
 
+/* The rotating call to action. Its faces are stacked in ONE grid cell, so the
+   button is always as wide as the longest label and holds still while the
+   labels change -- a button that resized on every rotation would shove the one
+   beside it around and move its own hit area out from under the pointer.
+   Hidden faces keep that width because they are `visibility: hidden` rather
+   than display:none, which also takes them out of the accessible name, so the
+   button reads as the one simulator it is offering. The state lives in
+   aria-hidden rather than a class of its own: there is then no second source of
+   truth to leave the visible face out of step with what a screen reader is
+   given.
+
+   One face fades OUT and then the next fades IN, rather than the two
+   cross-fading: they share a cell, so overlapping fades would put two labels
+   on top of each other and read as a smear. The whole sequence is the delay on
+   the way in -- an arriving face waits out the departing one -- and the
+   departing face overrides it back to zero so it leaves at once. Visibility is
+   transitioned alongside opacity because it is special-cased to hold `visible`
+   for the whole of a transition either way, so a face stays on screen while it
+   fades out and is gone the instant it is clear. */
+.cta-rotate { display: inline-grid; align-items: center; justify-items: center; }
+.cta-face {
+  grid-area: 1 / 1;
+  display: inline-flex; align-items: center; gap: 9px;
+  transition: opacity .28s ease .28s, visibility .28s .28s;
+}
+.cta-face[aria-hidden="true"] {
+  opacity: 0; visibility: hidden;
+  transition-delay: 0s;
+}
+@media (prefers-reduced-motion: reduce) { .cta-face { transition: none; } }
+
 /* ---------- hero ---------- */
 /* Bottom padding is much smaller than the top's, and smaller than the section
    rhythm elsewhere, because the stat strip is already a hard-edged panel: it

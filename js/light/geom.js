@@ -5,8 +5,8 @@
    failure with no acceleration structure present can only be a BSDF, PDF or
    estimator bug. These scenes are a handful of primitives, so it stays fast. */
 
-import { PI } from "./core.js?v=3d923acb";
-import * as v from "./vec3.js?v=3d923acb";
+import { PI } from "./core.js?v=4c85dc67";
+import * as v from "./vec3.js?v=4c85dc67";
 
 export const SPHERE = "sphere";
 export const PLANE = "plane";   /* infinite plane through c with normal n */

@@ -25,8 +25,8 @@
    it -- so the background is the same engine as the tool, not a canned
    animation. The two agree to about 1e-7 of a link length over a revolution. */
 
-import * as M from "../linkage/mechanism.js?v=3d923acb";
-import * as S from "../linkage/solver.js?v=3d923acb";
+import * as M from "../linkage/mechanism.js?v=4c85dc67";
+import * as S from "../linkage/solver.js?v=4c85dc67";
 
 /* Thirteen lengths, but only six distinct ones.
 

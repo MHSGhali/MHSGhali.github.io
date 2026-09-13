@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="A camera">
+  <!-- The optics simulator's tab: a camera, which is what that page is, a lens
+       prescription traced onto a film plane. A lens cross-section was the
+       obvious mark and it is unreadable this small, a sliver two pixels wide.
+       Theme-aware ink and the button's own path, as in favicon-light.svg. -->
+  <style>
+    :root { --ink: #858585; }
+    @media (prefers-color-scheme: light) { :root { --ink: #131313; } }
+    @media (prefers-color-scheme: dark)  { :root { --ink: #ffffff; } }
+  </style>
+  <g fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14.5 4h-5L8 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-4z"/>
+    <circle cx="12" cy="13.5" r="3.5"/>
+  </g>
+</svg>
