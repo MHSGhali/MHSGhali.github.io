@@ -53,11 +53,11 @@
 
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
 
-import { pairExtent } from "./walker/jansen.js?v=4c85dc67";
-import { sweptBox, fitCamera } from "./walker/framing.js?v=4c85dc67";
-import * as RNG from "./light/rng.js?v=4c85dc67";
+import { pairExtent } from "./walker/jansen.js?v=b85a68ae";
+import { sweptBox, fitCamera } from "./walker/framing.js?v=b85a68ae";
+import * as RNG from "./light/rng.js?v=b85a68ae";
 import { LAYOUT, PLANES, FRAMING, BUILD, buildCreature, advance, members }
-  from "./walker/creature.js?v=4c85dc67";
+  from "./walker/creature.js?v=b85a68ae";
 
 const { LEG_SPACING } = LAYOUT;
 const WRAP = 4000;               /* invisible: the ground carries no features */
@@ -155,11 +155,20 @@ async function start(host) {
     return tex;
   }
 
+  /* Barely metallic, and that is a correction rather than a taste.
+
+     A metallic surface has NO diffuse colour: it shows the environment
+     instead, and there is no environment map in this scene. At metalness 0.7
+     the crank was throwing seven tenths of its albedo away in exchange for a
+     reflection of nothing, so it rendered near-black whatever colour it was
+     handed -- which is why the creature came out the same dark grey in both
+     themes while the palette underneath it was dutifully inverting. What is
+     left here is enough for a highlight to read along a bar and no more. */
   const mat = {
-    rod: new THREE.MeshStandardMaterial({ metalness: 0.5, roughness: 0.45 }),
-    crank: new THREE.MeshStandardMaterial({ metalness: 0.7, roughness: 0.3 }),
-    joint: new THREE.MeshStandardMaterial({ metalness: 0.3, roughness: 0.6 }),
-    frame: new THREE.MeshStandardMaterial({ metalness: 0.6, roughness: 0.35 }),
+    rod: new THREE.MeshStandardMaterial({ metalness: 0.12, roughness: 0.45 }),
+    crank: new THREE.MeshStandardMaterial({ metalness: 0.18, roughness: 0.3 }),
+    joint: new THREE.MeshStandardMaterial({ metalness: 0.1, roughness: 0.6 }),
+    frame: new THREE.MeshStandardMaterial({ metalness: 0.15, roughness: 0.35 }),
     stone: new THREE.MeshStandardMaterial({ metalness: 0.05, roughness: 0.95 }),
     ground: new THREE.MeshStandardMaterial({
       roughness: 1, metalness: 0, transparent: true, alphaMap: radialFade(),
@@ -304,34 +313,75 @@ async function start(host) {
   const tmpV3 = new THREE.Vector3();
   const eyeRel = new THREE.Vector3(), atRel = new THREE.Vector3();
 
+  /* Drawn in the page's own ink, and inverted with it: light on a dark page,
+     dark on a light one, exactly the way the linkage tool strokes a mechanism
+     in --text over --bg. On a 2D canvas that is free -- you name the stroke
+     colour and it is the colour you get. In a lit 3D scene the shading gets a
+     vote, and it was outvoting the palette: this creature came out the same
+     mid-dark grey in BOTH themes while the colours underneath it dutifully
+     swapped over. Two things were taking the inversion away.
+
+     THE METAL, which the material block above deals with.
+
+     THE AMBIENT, which is this. Albedo only reaches the eye where light does;
+     a face turned away from the key falls back on the ambient term alone. On a
+     dark page the creature has to stay lighter than the page EVERYWHERE,
+     including in its own shade, so the ambient has to carry most of the load
+     and the key is left to model the form -- a strong key over a weak ambient
+     gives a bright rim and a body that sinks into the background it is meant
+     to stand out from. On a light page the problem inverts and is much easier:
+     dark ink stays dark under any amount of light, so the key can be the
+     brighter of the two and the shadows stay worth having.
+
+     Which is why the light and dark branches here are not mirror images of one
+     another. The palette inverts; the lighting that keeps it readable does
+     not. */
   function applyTheme() {
     const cs = getComputedStyle(document.documentElement);
     const pick = (name, fallback) => cs.getPropertyValue(name).trim() || fallback;
     const light = document.documentElement.getAttribute("data-theme") === "light";
-    mat.rod.color.set(pick("--text-faint", "#858585"));
-    mat.crank.color.set(pick("--text", "#e9e9e9"));
-    mat.joint.color.set(pick("--text-dim", "#a1a1a1"));
+    /* The same four tokens the rest of the page writes its text in, so the
+       creature is drawn in the ink of whatever theme it finds itself in. */
+    const ink = pick("--text", light ? "#131313" : "#e9e9e9");
+    const inkDim = pick("--text-dim", light ? "#555555" : "#a1a1a1");
+    const inkFaint = pick("--text-faint", light ? "#6e6e6e" : "#858585");
+    /* The crank is the brightest thing on a dark page and the blackest on a
+       light one, because it is the part everything else is driven by. */
+    mat.crank.color.set(pick("--accent", light ? "#000000" : "#ffffff"));
+    mat.rod.color.set(ink);
+    mat.joint.color.set(inkDim);
     /* The frame reads as the heaviest thing on the creature, because it is the
        thing being carried. */
-    mat.frame.color.set(pick("--text-dim", "#a1a1a1"));
+    mat.frame.color.set(inkDim);
     /* The ground is drawn, not transparent: a shadow can only darken what is
        already there, and on a near-black page there is nothing to darken. */
-    /* The floor takes the PAGE's own background colour, not a raised surface
-       colour: it is lit, so whatever colour it is gets multiplied up by the key
-       light, and anything lighter than the page to begin with becomes a glare
-       behind the creature rather than a floor under it. Starting from the page
-       colour, the key lifts it just clear of the page and the shadow drops it
-       just below -- which is all a shadow on a near-black page can be. */
     /* Set between the floor and the rods: the stones have to be visible against
-       the ground without ever competing with the creature for attention. */
-    mat.stone.color.set(pick("--surface-line", light ? "#d8d8d8" : "#242424"));
-    mat.ground.color.set(pick("--bg", light ? "#ffffff" : "#0a0a0a"));
+       the ground without ever competing with the creature for attention. They
+       take the faintest of the ink tokens rather than the surface line they
+       used to, which was a near-invisible #e2e2e2 on a white page -- scenery
+       that only exists in one of the two themes is scenery that is not doing
+       its job, which is to prove the creature is moving. */
+    mat.stone.color.set(inkFaint);
+    /* The floor, unlike everything above it, does NOT invert: it is a surface
+       the page is seen through rather than a mark on the page, so it takes the
+       page's own background colour. It is lit, so whatever colour it starts at
+       gets multiplied up by the key; anything lighter than the page to begin
+       with becomes a glare behind the creature rather than a floor under it.
+       From the page colour, the key lifts it just clear of the page and the
+       shadow drops it just below -- which is all a shadow can be here. */
+    const bg = pick("--bg", light ? "#fbfbfb" : "#0a0a0a");
+    mat.ground.color.set(bg);
     /* The same colour the floor takes, and for the same reason: fog that is not
        the page's own colour reads as haze rather than as distance. */
-    scene.fog.color.set(pick("--bg", light ? "#ffffff" : "#0a0a0a"));
-    mat.ground.opacity = light ? 0.85 : 1;
-    ambient.intensity = light ? 0.5 : 0.4;
-    key.intensity = light ? 1.8 : 1.5;
+    scene.fog.color.set(bg);
+    /* Held down on a dark page. The floor is lit by the same ambient that is
+       holding the creature up, and at full strength that lifts a #0a0a0a plane
+       into a grey slab across the hero -- the very thing the radial fade
+       exists to prevent. */
+    mat.ground.opacity = light ? 0.85 : 0.55;
+    ambient.intensity = light ? 0.55 : 2.6;
+    key.intensity = light ? 2.2 : 1.1;
+    fill.intensity = light ? 0.7 : 0.35;
     draw();
   }
   applyTheme();

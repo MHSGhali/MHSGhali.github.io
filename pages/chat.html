@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="../css/main.css?v=4c85dc67">
+<link rel="stylesheet" href="../css/main.css?v=b85a68ae">
 <script>/* Runs before paint: marks JS alive so the reveal animation can hide
    things it will later show, and settles the theme so there is no flash. */
 document.documentElement.classList.add("js");
@@ -26,8 +26,8 @@ try{var t=localStorage.getItem("theme");
 /* No stored choice means the visitor has not chosen; follow the OS. */
 if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
 document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="../js/app.js?v=4c85dc67" defer></script>
-<script type="module" src="../js/chat/page.js?v=4c85dc67"></script>
+<script src="../js/app.js?v=b85a68ae" defer></script>
+<script type="module" src="../js/chat/page.js?v=b85a68ae"></script>
 </head>
 <body>
 <div class="sheen" aria-hidden="true"></div>
@@ -98,6 +98,45 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
       </div>
     </div>
   </details>
+
+  <!-- Every other tool page ends by tying the browser version back to the C
+       program it was ported from. This one has no C program behind it: what it
+       is a small version of is the platform I work on, so that is what this
+       says. It is deliberately visible rather than folded into a <details>,
+       because for the visitor most likely to be reading this page it is the
+       whole point of the page. -->
+  <p class="eyebrow" style="margin-top:52px">Why this is here</p>
+  <h2>The day job, at a scale of one.</h2>
+  <p style="max-width:70ch">I lead Tesla&rsquo;s internal GenAI platform: the inference gateway, the on-prem GPU fleet, the access-control plane, the cost attribution. None of it is something I can hand you a link to. This page is the same set of problems, one model and one GPU wide.</p>
+
+  <div class="grid grid-3" style="margin-top:26px">
+    <div>
+      <h3>One endpoint, several callers</h3>
+      <p class="panel-hint">This page and the three simulator panels all call one module, and none of them names a model. Swap what runs underneath and nothing above changes. That is what the gateway does at work, for every internal tool.</p>
+    </div>
+    <div>
+      <h3>Getting the weights resident</h3>
+      <p class="panel-hint">1.4&nbsp;GB, fetched once, held by a service worker so they survive a navigation, and warmed so your first question is not the slow one. Cold start and residency, on someone else&rsquo;s laptop.</p>
+    </div>
+    <div>
+      <h3>Fitting the model to the hardware</h3>
+      <p class="panel-hint">The candidate list is ordered by the memory each model needs, and a phone starts further down it. Every answer reports its own tokens per second. Benchmarking, minus the queue.</p>
+    </div>
+    <div>
+      <h3>Context is the bill</h3>
+      <p class="panel-hint">The whole prompt is prefilled on every message, so length is a per-message cost. Hence the resume is cut into sections and only the ones a question touches get sent. Metering, without the invoice.</p>
+    </div>
+    <div>
+      <h3>Policy before the GPU</h3>
+      <p class="panel-hint">Off-topic questions are refused before any inference, and commands run off a fixed grammar rather than the model&rsquo;s guess. Cheapest path first, which is most of what an access-control plane does.</p>
+    </div>
+    <div>
+      <h3>What does not carry over</h3>
+      <p class="panel-hint">One tenant, no queue, no rate card, nobody paged at 3am. One visitor on one GPU is the easy case of all of it.</p>
+    </div>
+  </div>
+
+  <p style="margin-top:32px;font-size:.9rem">The real numbers are on the <a href="../index.html#about">homepage</a> and in the <a href="../assets/files/MarkGerges.pdf">resume</a>. Or ask the model above, which has been told how this page relates to the work.</p>
 </section>
 </main>
 

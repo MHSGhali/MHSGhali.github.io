@@ -1,4 +1,4 @@
-import { makeRetriever, MARKDOWN } from "./retrieve.js?v=4c85dc67";
+import { makeRetriever, MARKDOWN } from "./retrieve.js?v=b85a68ae";
 
 /* ---------------------------------------------------------------
    Everything the in-browser model is told about Mark, and the rules
@@ -162,6 +162,29 @@ Mark's own desktop C programs, and both run entirely on the visitor's machine.
   ever pass through one another.
 - This chat runs a small quantized language model downloaded into the visitor's own browser and
   compiled to WebGPU shaders. Nothing they type is sent anywhere.
+
+## Why the Ask page exists, and how it relates to his day job
+The Ask page is a small version of the platform Mark builds at work, made out of parts he is free to
+give away. The same decisions turn up in both, at very different sizes.
+- One interface, several callers. This page and the panel on each simulator go through one module,
+  and not one of them names a model: which one loads is resolved at runtime from a ladder of six
+  candidates with a fallback transport underneath. At work the same contract lets every internal
+  tool call one endpoint without ever learning which provider answered.
+- Deployment. The 4-bit weights stream once, compile to WebGPU shaders, and are then held by a
+  service worker so they survive a navigation, with a warm-up generation so nobody waits for shader
+  compilation. Cold start, residency and eviction are what keeping a model live on a serving node
+  comes down to.
+- Capacity. The ladder is ordered by the memory each model needs, a phone starts further down it,
+  and every answer reports its own token count and speed. It is his capacity work with the hard part
+  removed: one request at a time, so nothing here measures a queue.
+- What things cost. The runtime prefills the whole prompt on every message, so prompt length is a
+  per-message price. That is why this profile is cut into sections and only the two or three a
+  question touches are sent. Charging each team for what it used is the same arithmetic with an
+  invoice attached.
+- Access control. Off-topic questions are refused before any inference happens, and commands are
+  matched against a fixed grammar rather than guessed at. Deciding what is allowed, on the cheapest
+  path available, is most of what an access-control plane does.
+One visitor on one GPU is the easy case of all of it: no tenants, no queue, no rate card, no bill.
 `.trim();
 
 /* What the assistant can do to the simulators, in the words a visitor would
@@ -247,6 +270,7 @@ export const SUGGESTIONS = {
     "Walk me through the LLM gateway",
     "How did he get from hardware into infrastructure?",
     "What is the benchmarking harness for?",
+    "How does this page relate to his day job?",
     "Tell me about the patent",
     "Open the linkage simulator with a Hoeken",
     "Open the optics simulator with the depth rail",
@@ -310,6 +334,13 @@ const retriever = makeRetriever({
     [/\b(patent|publication|paper|ieee|mecc|illuminance)\b/i, "Patent and publications"],
     [/\b(degree|school|university|masters?|bachelors?|thesis|stud(?:y|ied|ies|ying)|education|graduat\w*|uw|cairo)\b/i, "Education"],
     [/\b(skills?|stack|tools?|languages?|frameworks?|kubernetes|python|go\b)\b/i, "Technical skills"],
+    /* "How does any of this relate to the job?" names the subject with none of
+       the section's own words, and the words it does use (relate, connection,
+       day job) appear nowhere else in the profile. Deliberately NOT triggered
+       by "gateway" or "job" alone: those belong to the Tesla role section, and
+       "walk me through the LLM gateway" must keep landing there. */
+    [/\b(relates?|related|relation|relevan\w*|connection|parallel|day job|have to do with|why (?:does|is) (?:this|the) (?:page|chat|site))\b/i,
+     "Why the Ask page exists, and how it relates to his day job"],
   ],
 
   /* Roughly 1000 tokens of profile per request: two or three sections, which is

@@ -31,7 +31,7 @@
      is written here and why lens.build() checks the paraxial focal length
      against the design value before it will hand back a lens. */
 
-import * as G from "./glass.js?v=4c85dc67";
+import * as G from "./glass.js?v=b85a68ae";
 
 export const MAX_SURF = 24;
 

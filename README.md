@@ -26,7 +26,15 @@ js/linkage/generate.js  four-, six- and eight-bar linkages built to order
 tests/                the engines' regression tests, the hero's camera framing,
                       the assistant's grammar and gate, and what keeps its
                       prompts from drifting out of step with the code
+docs/                 one reference file per page and per subsystem
+CLAUDE.md             where to start before changing anything
 ```
+
+This README is the narrative: what was tried, and why it changed. `docs/` is the
+reference that goes with it, one file per page or subsystem, indexed in
+`docs/README.md`. If you are about to edit something, `CLAUDE.md` is the shorter
+and more urgent read: it has the two commands that must be run and the handful of
+things that will bite you.
 
 ## The linkage simulator
 
@@ -476,6 +484,9 @@ python3 scripts/build-site.py --check    # non-zero if anything is stale
 node --test tests/*.mjs                  # engines, hero framing, chat grammar
 python3 -m http.server 8000              # then open http://localhost:8000
 ```
+
+`docs/build-and-test.md` covers all of this in more detail, including what each
+test file is for and what to do when adding a page.
 
 The build script must be run after any CSS or JS change: it hashes those files
 and stamps the hash onto every asset URL, including the ES-module specifiers the
