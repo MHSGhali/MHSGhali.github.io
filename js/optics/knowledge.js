@@ -15,7 +15,7 @@
    No DOM in here, so the tests can import it under node.
    --------------------------------------------------------------- */
 
-import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=4c85dc67";
+import { makeRetriever, CHEVRON } from "../chat/retrieve.js?v=b85a68ae";
 
 export const VOCABULARY = [
   "load the depth rail",

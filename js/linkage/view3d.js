@@ -18,8 +18,8 @@
 const THREE_URL = "three";
 const CONTROLS_URL = "three/addons/controls/OrbitControls.js";
 
-import { bounds as mechanismBounds, liveSliders } from "./mechanism.js?v=4c85dc67";
-import { createViewControl } from "../viewcontrol.js?v=4c85dc67";
+import { bounds as mechanismBounds, liveSliders } from "./mechanism.js?v=b85a68ae";
+import { createViewControl } from "../viewcontrol.js?v=b85a68ae";
 
 export async function createView3D(container, getMechanism) {
   let THREE, OrbitControls;
