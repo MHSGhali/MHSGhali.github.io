@@ -19,7 +19,7 @@
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="css/main.css?v=3d923acb">
+<link rel="stylesheet" href="css/main.css?v=4c85dc67">
 <script>/* Runs before paint: marks JS alive so the reveal animation can hide
    things it will later show, and settles the theme so there is no flash. */
 document.documentElement.classList.add("js");
@@ -27,8 +27,8 @@ try{var t=localStorage.getItem("theme");
 /* No stored choice means the visitor has not chosen; follow the OS. */
 if(t==="light"||(!t&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches))
 document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
-<script src="js/app.js?v=3d923acb" defer></script>
-<script type="module" src="js/hero-walkers.js?v=3d923acb"></script>
+<script src="js/app.js?v=4c85dc67" defer></script>
+<script type="module" src="js/hero-walkers.js?v=4c85dc67"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -93,9 +93,26 @@ document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
       <p class="hero-role">Staff Software Engineer, AI Platform<span class="sep">/</span>M.S. Controls &amp; Robotics</p>
       <p class="lead">I lead Tesla's internal Generative AI platform: the multi-provider LLM gateway, the on-prem GPU fleet, the access-control plane, and the cost-attribution pipeline that teams across the company build on, including the systems serving external customers on Tesla.com. I came to infrastructure through hardware: three years of computer vision and opto-electro-mechanical inspection, and six years of cost, schedule, and risk on Gulf oil and gas capital projects before that.</p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="pages/linkage.html">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="9" cy="6" r="2"/><path d="M5 19 9 6l8 5-2 8"/></svg>
-          Try the linkage simulator
+        <!-- One button for three simulators: it names one at a time and app.js
+             rotates the faces, carrying the href with whichever is on show, so a
+             click always lands where the label reads. All three sit in one grid
+             cell, so the button is as wide as the longest label and never
+             resizes under the pointer. Without JavaScript nothing rotates and
+             the first face stands on its own -- the href in the markup already
+             points at it. -->
+        <a class="btn btn-primary cta-rotate" href="pages/linkage.html" data-cta-rotate>
+          <span class="cta-face" data-cta-href="pages/linkage.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="9" cy="6" r="2"/><path d="M5 19 9 6l8 5-2 8"/></svg>
+            Try the linkage simulator
+          </span>
+          <span class="cta-face" data-cta-href="pages/light.html" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.8 1.5-2.5A6 6 0 1 0 6 8c0 1.3.5 2.6 1.5 3.5.8.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6M10 21.5h4"/></svg>
+            Try the light simulator
+          </span>
+          <span class="cta-face" data-cta-href="pages/optics.html" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+            Try the optics simulator
+          </span>
         </a>
         <a class="btn" href="assets/files/MarkGerges.pdf" download>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>

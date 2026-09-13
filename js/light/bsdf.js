@@ -12,9 +12,9 @@
        alpha = roughness^2 remapping is an artist convention and belongs in a
        scene parser, not in the physics. */
 
-import { PI, INV_PI, clamp } from "./core.js?v=3d923acb";
-import * as v from "./vec3.js?v=3d923acb";
-import * as S from "./spectrum.js?v=3d923acb";
+import { PI, INV_PI, clamp } from "./core.js?v=4c85dc67";
+import * as v from "./vec3.js?v=4c85dc67";
+import * as S from "./spectrum.js?v=4c85dc67";
 
 export const LAMBERT = "lambert";
 export const CONDUCTOR = "conductor";

@@ -27,9 +27,9 @@
    looks right, and the two rows push forwards and backwards in equal measure
    and the creature stands still on the spot. */
 
-import * as S from "../linkage/solver.js?v=3d923acb";
-import { buildLeg, pairExtent, inStance } from "./jansen.js?v=3d923acb";
-import * as B from "./body.js?v=3d923acb";
+import * as S from "../linkage/solver.js?v=4c85dc67";
+import { buildLeg, pairExtent, inStance } from "./jansen.js?v=4c85dc67";
+import * as B from "./body.js?v=4c85dc67";
 
 export const LAYOUT = {
   PINS: 2,               /* each carrying a mirrored pair, so four legs */

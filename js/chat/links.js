@@ -5,7 +5,7 @@
    right tool with the right thing already loaded, rather than telling them to
    go and find it. */
 
-import { LINKAGE_PRESETS, LIGHT_PRESETS, OPTICS_PRESETS } from "./commands.js?v=3d923acb";
+import { LINKAGE_PRESETS, LIGHT_PRESETS, OPTICS_PRESETS } from "./commands.js?v=4c85dc67";
 
 /* Resolved against this module's own URL rather than the document's, so the
    link is right wherever the controller is mounted from. A relative path here
